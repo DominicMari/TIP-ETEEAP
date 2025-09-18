@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 
@@ -8,79 +8,91 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-interface Admin {
-  id: string;
-  name: string;
-  email: string;
-  password: string; // ideally hashed and not handled directly here
-}
-
-export default function AdminPage() {
+export default function AdminAuth() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [admins, setAdmins] = useState<Admin[]>([]);
-  const router = useRouter();
+  const [authMode, setAuthMode] = useState<"login" | "register">("register");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // Fetch all admins for display (optional - remove if not needed)
-  useEffect(() => {
-    async function fetchAdmins() {
-      const { data, error } = await supabase.from<Admin>("admin").select("*");
-      if (error) {
-        console.error("Failed to fetch admins:", error.message);
-      } else if (data) {
-        setAdmins(data);
-      }
-    }
-    fetchAdmins();
-  }, []);
+  const router = useRouter();
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password) {
-      alert("Please enter email and password.");
+    setErrorMessage("");
+
+    if (!email || !password || (authMode === "register" && !name)) {
+      setErrorMessage("Please fill in all required fields.");
       return;
     }
 
-    if (authMode === "login") {
-      // Login: Check if email and password match an admin
-      const { data, error } = await supabase
-        .from<Admin>("admin")
-        .select("*")
-        .eq("email", email)
-        .eq("password", password) // ⚠️ Use hashing in production
-        .single();
+    setLoading(true);
 
-      if (error || !data) {
-        alert("Invalid admin credentials.");
+    try {
+      if (authMode === "login") {
+        // Login using Supabase Auth
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error || !data.session) {
+          setErrorMessage("Invalid credentials. Please try again.");
+          setLoading(false);
+          return;
+        }
+
+        router.replace("/admin/dashboard");
       } else {
-        router.push("/admin/dashboard");
-      }
-    } else {
-      // Register: Insert new admin with name, email, password
-      if (!name) {
-        alert("Please enter your name to register.");
-        return;
-      }
-      const { error } = await supabase.from("admin").insert([
-        {
+        // Register
+
+        // 1. Create user with Supabase Auth
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: name },
+          },
+        });
+
+        if (error || !data.user) {
+          setErrorMessage(error?.message ?? "Failed to register.");
+          setLoading(false);
+          return;
+        }
+
+        // 2. Insert into admin table with id matching auth user id
+        const { error: profileError } = await supabase.from("admin").insert({
+          id: data.user.id, // FK to auth.users.id
           name,
           email,
-          password, // ⚠️ Use hashed passwords in production
-        },
-      ]);
-      if (error) {
-        console.error("Error registering admin:", error.message);
-        alert("Failed to register admin: " + error.message);
-      } else {
-        alert("Admin registered successfully! You can now log in.");
-        setAuthMode("login");
-        // Clear form
-        setName("");
-        setEmail("");
-        setPassword("");
+        });
+
+        if (profileError) {
+          setErrorMessage("Failed to save profile: " + profileError.message);
+          setLoading(false);
+          return;
+        }
+
+        // 3. Auto-login after registration
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (loginError) {
+          setErrorMessage(
+            "Registration successful, but auto-login failed. Please login manually."
+          );
+          setLoading(false);
+          return;
+        }
+
+        router.replace("/admin/dashboard");
       }
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -91,6 +103,7 @@ export default function AdminPage() {
           <img src="/assets/TIPLogo.png" alt="TIP Logo" className="w-8 h-8" />
           {authMode === "login" ? "Admin Login" : "Admin Register"}
         </h1>
+
         <form onSubmit={handleAuth} className="flex flex-col">
           {authMode === "register" && (
             <input
@@ -99,6 +112,7 @@ export default function AdminPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full mb-4 p-3 border rounded-lg text-black focus:ring focus:ring-yellow-300"
+              required
             />
           )}
           <input
@@ -107,6 +121,7 @@ export default function AdminPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full mb-4 p-3 border rounded-lg text-black focus:ring focus:ring-yellow-300"
+            required
           />
           <input
             type="password"
@@ -114,26 +129,34 @@ export default function AdminPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full mb-6 p-3 border rounded-lg text-black focus:ring focus:ring-yellow-300"
+            required
           />
+          {errorMessage && <p className="text-red-600 mb-4">{errorMessage}</p>}
           <button
             type="submit"
-            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg mb-4 transition"
+            disabled={loading}
+            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg mb-4 transition disabled:opacity-50"
           >
-            {authMode === "login" ? "Login" : "Register"}
+            {loading
+              ? "Please wait..."
+              : authMode === "login"
+              ? "Login"
+              : "Register"}
           </button>
         </form>
+
         <p className="text-sm text-center">
           {authMode === "login" ? "Don’t have an account?" : "Already registered?"}{" "}
           <button
-            onClick={() =>
-              setAuthMode(authMode === "login" ? "register" : "login")
-            }
+            onClick={() => {
+              setAuthMode(authMode === "login" ? "register" : "login");
+              setErrorMessage("");
+            }}
             className="text-yellow-600 font-semibold hover:underline"
           >
             {authMode === "login" ? "Register here" : "Login here"}
           </button>
         </p>
-
       </div>
     </div>
   );

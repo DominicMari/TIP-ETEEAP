@@ -34,48 +34,32 @@ export default function Page() {
     ],
   };
 
-  // Upsert user info when session changes
+  // Save user info in Supabase when logged in
   useEffect(() => {
-  const saveUser = async () => {
-    if (session?.user && session.user.email) {
-      // Optional: add a tiny delay for auth to “settle”
-      await new Promise((r) => setTimeout(r, 200));
-
-      try {
-        const { data, error } = await supabase
-          .from("users")
-          .upsert(
-            [
-              {
-                name: session.user.name || "Unknown",
+    async function saveUser() {
+      if (session?.user && session.user.email) {
+        try {
+          await supabase
+            .from("users")
+            .upsert(
+              [{
+                id: session.user.id,
                 email: session.user.email,
+                name: session.user.name || session.user.user_metadata?.full_name || "Unknown",
                 date_logged_in: new Date().toISOString(),
-              },
-            ],
-            { onConflict: "email" }
-          )
-          .select();
-
-        if (error) {
-          console.error("Supabase upsert error:", {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code,
-          });
-        } else {
-          console.log("User upsert successful:", data);
+              }],
+              { onConflict: "id" }
+            );
+        } catch (err) {
+          console.error("Error saving user login:", err);
         }
-      } catch (err) {
-        console.error("Error saving user:", err);
       }
     }
-  };
 
-  saveUser();
-}, [session]);
+    saveUser();
+  }, [session]);
 
-
+  // Handle Application Form click
   function handleApplicationClick() {
     if (session) {
       window.location.href = "/appform";
@@ -86,6 +70,7 @@ export default function Page() {
     }
   }
 
+  // Handle Portfolio Form click
   function handlePortfolioClick() {
     if (session) {
       window.location.href = "/portform";
@@ -276,25 +261,4 @@ export default function Page() {
       <Footer />
     </div>
   );
-
-  // Handlers outside return statement
-  function handleApplicationClick() {
-    if (session) {
-      window.location.href = "/appform";
-    } else {
-      setModalType("application");
-      setCurrentImage(0);
-      setShowModal(true);
-    }
-  }
-
-  function handlePortfolioClick() {
-    if (session) {
-      window.location.href = "/portform";
-    } else {
-      setModalType("portfolio");
-      setCurrentImage(0);
-      setShowModal(true);
-    }
-  }
 }
