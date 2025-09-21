@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import Image from "next/image";
 import { useSession, signIn, signOut } from "next-auth/react";
 
 export default function Header() {
@@ -30,13 +31,16 @@ export default function Header() {
       <div>
         {session ? (
           <div className="flex items-center gap-3">
-            <img
+            <Image
               src={session.user?.image || "/assets/default-avatar.png"}
-              alt="User"
-              className="w-8 h-8 rounded-full border-2 border-yellow-400"
+              alt="User Profile"
+              width={32}
+              height={32}
+              className="rounded-full border-2 border-yellow-400 object-cover"
+              priority={true} // optional: load eagerly as this is UI important
             />
             <button
-              onClick={() => signOut()}
+              onClick={() => signOut({ callbackUrl: "/" })}
               className="bg-yellow-400 text-black font-semibold py-1 px-3 rounded-lg hover:bg-yellow-300 transition"
             >
               Logout
