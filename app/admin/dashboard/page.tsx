@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import AdminManagement from "./adminmanage";
 import UserManage from "./usermanage";
+import ApplicantsManage from "./applicantsmanage"; // ✅ 1. Import the new component
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -15,7 +16,8 @@ export default function DashboardPage() {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"Home" | "Dashboard" | "AdminManagement">("Home");
+  // ✅ 2. Add "Applicants" to the list of possible active tabs
+  const [activeTab, setActiveTab] = useState<"Home" | "UsersLogins" | "Applicants" | "AdminManagement">("Home");
 
   useEffect(() => {
     const checkSession = async () => {
@@ -73,13 +75,24 @@ export default function DashboardPage() {
             Home
           </button>
           <button
-            onClick={() => setActiveTab("Dashboard")}
+            onClick={() => setActiveTab("UsersLogins")}
             className={`text-left px-3 py-2 rounded hover:bg-yellow-200 ${
-              activeTab === "Dashboard" ? "bg-yellow-200 font-semibold" : ""
+              activeTab === "UsersLogins" ? "bg-yellow-200 font-semibold" : ""
             }`}
           >
             Users Logins
           </button>
+          
+          {/* ✅ 3. Add the new "Applicants" button to the sidebar */}
+          <button
+            onClick={() => setActiveTab("Applicants")}
+            className={`text-left px-3 py-2 rounded hover:bg-yellow-200 ${
+              activeTab === "Applicants" ? "bg-yellow-200 font-semibold" : ""
+            }`}
+          >
+            Applicants
+          </button>
+
           <button
             onClick={() => setActiveTab("AdminManagement")}
             className={`text-left px-3 py-2 rounded hover:bg-yellow-200 ${
@@ -105,7 +118,11 @@ export default function DashboardPage() {
             <p className="text-black mt-4">Select a tab to manage Users or Admin settings.</p>
           </div>
         )}
-        {activeTab === "Dashboard" && <UserManage />}
+        {activeTab === "UsersLogins" && <UserManage />}
+        
+        {/* ✅ 4. Add the rendering logic for the new component */}
+        {activeTab === "Applicants" && <ApplicantsManage />}
+
         {activeTab === "AdminManagement" && (
           <AdminManagement currentUserEmail={currentUser?.email ?? null} />
         )}
