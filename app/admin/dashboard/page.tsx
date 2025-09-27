@@ -1,3 +1,5 @@
+// app/admin/dashboard/DashboardPage.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,38 +7,35 @@ import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import AdminManagement from "./adminmanage";
 import UserManage from "./usermanage";
-import ApplicantsManage from "./applicantsmanage"; // ✅ 1. Import the new component
+import ApplicantsManage from "./applicantsmanage";
+import UserLoginsManage from "./userlogins";
+import { GoogleUser } from "./page";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export default function DashboardPage() {
+export default function DashboardPage({ initialGoogleUsers }: { initialGoogleUsers: GoogleUser[] }) {
   const router = useRouter();
-
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  // ✅ 2. Add "Applicants" to the list of possible active tabs
-  const [activeTab, setActiveTab] = useState<"Home" | "UsersLogins" | "Applicants" | "AdminManagement">("Home");
+  
+  // ✅ FIX: Corrected the activeTab state to have unique names for each tab.
+  const [activeTab, setActiveTab] = useState<"Home" | "AdminLogins" | "Applicants" | "UserLogins" | "AdminManagement">("Home");
 
   useEffect(() => {
     const checkSession = async () => {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
-
-      if (error || !session) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         router.replace("/admin");
         return;
       }
       setCurrentUser(session.user);
       setLoading(false);
     };
-
     checkSession();
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         router.replace("/admin");
       } else {
@@ -44,7 +43,9 @@ export default function DashboardPage() {
       }
     });
 
-    return () => subscription?.subscription?.unsubscribe?.();
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
   }, [router]);
 
   async function handleLogout() {
@@ -62,7 +63,6 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen bg-white text-yellow-400 font-sans">
-      {/* Sidebar */}
       <aside className="w-64 bg-gray-100 border-r border-yellow-400 p-6 flex flex-col">
         <h2 className="text-2xl font-bold mb-6 text-black">Admin Panel</h2>
         <nav className="flex flex-col gap-3 text-black">
@@ -75,15 +75,13 @@ export default function DashboardPage() {
             Home
           </button>
           <button
-            onClick={() => setActiveTab("UsersLogins")}
+            onClick={() => setActiveTab("AdminLogins")} // ✅ FIX: Sets "AdminLogins" state
             className={`text-left px-3 py-2 rounded hover:bg-yellow-200 ${
-              activeTab === "UsersLogins" ? "bg-yellow-200 font-semibold" : ""
+              activeTab === "AdminLogins" ? "bg-yellow-200 font-semibold" : ""
             }`}
           >
-            Users Logins
+            Admin Logins
           </button>
-          
-          {/* ✅ 3. Add the new "Applicants" button to the sidebar */}
           <button
             onClick={() => setActiveTab("Applicants")}
             className={`text-left px-3 py-2 rounded hover:bg-yellow-200 ${
@@ -92,7 +90,14 @@ export default function DashboardPage() {
           >
             Applicants
           </button>
-
+          <button
+            onClick={() => setActiveTab("UserLogins")} // ✅ FIX: Sets "UserLogins" state
+            className={`text-left px-3 py-2 rounded hover:bg-yellow-200 ${
+              activeTab === "UserLogins" ? "bg-yellow-200 font-semibold" : ""
+            }`}
+          >
+            User Logins
+          </button>
           <button
             onClick={() => setActiveTab("AdminManagement")}
             className={`text-left px-3 py-2 rounded hover:bg-yellow-200 ${
@@ -110,7 +115,6 @@ export default function DashboardPage() {
         </nav>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto space-y-8">
         {activeTab === "Home" && (
           <div>
@@ -118,11 +122,11 @@ export default function DashboardPage() {
             <p className="text-black mt-4">Select a tab to manage Users or Admin settings.</p>
           </div>
         )}
-        {activeTab === "UsersLogins" && <UserManage />}
-        
-        {/* ✅ 4. Add the rendering logic for the new component */}
+        {activeTab === "AdminLogins" && <UserManage />} 
         {activeTab === "Applicants" && <ApplicantsManage />}
-
+        
+        {activeTab === "UserLogins" && <UserLoginsManage users={initialGoogleUsers} />}
+        
         {activeTab === "AdminManagement" && (
           <AdminManagement currentUserEmail={currentUser?.email ?? null} />
         )}

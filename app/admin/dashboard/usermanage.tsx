@@ -73,7 +73,7 @@ export default function UserManage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-black">Users Logins</h2>
+      <h2 className="text-2xl font-semibold text-black">Admin Logins</h2>
       <div className="text-sm text-gray-600 mb-4">Total Logins: {logs.length}</div>
       <div className="overflow-x-auto">
         <table className="min-w-full bg-gray-50 border border-yellow-400 rounded-xl overflow-hidden shadow-md">
