@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface AdminProfile {
-  id: string; // Corresponds to auth user id
+  id: string;
   name: string | null;
   email: string | null;
-  password: string | null;
 }
 
 export default function AdminManagement() {
@@ -25,6 +25,7 @@ export default function AdminManagement() {
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   const fetchAdmins = async () => {
     setLoading(true);
@@ -34,12 +35,12 @@ export default function AdminManagement() {
         console.error("Error fetching admins:", error.message);
         setAdmins([]);
       } else {
-        setAdmins(data as AdminProfile[]);
-        if (data && data.length > 0 && !selectedAdmin) {
-          setSelectedAdmin(data[0]);
-          setNewName(data[0].name ?? "");
-          setNewEmail(data[0].email ?? "");
-          setNewPassword(data[0].password ?? "");
+        const adminData = data as AdminProfile[];
+        setAdmins(adminData);
+        if (adminData && adminData.length > 0 && !selectedAdmin) {
+          setSelectedAdmin(adminData[0]);
+          setNewName(adminData[0].name ?? "");
+          setNewEmail(adminData[0].email ?? "");
         }
       }
     } catch (err) {
@@ -54,55 +55,89 @@ export default function AdminManagement() {
     fetchAdmins();
   }, []);
 
+  const validatePassword = (password: string) => {
+    if (!password) {
+        return "";
+    }
+    if (password.length < 8) {
+      return "Password must be at least 8 characters long.";
+    }
+    if (!/[A-Z]/.test(password)) {
+      return "Password must contain an uppercase letter.";
+    }
+    if (!/[a-z]/.test(password)) {
+      return "Password must contain a lowercase letter.";
+    }
+    if (!/\d/.test(password)) {
+      return "Password must contain a number.";
+    }
+    if (!/[!@#$%^&*]/.test(password)) {
+      return "Password must contain a special character (e.g., !@#$%).";
+    }
+    return "";
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const password = e.target.value;
+    setNewPassword(password);
+    setPasswordError(validatePassword(password));
+  };
+
   const selectAdmin = (admin: AdminProfile) => {
     setSelectedAdmin(admin);
     setEditing(false);
     setNewName(admin.name ?? "");
     setNewEmail(admin.email ?? "");
-    setNewPassword(admin.password ?? "");
+    setNewPassword("");
+    setPasswordError("");
   };
 
   const saveAdminInfo = async () => {
-  if (!selectedAdmin) return;
-  setLoading(true);
-  try {
-    // Update name and email in admin table
-    const { error: profileError } = await supabase
-      .from("admin")
-      .update({ name: newName, email: newEmail })
-      .eq("id", selectedAdmin.id);
-
-    if (profileError) {
-      alert("Failed to update profile: " + profileError.message);
-      setLoading(false);
+    if (!selectedAdmin) return;
+    
+    if (newPassword.trim() && passwordError) {
+      alert("Please fix the password errors before saving.");
       return;
     }
 
-    // Update password via Supabase Auth for currently authenticated user only
-    const user = supabase.auth.getUser();
-    if (newPassword.trim() && user?.data.user?.id === selectedAdmin.id) {
-      const { data, error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (error) {
-        alert("Failed to update password: " + error.message);
-        setLoading(false);
-        return;
+    setLoading(true);
+    try {
+      const { error: profileError } = await supabase
+        .from("admin")
+        .update({ name: newName, email: newEmail })
+        .eq("id", selectedAdmin.id);
+
+      if (profileError) {
+        throw new Error("Failed to update profile: " + profileError.message);
       }
+      
+      if (newPassword.trim()) {
+        const response = await fetch('/api/update-admin-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: selectedAdmin.id,
+            newPassword: newPassword,
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to update password.');
+        }
+      }
+
+      alert("Admin updated successfully.");
+      setEditing(false);
+      setNewPassword("");
+      fetchAdmins();
+
+    } catch (err) {
+      console.error("Error updating admin:", err);
+      alert((err as Error).message);
+    } finally {
+      setLoading(false);
     }
-
-    alert("Admin updated successfully.");
-    setEditing(false);
-    fetchAdmins();
-    setNewPassword("");
-  } catch (err) {
-    console.error("Unexpected error updating admin info:", err);
-    alert("Unexpected error: " + (err as Error).message);
-  } finally {
-    setLoading(false);
-  }
-}
-
+  };
 
   const deleteAdmin = async () => {
     if (!selectedAdmin) return;
@@ -110,7 +145,6 @@ export default function AdminManagement() {
     try {
       const { error } = await supabase.from("admin").delete().eq("id", selectedAdmin.id);
       if (error) {
-        console.error("Error deleting admin profile:", error);
         alert("Failed to delete admin.");
       } else {
         alert("Admin deleted successfully.");
@@ -119,7 +153,6 @@ export default function AdminManagement() {
         fetchAdmins();
       }
     } catch (err) {
-      console.error("Unexpected error deleting admin:", err);
       alert("Unexpected error deleting admin.");
     } finally {
       setLoading(false);
@@ -133,119 +166,73 @@ export default function AdminManagement() {
   return (
     <div>
       <h2 className="text-2xl font-semibold text-black mb-4">Admin Management</h2>
-
       <div className="flex gap-4">
         <div className="w-1/3 overflow-auto max-h-[400px] border border-gray-300 rounded p-2 bg-gray-50">
-          <h3 className="font-semibold mb-2">All Admins</h3>
-          {admins.length === 0 ? (
-            <p>No admins found.</p>
-          ) : (
-            admins.map((admin) => (
-              <div
-                key={admin.id}
-                className={`cursor-pointer p-2 rounded ${
-                  selectedAdmin?.id === admin.id ? "bg-yellow-200 font-semibold" : ""
-                }`}
-                onClick={() => selectAdmin(admin)}
-              >
-                {admin.name ?? "-"} ({admin.email ?? "-"})
-              </div>
-            ))
-          )}
+          <h3 className="font-semibold mb-2 text-black">All Admins</h3>
+          {admins.map((admin) => (
+            <div
+              key={admin.id}
+              className={`cursor-pointer p-2 rounded text-black ${
+                selectedAdmin?.id === admin.id ? "bg-yellow-200 font-semibold" : ""
+              }`}
+              onClick={() => selectAdmin(admin)}
+            >
+              {admin.name ?? "-"} ({admin.email ?? "-"})
+            </div>
+          ))}
         </div>
 
         <div className="flex-1 bg-gray-50 p-6 rounded-xl border border-yellow-400 shadow-md text-black">
           {selectedAdmin ? (
             <>
-              <p>
+              <div className="mb-2">
                 <strong>Name:</strong>{" "}
                 {!editing ? (
                   <>
                     {newName ?? "-"}{" "}
-                    <button
-                      onClick={() => setEditing(true)}
-                      className="ml-2 text-yellow-500 hover:text-yellow-700"
-                      title="Edit"
-                    >
-                      ✏️
-                    </button>
+                    <button onClick={() => setEditing(true)} className="ml-2 text-yellow-500 hover:text-yellow-700" title="Edit">✏️</button>
                   </>
                 ) : (
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="border border-gray-400 rounded px-2 py-1 text-black"
-                  />
+                  <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="border border-gray-400 rounded px-2 py-1 text-black" />
                 )}
-              </p>
-              <p>
+              </div>
+              <div className="mb-2">
                 <strong>Email:</strong>{" "}
                 {!editing ? (
                   newEmail ?? "-"
                 ) : (
-                  <input
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="border border-gray-400 rounded px-2 py-1 text-black"
-                  />
+                  <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="border border-gray-400 rounded px-2 py-1 text-black" />
                 )}
-              </p>
+              </div>
+
               <div>
                 <strong>Password:</strong>{" "}
                 {!editing ? (
-                  "*".repeat(newPassword?.length || 8)
+                  "************"
                 ) : (
                   <div className="relative inline-block">
                     <input
                       type={showPassword ? "text" : "password"}
                       value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
+                      onChange={handlePasswordChange}
+                      placeholder="Enter new password to change"
                       className="border border-gray-400 rounded px-2 py-1 pr-10 text-black"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-700 hover:text-gray-900"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-700 hover:text-gray-900">
                       {showPassword ? <FaEyeSlash /> : <FaEye />}
                     </button>
                   </div>
                 )}
+                {passwordError && editing && (
+                  <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+                )}
               </div>
+
               {editing && (
                 <div className="mt-4 space-x-2">
-                  <button
-                    onClick={saveAdminInfo}
-                    className="px-4 py-2 bg-yellow-400 text-black rounded hover:bg-yellow-500"
-                    disabled={loading}
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditing(false);
-                      if (selectedAdmin) {
-                        setNewName(selectedAdmin.name ?? "");
-                        setNewEmail(selectedAdmin.email ?? "");
-                        setNewPassword(selectedAdmin.password ?? "");
-                        setShowPassword(false);
-                      }
-                    }}
-                    className="px-4 py-2 bg-gray-300 text-black rounded hover:bg-gray-400"
-                    disabled={loading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                    disabled={loading}
-                  >
-                    Delete
-                  </button>
+                  <button onClick={saveAdminInfo} className="px-4 py-2 bg-yellow-400 text-black rounded hover:bg-yellow-500" disabled={loading}>Save</button>
+                  <button onClick={() => { setEditing(false); if (selectedAdmin) { setNewName(selectedAdmin.name ?? ""); setNewEmail(selectedAdmin.email ?? ""); setNewPassword(""); setPasswordError(""); } }} className="px-4 py-2 bg-gray-300 text-black rounded hover:bg-gray-400" disabled={loading}>Cancel</button>
+                  <button onClick={() => setShowDeleteModal(true)} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" disabled={loading}>Delete</button>
                 </div>
               )}
             </>
@@ -261,20 +248,8 @@ export default function AdminManagement() {
             <h3 className="text-xl font-semibold mb-4">Confirm Delete</h3>
             <p>Are you sure you want to delete Admin {selectedAdmin?.name}?</p>
             <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={deleteAdmin}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                disabled={loading}
-              >
-                Delete
-              </button>
+              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400" disabled={loading}>Cancel</button>
+              <button onClick={deleteAdmin} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" disabled={loading}>Delete</button>
             </div>
           </div>
         </div>

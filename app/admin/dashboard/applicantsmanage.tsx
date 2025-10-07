@@ -7,13 +7,13 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Define the structure of an Applicant based on your database columns
+// ✅ 1. Use 'created_at' instead of 'date' to match the reliable database column
 interface Applicant {
   application_id: string;
   name: string | null;
   degree: string | null;
   campus: string | null;
-  date: string | null;
+  created_at: string | null; // Changed from 'date'
   folder_link: string | null;
   photo_url: string | null;
 }
@@ -26,13 +26,14 @@ export default function ApplicantsManage() {
     const fetchApplicants = async () => {
       setLoading(true);
       try {
-        // Fetch all columns from the 'applications' table
         const { data, error } = await supabase
           .from("applications")
           .select("*")
-          .order("date", { ascending: false }); // Order by application date
+          // ✅ 2. Order by 'created_at' to fix the error
+          .order("created_at", { ascending: false });
 
         if (error) {
+          // The error message from your screenshot will appear here
           console.error("Error fetching applicants:", error.message);
           setApplicants([]);
         } else {
@@ -97,7 +98,8 @@ export default function ApplicantsManage() {
                   <td className="p-3">{app.degree ?? "-"}</td>
                   <td className="p-3">{app.campus ?? "-"}</td>
                   <td className="p-3">
-                    {app.date ? new Date(app.date).toLocaleDateString() : "-"}
+                    {/* ✅ 3. Display the 'created_at' value */}
+                    {app.created_at ? new Date(app.created_at).toLocaleDateString() : "-"}
                   </td>
                   <td className="p-3">
                     {app.folder_link ? (
