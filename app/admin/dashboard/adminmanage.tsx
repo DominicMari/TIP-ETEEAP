@@ -48,16 +48,19 @@ export default function AdminManagement() {
       if (error) throw error;
 
       const adminData = data as AdminProfile[];
-      setAdmins(adminData);
-
       const currentUserProfile = adminData.find(admin => admin.id === user.id);
       setCurrentUser(currentUserProfile || null);
 
-      if (adminData.length > 0 && !selectedAdmin) {
-        const initialAdmin = adminData[0];
-        setSelectedAdmin(initialAdmin);
-        setNewName(initialAdmin.name ?? "");
-        setNewEmail(initialAdmin.email ?? "");
+      if (currentUserProfile?.role === 'super_admin') {
+        setAdmins(adminData);
+        if (adminData.length > 0 && !selectedAdmin) {
+          selectAdmin(adminData[0]);
+        }
+      } else {
+        setAdmins(currentUserProfile ? [currentUserProfile] : []);
+        if (currentUserProfile) {
+          selectAdmin(currentUserProfile);
+        }
       }
     } catch (err) {
       console.error("Error fetching data:", (err as Error).message);
@@ -204,6 +207,10 @@ export default function AdminManagement() {
     }
   };
 
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const canEditSelected = isSuperAdmin || currentUser?.id === selectedAdmin?.id;
+  const canDeleteSelected = isSuperAdmin && currentUser?.id !== selectedAdmin?.id;
+
   if (loading && !admins.length) {
     return <p className="text-gray-500">Loading admin data...</p>;
   }
@@ -212,7 +219,7 @@ export default function AdminManagement() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div></div> 
-        {currentUser?.role === 'super_admin' && (
+        {isSuperAdmin && (
           <button 
             onClick={() => {
               setShowAddModal(true);
@@ -227,7 +234,9 @@ export default function AdminManagement() {
 
       <div className="flex gap-6">
         <div className="w-1/3 bg-white p-4 rounded-lg border border-gray-200">
-          <h3 className="font-semibold mb-3 text-gray-700 text-lg">All Admins</h3>
+          <h3 className="font-semibold mb-3 text-gray-700 text-lg">
+            {isSuperAdmin ? "All Admins" : "My Profile"}
+          </h3>
           <div className="flex flex-col gap-1 max-h-[50vh] overflow-y-auto">
             {admins.map((admin) => (
               <div
@@ -250,21 +259,19 @@ export default function AdminManagement() {
                       <h3 className="text-lg font-bold text-gray-800">{newName}</h3>
                       <p className="text-sm text-gray-500">{newEmail}</p>
                   </div>
-                  {!editing && (
+                  {!editing && canEditSelected && (
                       <button onClick={() => setEditing(true)} className="px-4 py-2 text-sm bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">Edit</button>
                   )}
               </div>
               
-              {editing && (
+              {editing && canEditSelected && (
                 <div className="pt-4 border-t border-gray-200 space-y-4">
                   <div>
                     <label className="font-medium text-gray-700">Name</label>
-                    {/* ✅ FIX: Added text-gray-800 to make input text visible */}
                     <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full mt-1 p-2 border rounded-lg text-gray-800" />
                   </div>
                   <div>
                     <label className="font-medium text-gray-700">Email</label>
-                    {/* ✅ FIX: Added text-gray-800 to make input text visible */}
                     <input type="email" value={newEmail} onChange={handleEmailChange} className="w-full mt-1 p-2 border rounded-lg text-gray-800" />
                     {emailError && <p className="text-red-500 text-sm mt-1">{emailError}</p>}
                   </div>
@@ -272,7 +279,6 @@ export default function AdminManagement() {
                     <div>
                       <label className="font-medium text-gray-700">New Password</label>
                       <div className="relative">
-                        {/* ✅ FIX: Added text-gray-800 to make input text visible */}
                         <input type={showPassword ? "text" : "password"} value={newPassword} onChange={handlePasswordChange} placeholder="Enter to change password" className="w-full mt-1 p-2 border rounded-lg pr-10 text-gray-800" />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">{showPassword ? <FaEyeSlash /> : <FaEye />}</button>
                       </div>
@@ -281,16 +287,19 @@ export default function AdminManagement() {
                     <div>
                       <label className="font-medium text-gray-700">Confirm Password</label>
                       <div className="relative">
-                        {/* ✅ FIX: Added text-gray-800 to make input text visible */}
                         <input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" className="w-full mt-1 p-2 border rounded-lg pr-10 text-gray-800" />
                         <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">{showConfirmPassword ? <FaEyeSlash /> : <FaEye />}</button>
                       </div>
                     </div>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                    <button onClick={() => setShowDeleteModal(true)} className="px-4 py-2 text-sm bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600">Delete Admin</button>
+                    {canDeleteSelected ? (
+                      <button onClick={() => setShowDeleteModal(true)} className="px-4 py-2 text-sm bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600">Delete Admin</button>
+                    ) : (
+                      <div></div>
+                    )}
                     <div className="space-x-2">
-                      <button onClick={() => { setEditing(false); selectAdmin(selectedAdmin); }} className="px-4 py-2 text-sm bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">Cancel</button>
+                      <button onClick={() => { setEditing(false); if (selectedAdmin) { selectAdmin(selectedAdmin); } }} className="px-4 py-2 text-sm bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">Cancel</button>
                       <button onClick={saveAdminInfo} className="px-4 py-2 text-sm bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600">Save Changes</button>
                     </div>
                   </div>

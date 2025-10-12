@@ -1,12 +1,20 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+// ✅ 1. Import the Supabase client
+import { createClient } from "@supabase/supabase-js";
 import { signIn, useSession } from "next-auth/react";
 import Header from "./components/header";
 import Footer from "./components/footer";
 import Assessment from "./components/assessment";
 import WhoCanEnroll from "./components/whocanenroll";
 import Main from "./components/mainsection";
-import { X, ArrowLeft, ArrowRight } from 'lucide-react'; // For icons
+import { X, ArrowLeft, ArrowRight } from 'lucide-react';
+
+// ✅ 2. Initialize the Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 
 export default function Page() {
   const { data: session } = useSession();
@@ -14,6 +22,9 @@ export default function Page() {
   const [modalType, setModalType] = useState<"application" | "portfolio" | null>(null);
   const [showLogin, setShowLogin] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
+  
+  // ✅ 3. Add a state to prevent multiple recordings for the same login session
+  const [loginEventRecorded, setLoginEventRecorded] = useState(false);
 
   const images = {
     application: [
@@ -29,8 +40,39 @@ export default function Page() {
     ],
   };
 
-  // ✅ Clean-up: The useEffect that synced user data to Supabase has been removed.
-  // This simplifies the component for a public-facing page.
+  // ✅ 4. This useEffect now runs when the session changes to record the login
+  useEffect(() => {
+    const recordLoginEvent = async () => {
+      // Proceed only if there's a user session AND we haven't already recorded this login
+      if (session?.user && !loginEventRecorded) {
+        // Mark that we've processed this login event to prevent duplicates
+        setLoginEventRecorded(true); 
+        const user = session.user;
+
+        console.log("✅ New user session detected. Recording login event for:", user.email);
+
+        const { error } = await supabase
+          .from('user_login_history') // Using your preferred table name
+          .insert({
+            name: user.name,
+            email: user.email,
+            avatar_url: user.image,
+          });
+
+        if (error) {
+          console.error("🔴 Error recording login event:", error.message);
+        } else {
+          console.log("✅ Login event recorded successfully!");
+        }
+      } else if (!session) {
+        // If the user logs out, reset the flag so we can record their next login
+        setLoginEventRecorded(false);
+      }
+    };
+
+    recordLoginEvent();
+  }, [session, loginEventRecorded]);
+
 
   const handleFormClick = (formType: "application" | "portfolio", redirectUrl: string) => {
     if (session) {

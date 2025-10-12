@@ -27,10 +27,35 @@ export default function AdminLoginPage() {
 
     if (error || !data.session) {
       setErrorMessage("Invalid credentials. Please try again.");
-    } else {
-      router.replace("/admin/dashboard");
-    }
+      setLoading(false);
+      return;
+    } 
+    
+    try {
+      // Fetch the admin's name from the 'admin' table
+      const { data: adminProfile } = await supabase
+        .from('admin')
+        .select('name')
+        .eq('id', data.user.id)
+        .single();
 
+      // Insert the login record into the history table
+      const { error: logError } = await supabase
+        .from("admin_login_history")
+        .insert({
+          admin_id: data.user.id,
+          name: adminProfile?.name || data.user.email,
+          email: data.user.email,
+        });
+
+      if (logError) {
+        console.error("Failed to record login event:", logError.message);
+      }
+    } catch (e) {
+      console.error("An unexpected error occurred while logging the event:", e);
+    }
+    
+    router.replace("/admin/dashboard");
     setLoading(false);
   };
 
@@ -42,28 +67,11 @@ export default function AdminLoginPage() {
           Admin Login
         </h1>
         <form onSubmit={handleLogin} className="flex flex-col">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full mb-4 p-3 border rounded-lg text-black focus:ring focus:ring-yellow-300"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full mb-6 p-3 border rounded-lg text-black focus:ring focus:ring-yellow-300"
-            required
-          />
+          {/* Input fields remain the same */}
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full mb-4 p-3 border rounded-lg text-black" required />
+          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full mb-6 p-3 border rounded-lg text-black" required />
           {errorMessage && <p className="text-red-600 mb-4 text-center">{errorMessage}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg transition disabled:opacity-50"
-          >
+          <button type="submit" disabled={loading} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-lg">
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>

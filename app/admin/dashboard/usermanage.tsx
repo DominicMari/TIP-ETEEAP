@@ -1,108 +1,154 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// ✅ Changed 'date_logged_in' to 'date' to match your database schema
-interface User {
+// Represents a single login event from your 'admin_login_history' table
+interface AdminLoginEvent {
   id: string;
   name: string | null;
   email: string | null;
-  date: string | null;
+  login_timestamp: string | null;
 }
 
+// ✅ Represents the processed summary for each unique admin
+interface AdminSummary {
+  email: string;
+  name: string | null;
+  last_login: string | null;
+  login_count: number;
+}
+
+// ✅ A simple component to generate a colored avatar from a name
+const AdminAvatar = ({ name }: { name: string | null }) => {
+  const initial = name ? name.charAt(0).toUpperCase() : "A";
+  const colors = [
+    "bg-red-500", "bg-yellow-500", "bg-green-500", "bg-blue-500", 
+    "bg-indigo-500", "bg-purple-500", "bg-pink-500"
+  ];
+  // Simple hash to get a consistent color for a name
+  const colorIndex = (name?.charCodeAt(0) || 0) % colors.length;
+
+  return (
+    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${colors[colorIndex]}`}>
+      {initial}
+    </div>
+  );
+};
+
 export default function UserManage() {
-  const [logs, setLogs] = useState<User[]>([]);
+  const [logs, setLogs] = useState<AdminLoginEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchLogs = async () => {
       setLoading(true);
-      try {
-        // ✅ Updated select, not, and order to use the correct 'date' column
-        const { data, error } = await supabase
-          .from("users")
-          .select("id, name, email, date")
-          .not("date", "is", null)
-          .order("date", { ascending: false });
+      const { data, error } = await supabase
+        .from("admin_login_history")
+        .select("id, name, email, login_timestamp")
+        .order("login_timestamp", { ascending: false });
 
-        if (error) {
-          console.error("Error fetching logs:", error.message);
-          setLogs([]);
-        } else {
-          setLogs(data as User[]);
-        }
-      } catch (err) {
-        console.error("Unexpected error fetching logs:", err);
-        setLogs([]);
-      } finally {
-        setLoading(false);
+      if (error) {
+        console.error("Error fetching logs:", error.message);
+      } else {
+        setLogs(data as AdminLoginEvent[]);
       }
+      setLoading(false);
     };
 
     fetchLogs();
 
     const channel = supabase
-      .channel("public:users")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "users" }, (payload) => {
-        setLogs((prev) => [payload.new as User, ...prev]);
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "users" }, (payload) => {
-        setLogs((prev) => {
-          const updated = payload.new as User;
-          const others = prev.filter((log) => log.id !== updated.id);
-          // ✅ Updated the sorting logic to use 'date'
-          return [updated, ...others].sort(
-            (a, b) =>
-              new Date(b.date || "").getTime() - new Date(a.date || "").getTime()
-          );
-        });
-      })
+      .channel("public:admin_login_history")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "admin_login_history" },
+        (payload) => {
+          setLogs((prevLogs) => [payload.new as AdminLoginEvent, ...prevLogs]);
+        }
+      )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
+  // ✅ Process the raw login data to create a summary for each admin
+  const adminSummaries = useMemo(() => {
+    if (!logs) return [];
+    
+    const summaryMap = new Map<string, AdminSummary>();
+
+    logs.forEach(log => {
+      if (!log.email) return;
+
+      if (summaryMap.has(log.email)) {
+        // If we've seen this admin before, just increment their login count
+        const existing = summaryMap.get(log.email)!;
+        existing.login_count += 1;
+      } else {
+        // If it's the first time, create their summary
+        summaryMap.set(log.email, {
+          email: log.email,
+          name: log.name,
+          last_login: log.login_timestamp, // The first one we see is the most recent
+          login_count: 1,
+        });
+      }
+    });
+
+    return Array.from(summaryMap.values());
+  }, [logs]);
+
   if (loading) {
-    return <div className="text-yellow-400">Loading user logs...</div>;
+    return <div className="text-gray-600">Loading admin login history...</div>;
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-black">Admin Logins</h2>
-      <div className="text-sm text-gray-600 mb-4">Total Logins: {logs.length}</div>
+    <div className="space-y-4">
+      <div className="text-sm text-gray-600">Total Unique Admins: {adminSummaries.length}</div>
       <div className="overflow-x-auto">
-        <table className="min-w-full bg-gray-50 border border-yellow-400 rounded-xl overflow-hidden shadow-md">
-          <thead className="bg-gray-100 text-black">
+        <table className="min-w-full bg-white border rounded-lg">
+          <thead className="bg-gray-50">
             <tr>
-              <th className="p-3 text-left">Name</th>
-              <th className="p-3 text-left">Email</th>
-              {/* ✅ Changed table header for consistency */}
-              <th className="p-3 text-left">Date Logged In</th>
+              {/* ✅ Updated table headers for the new summary view */}
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Logged In</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Total Logins</th>
             </tr>
           </thead>
-          <tbody>
-            {logs.length === 0 ? (
+          <tbody className="divide-y divide-gray-200">
+            {adminSummaries.length === 0 ? (
               <tr>
-                <td colSpan={3} className="p-4 text-center text-yellow-600">
-                  No login logs found.
+                <td colSpan={4} className="p-4 text-center text-gray-500">
+                  No login history found.
                 </td>
               </tr>
             ) : (
-              logs.map((log) => (
-                <tr
-                  key={log.id}
-                  className="border-b border-yellow-400 hover:bg-yellow-100 transition text-black"
-                >
-                  <td className="p-3">{log.name ?? "-"}</td>
-                  <td className="p-3">{log.email ?? "-"}</td>
-                  {/* ✅ Updated the rendered property to 'log.date' */}
-                  <td className="p-3">
-                    {log.date ? new Date(log.date).toLocaleString() : "-"}
+              adminSummaries.map((admin) => (
+                <tr key={admin.email} className="text-black">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <AdminAvatar name={admin.name} />
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{admin.name || "N/A"}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">{admin.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {admin.last_login
+                      ? new Date(admin.last_login).toLocaleString()
+                      : "N/A"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-center">
+                    {admin.login_count}
                   </td>
                 </tr>
               ))
