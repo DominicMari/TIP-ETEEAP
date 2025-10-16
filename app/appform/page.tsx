@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react"; // Make sure useRef is imported
-import { PenTool } from "lucide-react"; 
-// 👇 1. IMPORT THE SIGNATURE PAD COMPONENT
-import SignatureCanvas from 'react-signature-canvas'; 
-
-// Import all the form step components
+// 👇 1. IMPORT useEffect
+import { useState, useRef, useEffect } from "react";
+import { PenTool } from "lucide-react";
+import SignatureCanvas from 'react-signature-canvas';
 import InitialForm from "./a";
 import PersonalInformationForm from "./b";
 import PrioritiesGoalsForm from "./c-h";
@@ -13,13 +11,11 @@ import CreativeWorksForm from "./i";
 import LifelongLearningForm from "./j";
 import SelfReportForm from "./selfassessment";
 
-// HELPER to get today's date
-const getTodayDateISO = () => {
-  const today = new Date();
-  return today.toISOString().split("T")[0];
-};
 
-// --- Shared UI Components ---
+const getTodayDateISO = () => {
+    const today = new Date();
+    return today.toISOString().split("T")[0];
+};
 
 function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: number; totalSteps: number; stepTitles: string[] }) {
   if (currentStep > totalSteps + 1) return null;
@@ -113,46 +109,81 @@ function SuccessScreen() {
 
 // --- Main Page Component ---
 export default function ApplicationFormPage() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({
-    initial: { name: "", degree: "", campus: "", date: getTodayDateISO(), folderLink: "", photo: null },
-    personalInfo: { fullAddress: "", mobile: "", email: "" },
-    goals: { degrees: [""], statement: "" },
-    creativeWorks: [{ title: "", institution: "", dates: "" }],
-    lifelongLearning: { hobbies: "", skills: "", workActivities: "", volunteer: "", travels: "" },
-    selfAssessment: { jobLearning: "", teamworkLearning: "", selfLearning: "", workBenefits: "", essay: "" }
-  });
+    const [currentStep, setCurrentStep] = useState(1);
+    const [formData, setFormData] = useState({
+        initial: { name: "", degree: "", campus: "", date: getTodayDateISO(), folderLink: "", photo: null },
+        personalInfo: { fullAddress: "", mobile: "", email: "" },
+        goals: { degrees: [""], statement: "" },
+        creativeWorks: [{ title: "", institution: "", dates: "" }],
+        lifelongLearning: { hobbies: "", skills: "", workActivities: "", volunteer: "", travels: "" },
+        selfAssessment: { jobLearning: "", teamworkLearning: "", selfLearning: "", workBenefits: "", essay: "" }
+    });
 
-  const stepTitles = ["Initial Info", "Personal", "Goals", "Creative Works", "Learning", "Self Assessment", "Submit"];
-  const totalSteps = stepTitles.length;
+    const stepTitles = ["Initial Info", "Personal", "Goals", "Creative Works", "Learning", "Self Assessment", "Submit"];
+    const totalSteps = stepTitles.length;
 
-  const nextStep = () => setCurrentStep((prev) => prev + 1);
-  const prevStep = () => setCurrentStep((prev) => prev - 1);
+    // 👇 2. HOOK TO LOAD DATA WHEN THE COMPONENT MOUNTS
+    useEffect(() => {
+        try {
+            const savedData = localStorage.getItem('applicationFormData');
+            const savedStep = localStorage.getItem('applicationFormStep');
 
-  const handleSubmit = () => {
-    console.log("FINAL FORM DATA:", formData);
-    // You would typically send the formData to your API here
-    nextStep(); // Move to success screen
-  };
+            if (savedData) {
+                setFormData(JSON.parse(savedData));
+            }
+            if (savedStep) {
+                // Ensure the user isn't sent back to the success screen
+                const step = parseInt(savedStep, 10);
+                if (step < totalSteps + 2) {
+                    setCurrentStep(step);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to load form data from local storage", error);
+            // Clear corrupted data
+            localStorage.removeItem('applicationFormData');
+            localStorage.removeItem('applicationFormStep');
+        }
+    }, []); // Empty array ensures this runs only once on mount
 
-  const renderStep = () => {
-    switch (currentStep) {
-      case 1: return <InitialForm formData={formData} setFormData={setFormData} nextStep={nextStep} />;
-      case 2: return <PersonalInformationForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-      case 3: return <PrioritiesGoalsForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-      case 4: return <CreativeWorksForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-      case 5: return <LifelongLearningForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-      case 6: return <SelfReportForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-      case 7: return <FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} />;
-      case 8: return <SuccessScreen />;
-      default: return <div>Form complete or invalid step.</div>;
-    }
-  };
+    // 👇 3. HOOK TO SAVE DATA WHEN IT CHANGES
+    useEffect(() => {
+        // Don't save data on the success screen (step 8)
+        if (currentStep < totalSteps + 2) {
+            localStorage.setItem('applicationFormData', JSON.stringify(formData));
+            localStorage.setItem('applicationFormStep', currentStep.toString());
+        }
+    }, [formData, currentStep]); // Re-run this effect whenever formData or currentStep changes
 
-  return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-gray-100 p-6 font-sans">
-      <Pagination currentStep={currentStep} totalSteps={totalSteps} stepTitles={stepTitles} />
-      {renderStep()}
-    </div>
-  );
+    const nextStep = () => setCurrentStep((prev) => prev + 1);
+    const prevStep = () => setCurrentStep((prev) => prev - 1);
+
+    const handleSubmit = () => {
+        console.log("FINAL FORM DATA:", formData);
+        // 👇 4. CLEAR LOCAL STORAGE ON SUCCESSFUL SUBMISSION
+        localStorage.removeItem('applicationFormData');
+        localStorage.removeItem('applicationFormStep');
+        nextStep(); // Move to success screen
+    };
+
+    const renderStep = () => {
+        switch (currentStep) {
+            case 1: return <InitialForm formData={formData} setFormData={setFormData} nextStep={nextStep} />;
+            case 2: return <PersonalInformationForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
+            case 3: return <PrioritiesGoalsForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
+            case 4: return <CreativeWorksForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
+            case 5: return <LifelongLearningForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
+            case 6: return <SelfReportForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
+            case 7: return <FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} />;
+            case 8: return <SuccessScreen />;
+            default: return <div>Form complete or invalid step.</div>;
+        }
+    };
+
+    return (
+        <div className="min-h-screen flex flex-col justify-center items-center bg-gray-100 p-6 font-sans">
+            <Pagination currentStep={currentStep} totalSteps={totalSteps} stepTitles={stepTitles} />
+            {renderStep()}
+        </div>
+    );
 }
