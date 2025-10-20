@@ -64,7 +64,12 @@ export default function DashboardPage() {
       .select("*")
       .eq("id", session.user.id)
       .single();
-
+  if (profileError || !profile) {
+        console.error("Could not fetch admin profile:", profileError);
+        await supabase.auth.signOut();
+        router.replace("/admin");
+        return;
+      }
     
     setCurrentUser(profile);
     setLoading(false);
