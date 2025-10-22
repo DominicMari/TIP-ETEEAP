@@ -1,41 +1,24 @@
 "use client";
 
 import { useEffect, useState, useMemo, FC, ReactNode } from "react";
-import { createClient } from "@supabase/supabase-js";
+// 1. REMOVE createClient import
+// import { createClient } from "@supabase/supabase-js";
+// 2. ADD shared client import
+import supabase from "../../../lib/supabase/client"; // Adjust path if needed
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area, LineChart, Line,
 } from "recharts";
 import {
-  Loader2,
-  Users,
-  CheckCircle,
-  Clock,
-  XCircle,
-  LogIn,
-  ShieldUser, 
-  GraduationCap,
-  Calendar,
-  BarChart3,
+  Loader2, Users, CheckCircle, Clock, XCircle, LogIn, ShieldUser,
+  GraduationCap, Calendar, BarChart3, AlertCircle, // Added AlertCircle
 } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// 3. REMOVE local client initialization
+// const supabase = createClient(
+//   process.env.NEXT_PUBLIC_SUPABASE_URL!,
+//   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// );
 
 // --- Type Definitions ---
 interface Applicant {
@@ -44,80 +27,70 @@ interface Applicant {
   degree_applied_for: string | null;
   campus: string | null;
   status: string | null;
+  // Add user_id if you need it for filtering later, though not used in charts
+  user_id?: string;
 }
-interface ProgramData {
-  name: string;
-  count: number;
-}
-interface StatusData {
-  name: string;
-  value: number;
-  [key: string]: string | number; 
-}
-interface TimeSeriesData {
-  date: string;
-  count: number;
-}
+interface ProgramData { name: string; count: number; }
+interface StatusData { name: string; value: number; }
+interface TimeSeriesData { date: string; count: number; }
 
-interface GlobalStatsData {
-  // per-day series for the last 30 days
-  dailyUserLogins: TimeSeriesData[];
-  dailyAdminLogins: TimeSeriesData[];
-  dailySubmissions: TimeSeriesData[];
-  totalUserLogins: number;
-  totalAdminLogins: number;
-  totalSubmissions: number;
-}
+// Removed GlobalStatsData interface as it's handled within the component
 
 // --- Constants ---
-const STATUS_COLORS = {
-  Approved: "#10B981",
-  Pending: "#F59E0B",
-  Declined: "#EF4444",
+const STATUS_COLORS: Record<string, string> = { // Explicitly type keys
+  Approved: "#10B981", // green-500
+  Pending: "#F59E0B",  // amber-500
+  Declined: "#EF4444", // red-500
+  Submitted: "#6B7280", // gray-500 (Added a default/fallback color)
 };
 const programMap: Record<string, string> = {
+  // Ensure these keys exactly match the values stored in the database
+  "BSCS": "CS",
+  "BSIS": "IS",
+  "BSIT": "IT",
+  "BSCpE": "CpE",
+  "BSIE": "IE",
+  "BSBA-LSCM": "BA-LSCM",
+  "BSBA-FM": "BA-FM",
+  "BSBA-HRM": "BA-HRM",
+  "BSBA-MM": "BA-MM",
+  // Add fallbacks if needed
   "Bachelor of Science in Computer Science": "CS",
   "Bachelor of Science in Information Systems": "IS",
   "Bachelor of Science in Information Technology": "IT",
   "Bachelor of Science in Computer Engineering": "CpE",
   "Bachelor of Science in Industrial Engineering": "IE",
-  "BS Business Administration Major in Logistics and Supply Chain Management":
-    "BA-LSCM",
+  "BS Business Administration Major in Logistics and Supply Chain Management": "BA-LSCM",
   "BS Business Administration Major in Financial Management": "BA-FM",
   "BS Business Administration Major in Human Resources Management": "BA-HRM",
   "BS Business Administration Major in Marketing Management": "BA-MM",
 };
 
 // --- Reusable Components ---
-const ChartContainer: FC<{ title: string; icon: ReactNode; children: ReactNode }> = ({
-  title,
-  icon,
-  children,
+const ChartContainer: FC<{ title: string; icon: ReactNode; children: ReactNode; className?: string }> = ({
+  title, icon, children, className = ""
 }) => (
-  <div className="bg-card-texture border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+  <div className={`bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden ${className}`}>
     <div className="flex items-center justify-between gap-3 mb-3">
       <div className="flex items-center gap-3">
-        <div className="text-gray-600">{icon}</div>
+        <div className="text-gray-500">{icon}</div>
         <h3 className="font-semibold text-md text-gray-800">{title}</h3>
       </div>
-      <div className="text-sm text-gray-500">{/* placeholder for controls */}</div>
     </div>
-    <div className="h-80">{children}</div>
+    <div className="h-80">{children}</div> {/* Fixed height for charts */}
   </div>
 );
 
 const StatCard: FC<{ title: string; value: string | number; icon: ReactNode }> = ({
-  title,
-  value,
-  icon,
+  title, value, icon,
 }) => (
-  <div className="bg-card-texture border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow duration-200 min-h-[88px]">
+  <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow duration-200 min-h-[88px]">
     <div className="flex-shrink-0">
-      <div className="bg-yellow-100 text-yellow-600 p-3 rounded-full shadow-inner">{icon}</div>
+      <div className="bg-yellow-100 text-yellow-600 p-3 rounded-full">{icon}</div>
     </div>
     <div className="flex-1">
-      <p className="text-sm text-gray-500 font-medium mb-1">{title}</p>
-      <p className="text-2xl font-semibold text-gray-800">{value}</p>
+      <p className="text-sm text-gray-500 font-medium mb-1 truncate">{title}</p>
+      <p className="text-2xl font-bold text-gray-800">{value}</p>
     </div>
   </div>
 );
@@ -127,407 +100,224 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allApplicants, setAllApplicants] = useState<Applicant[]>([]);
-  const [userLogins, setUserLogins] = useState(0);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [adminLogins, setAdminLogins] = useState(0);
-  const [chartCampus, setChartCampus] = useState<"Manila" | "Quezon City">(
-    "Manila"
-  );
+  // Removed login states as they seem handled elsewhere or weren't fully used
+  // const [userLogins, setUserLogins] = useState(0);
+  // const [adminLogins, setAdminLogins] = useState(0);
+  const [totalUsers, setTotalUsers] = useState(0); // Assuming this comes from user_login_history now
+  const [totalAdmins, setTotalAdmins] = useState(0); // Added: Count unique admins
+  const [chartCampus, setChartCampus] = useState<"Manila" | "Quezon City">("Manila");
 
-  // State to track unique login IDs for users and admins
-  const [uniqueUserIds, setUniqueUserIds] = useState<Set<string>>(new Set());
-  const [uniqueAdminIds, setUniqueAdminIds] = useState<Set<string>>(new Set());
-
+  // Fetch all necessary data on mount
   useEffect(() => {
     console.log("[DashboardHome] Mount: Initializing data fetch.");
+    let isMounted = true; // Flag to prevent state updates if unmounted
 
     const fetchData = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        console.log("[DashboardHome] fetchData: Starting...");
-        setLoading(true);
-        setError(null);
+        console.log("[DashboardHome] Fetching data...");
 
-        // Guard: ensure Supabase is configured
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-          const msg = "Supabase configuration missing (NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY).";
-          console.error("[DashboardHome] fetchData:", msg);
-          setError(msg);
-          setLoading(false);
-          return;
+        // Use Promise.all for parallel fetching
+        const [
+            applicationsRes,
+            userLoginHistoryRes,
+            adminLoginHistoryRes
+        ] = await Promise.all([
+          supabase
+            .from("applications") // ⚠️ RLS must allow admin SELECT
+            .select("application_id, created_at, status, degree_applied_for, campus"),
+          supabase
+            .from("user_login_history") // ⚠️ RLS must allow admin SELECT
+            .select("email, user_id"), // Select only needed columns
+          supabase
+            .from("admin_login_history") // ⚠️ RLS must allow admin SELECT
+            .select("email, admin_id"), // Select only needed columns
+        ]);
+
+        // Check Applications fetch result
+        if (applicationsRes.error) throw new Error(`Applications fetch failed: ${applicationsRes.error.message}`);
+        const applications = applicationsRes.data || [];
+        console.log(`[DashboardHome] Fetched ${applications.length} applications.`);
+
+        // Check User Login History fetch result
+        if (userLoginHistoryRes.error) throw new Error(`User login history fetch failed: ${userLoginHistoryRes.error.message}`);
+        const userLoginsData = userLoginHistoryRes.data || [];
+        console.log(`[DashboardHome] Fetched ${userLoginsData.length} user login records.`);
+
+        // Check Admin Login History fetch result
+        if (adminLoginHistoryRes.error) throw new Error(`Admin login history fetch failed: ${adminLoginHistoryRes.error.message}`);
+        const adminLoginsData = adminLoginHistoryRes.data || [];
+        console.log(`[DashboardHome] Fetched ${adminLoginsData.length} admin login records.`);
+
+        // Process data only if component is still mounted
+        if (isMounted) {
+          setAllApplicants(applications as Applicant[]);
+
+          // Calculate total unique users based on email from login history
+          const uniqueUserEmails = new Set(userLoginsData.map(log => log.email).filter(Boolean));
+          setTotalUsers(uniqueUserEmails.size);
+          console.log(`[DashboardHome] Calculated ${uniqueUserEmails.size} total unique users.`);
+
+          // Calculate total unique admins based on email from login history
+           const uniqueAdminEmails = new Set(adminLoginsData.map(log => log.email).filter(Boolean));
+           setTotalAdmins(uniqueAdminEmails.size);
+           console.log(`[DashboardHome] Calculated ${uniqueAdminEmails.size} total unique admins.`);
         }
 
-        // Fetch applications
-        const { data: applications, error: applicationsError } = await supabase
-          .from("applications")
-          .select(
-            "id, created_at, status, degree_applied_for, campus"
-          );
-
-        if (applicationsError) {
-          // Supabase errors can be empty objects depending on the client or network layer.
-          console.error("[DashboardHome] fetchData: Applications fetch error:", applicationsError);
-          const appsMsg =
-            (applicationsError && ((applicationsError as any).message || (applicationsError as any).error)) ||
-            JSON.stringify(applicationsError) ||
-            "Failed to fetch applications";
-          setError(String(appsMsg));
-          setLoading(false);
-          return;
+      } catch (err) {
+        console.error("[DashboardHome] Error fetching dashboard data:", err);
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "An unknown error occurred");
         }
-        console.log(
-          `[DashboardHome] fetchData: Fetched ${applications?.length || 0} applications.`
-        );
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        // Fetch user login history
-        const { data: userLoginsData, error: userLoginsError } = await supabase
-          .from("user_login_history")
-          .select("*");
-
-        if (userLoginsError) {
-          console.error("[DashboardHome] fetchData: User logins fetch error:", userLoginsError);
-          const uMsg = (userLoginsError && ((userLoginsError as any).message || (userLoginsError as any).error)) || JSON.stringify(userLoginsError) || "Failed to fetch user logins";
-          setError(String(uMsg));
-          setLoading(false);
-          return;
-        }
-        console.log(
-          `[DashboardHome] fetchData: Fetched ${userLoginsData?.length || 0} user login records.`
-        );
-
-        // Compute total unique users (fallback to email if user_id not present)
-        try {
-          const uniqueUsers = new Set<string>();
-          (userLoginsData || []).forEach((login: any) => {
-            if (login.user_id) uniqueUsers.add(String(login.user_id));
-            else if (login.email) uniqueUsers.add(String(login.email));
-          });
-          setTotalUsers(uniqueUsers.size);
-          console.log(`[DashboardHome] fetchData: Computed total unique users: ${uniqueUsers.size}`);
-        } catch (err) {
-          console.warn('[DashboardHome] fetchData: Failed to compute total users', err);
-        }
-
-        // Fetch admin login history
-        const { data: adminLoginsData, error: adminLoginsError } = await supabase
-          .from("admin_login_history")
-          .select("*");
-
-        if (adminLoginsError) {
-          console.error("[DashboardHome] fetchData: Admin logins fetch error:", adminLoginsError);
-          const aMsg = (adminLoginsError && ((adminLoginsError as any).message || (adminLoginsError as any).error)) || JSON.stringify(adminLoginsError) || "Failed to fetch admin logins";
-          setError(String(aMsg));
-          setLoading(false);
-          return;
-        }
-        console.log(
-          `[DashboardHome] fetchData: Fetched ${adminLoginsData?.length || 0} admin login records.`
-        );
-
-        // Process and set data
-        setAllApplicants(applications || []);
-
-        const todayUserUniqueIds = new Set<string>();
-        (userLoginsData || []).forEach((login: any) => {
-          const loginDate = new Date(login.created_at);
-          loginDate.setHours(0, 0, 0, 0);
-          if (loginDate.getTime() === today.getTime() && login.user_id) {
-            todayUserUniqueIds.add(login.user_id);
-          }
-        });
-        console.log(
-          `[DashboardHome] fetchData: Processed ${todayUserUniqueIds.size} unique user logins for today.`
-        );
-        setUniqueUserIds(todayUserUniqueIds);
-        setUserLogins(todayUserUniqueIds.size);
-
-        const todayAdminUniqueIds = new Set<string>();
-        (adminLoginsData || []).forEach((login: any) => {
-          const loginDate = new Date(login.created_at);
-          loginDate.setHours(0, 0, 0, 0);
-          if (loginDate.getTime() === today.getTime() && login.admin_id) {
-            todayAdminUniqueIds.add(login.admin_id);
-          }
-        });
-        console.log(
-          `[DashboardHome] fetchData: Processed ${todayAdminUniqueIds.size} unique admin logins for today.`
-        );
-        setUniqueAdminIds(todayAdminUniqueIds);
-        setAdminLogins(todayAdminUniqueIds.size);
-      } catch (error) {
-        console.error("[DashboardHome] fetchData: Unhandled error:", error);
-        setError(
-          error instanceof Error ? error.message : "Failed to fetch dashboard data"
-        );
       } finally {
-        console.log("[DashboardHome] fetchData: Finished.");
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          console.log("[DashboardHome] Data fetch finished.");
+        }
       }
     };
 
     fetchData();
 
-    // removed real-time subscriptions — this effect now only fetches statistics once on mount
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      console.log("[DashboardHome] Unmount: Cleanup.");
+    };
+  }, []); // Run once on mount
 
-  }, []); // run once on mount
+  // --- Calculations based on fetched data (using useMemo for efficiency) ---
 
-  // --- Global Stats (All Campuses) ---
-  const applicationStats = useMemo(
-    () => ({
+  // Global application stats (across both campuses)
+  const applicationStats = useMemo(() => {
+    console.log("[DashboardHome] Calculating application stats...");
+    return {
       total: allApplicants.length,
       approved: allApplicants.filter((a) => a.status === "Approved").length,
-      pending: allApplicants.filter((a) => a.status === "Pending").length,
+      pending: allApplicants.filter((a) => a.status === "Pending" || a.status === "Submitted").length, // Combine Pending & Submitted?
       declined: allApplicants.filter((a) => a.status === "Declined").length,
-    }),
-    [allApplicants]
-  );
+    };
+  }, [allApplicants]);
 
-  // --- Campus-Specific Data for Charts ---
+  // Filter applicants based on selected campus for charts
   const chartApplicants = useMemo(
     () => allApplicants.filter((app) => app.campus === chartCampus),
     [allApplicants, chartCampus]
   );
 
+  // Data for "Top Programs" chart
   const programData = useMemo((): ProgramData[] => {
+    console.log("[DashboardHome] Calculating program data for campus:", chartCampus);
     const byDegree = chartApplicants.reduce((acc, app) => {
-      const shortName =
-        programMap[app.degree_applied_for || ""] ||
-        app.degree_applied_for ||
-        "N/A";
+      const degreeKey = app.degree_applied_for || "N/A";
+      // Use the map, fall back to the raw name, then N/A
+      const shortName = programMap[degreeKey] || degreeKey;
       acc[shortName] = (acc[shortName] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
+
     return Object.entries(byDegree)
       .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 7);
+      .sort((a, b) => b.count - a.count) // Sort descending by count
+      .slice(0, 7); // Show top 7
   }, [chartApplicants]);
 
+  // Data for "Applicant Status" chart
   const statusData = useMemo((): StatusData[] => {
-    const approved = chartApplicants.filter(
-      (a) => a.status === "Approved"
-    ).length;
-    const pending = chartApplicants.filter(
-      (a) => a.status === "Pending"
-    ).length;
-    const declined = chartApplicants.filter(
-      (a) => a.status === "Declined"
-    ).length;
-    return [
-      { name: "Approved", value: approved },
-      { name: "Pending", value: pending },
-      { name: "Declined", value: declined },
-    ];
+    console.log("[DashboardHome] Calculating status data for campus:", chartCampus);
+    const counts = chartApplicants.reduce((acc, a) => {
+        const status = a.status || 'Pending'; // Default null status to Pending?
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    // Ensure all main statuses are present, even if count is 0
+    const statuses = ["Approved", "Pending", "Declined", "Submitted"]; // Define expected statuses
+    return statuses.map(name => ({
+        name: name,
+        value: counts[name] || 0
+    })).filter(entry => entry.value > 0); // Optionally filter out statuses with 0 count
+
   }, [chartApplicants]);
 
+  // Data for "Application Volume" chart (time series)
   const timeSeriesData = useMemo((): TimeSeriesData[] => {
+     console.log("[DashboardHome] Calculating time series data for campus:", chartCampus);
+    // Group applications by date
     const byDate = chartApplicants.reduce((acc, app) => {
-      const date = new Date(app.created_at).toISOString().split("T")[0];
-      acc[date] = (acc[date] || 0) + 1;
+      try {
+          // Attempt to parse the date safely
+          const dateStr = new Date(app.created_at).toISOString().split("T")[0];
+          if (dateStr) {
+             acc[dateStr] = (acc[dateStr] || 0) + 1;
+          }
+      } catch (e) {
+         console.warn("Invalid date format in application:", app.created_at, e);
+      }
       return acc;
     }, {} as Record<string, number>);
+
+    // Convert to array and sort by date
     return Object.entries(byDate)
       .map(([date, count]) => ({ date, count }))
-      .sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [chartApplicants]);
 
-  // Global Statistics Over Time
-  const [globalStats, setGlobalStats] = useState<GlobalStatsData>({
-    dailyUserLogins: [],
-    dailyAdminLogins: [],
-    dailySubmissions: [],
-    totalUserLogins: 0,
-    totalAdminLogins: 0,
-    totalSubmissions: 0,
-  });
 
-  // Fetch global stats
-  useEffect(() => {
-    const fetchGlobalStats = async () => {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const isoDate = thirtyDaysAgo.toISOString();
-
-      try {
-        // Fetch both user and admin login histories plus submissions
-        const [userLoginData, adminLoginData, submissionData] = await Promise.all([
-          supabase
-            .from('user_login_history')
-            .select('created_at')
-            .gte('created_at', isoDate),
-          supabase
-            .from('admin_login_history')
-            .select('created_at, admin_id')
-            .gte('created_at', isoDate),
-          supabase
-            .from('applications')
-            .select('created_at')
-            .gte('created_at', isoDate)
-        ]);
-
-        // Build per-day counts for both tables
-        const userByDate = (userLoginData.data || []).reduce((acc: Record<string, number>, login: any) => {
-          const date = new Date(login.created_at).toISOString().split('T')[0];
-          acc[date] = (acc[date] || 0) + 1;
-          return acc;
-        }, {});
-
-        // Count per-day admin logins and collect unique admin IDs over the window
-        const adminByDate = (adminLoginData.data || []).reduce((acc: Record<string, number>, login: any) => {
-          const date = new Date(login.created_at).toISOString().split('T')[0];
-          acc[date] = (acc[date] || 0) + 1;
-          return acc;
-        }, {});
-
-        const uniqueAdminIds30d = new Set<string>();
-        (adminLoginData.data || []).forEach((login: any) => {
-          if (login.admin_id) uniqueAdminIds30d.add(String(login.admin_id));
-        });
-
-        // Process submission data
-        const submissionsByDate = (submissionData.data || []).reduce((acc: Record<string, number>, submission: any) => {
-          const date = new Date(submission.created_at).toISOString().split('T')[0];
-          acc[date] = (acc[date] || 0) + 1;
-          return acc;
-        }, {});
-
-        // Create daily stats arrays (last 30 days)
-        const dailyDates = Array.from({ length: 30 }, (_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          return date.toISOString().split('T')[0];
-        }).reverse();
-
-        const dailyUserLogins = dailyDates.map((date) => ({ date, count: userByDate[date] || 0 }));
-        const dailyAdminLogins = dailyDates.map((date) => ({ date, count: adminByDate[date] || 0 }));
-        const dailySubmissions = dailyDates.map((date) => ({ date, count: submissionsByDate[date] || 0 }));
-
-        setGlobalStats({
-          dailyUserLogins,
-          dailyAdminLogins,
-          dailySubmissions,
-          totalUserLogins: Object.values(userByDate).reduce((a, b) => a + b, 0),
-          // totalAdminLogins is now the count of unique admin IDs seen in the last 30 days
-          totalAdminLogins: uniqueAdminIds30d.size,
-          totalSubmissions: Object.values(submissionsByDate).reduce((a, b) => a + b, 0),
-        });
-      } catch (error) {
-        console.error('Error fetching global stats:', error);
-      }
-    };
-
-    fetchGlobalStats();
-  }, []);
-
-  // Merge the two per-day series into a single series suitable for charting
-  const loginSeries = useMemo(() => {
-    const users = globalStats.dailyUserLogins || [];
-    const admins = globalStats.dailyAdminLogins || [];
-    const merged: Array<{ date: string; user: number; admin: number }> = [];
-    const length = Math.max(users.length, admins.length);
-    for (let i = 0; i < length; i++) {
-      const date = users[i]?.date || admins[i]?.date || '';
-      merged.push({
-        date,
-        user: users[i]?.count || 0,
-        admin: admins[i]?.count || 0,
-      });
-    }
-    return merged;
-  }, [globalStats.dailyUserLogins, globalStats.dailyAdminLogins]);
+  // --- Render Logic ---
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-50 text-gray-600">
-        <Loader2 className="animate-spin mr-3" />
-        Loading Dashboard...
+      <div className="flex items-center justify-center h-[calc(100vh-10rem)] text-gray-600">
+        <Loader2 className="animate-spin mr-3 h-8 w-8" />
+        <span className="text-lg font-medium">Loading Dashboard Data...</span>
       </div>
     );
   }
 
-  // Show error as a dismissible alert instead of full page error
-  const dismissError = () => setError(null);
-
-  const ErrorAlert = () => error ? (
-    <div className="mb-4">
-      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg relative">
-        <div className="flex items-center">
-          <XCircle className="w-5 h-5 mr-2" />
-          <div className="flex-1">
-            <p className="font-medium">Error Loading Data</p>
-            <p className="text-sm text-red-500">{error}</p>
+  // Display error message if fetch failed
+  if (error) {
+     return (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 text-red-700">
+          <div className="flex items-center">
+             <AlertCircle className="h-6 w-6 mr-3" />
+             <div>
+                <p className="font-bold">Error Loading Dashboard</p>
+                <p>{error}</p>
+             </div>
           </div>
-          <button 
-            onClick={dismissError}
-            className="text-red-400 hover:text-red-600"
-          >
-            <XCircle className="w-5 h-5" />
-          </button>
         </div>
-      </div>
-    </div>
-  ) : null;
+     );
+  }
 
   return (
-    <div className="bg-slate-50 min-h-screen p-4 sm:p-6 lg:p-8">
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        {/* First Row - Application Stats */}
-        <StatCard
-          title="Total Applicants"
-          value={applicationStats.total}
-          icon={<Users className="text-yellow-500" size={20} />}
-        />
-        <StatCard
-          title="Total Approved"
-          value={applicationStats.approved}
-          icon={<CheckCircle className="text-yellow-500" size={20} />}
-        />
-        <StatCard
-          title="Total Pending"
-          value={applicationStats.pending}
-          icon={<Clock className="text-yellow-500" size={20} />}
-        />
-        <StatCard
-          title="Total Declined"
-          value={applicationStats.declined}
-          icon={<XCircle className="text-yellow-500" size={20} />}
-        />
-        <StatCard
-          title="Total Users"
-          value={totalUsers}
-          icon={<LogIn className="text-yellow-500" size={20} />}
-        />
-        <StatCard
-          title="Admin Logins"
-          value={globalStats.totalAdminLogins}
-          icon={<ShieldUser className="text-yellow-500" size={20} />}
-        />
+    <div className="space-y-6">
+      {/* Stat Cards Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+        <StatCard title="Total Applications" value={applicationStats.total} icon={<Users size={20} />} />
+        <StatCard title="Approved" value={applicationStats.approved} icon={<CheckCircle size={20} />} />
+        <StatCard title="Pending / Submitted" value={applicationStats.pending} icon={<Clock size={20} />} />
+        <StatCard title="Declined" value={applicationStats.declined} icon={<XCircle size={20} />} />
+        <StatCard title="Total Unique Users" value={totalUsers} icon={<LogIn size={20} />} />
+        <StatCard title="Total Unique Admins" value={totalAdmins} icon={<ShieldUser size={20} />} />
       </div>
 
-      {/* --- Campus Switch --- */}
-      <div className="mb-6">
+      {/* Campus Switch */}
+      <div className="flex justify-center md:justify-start">
         <div className="inline-flex items-center bg-white border border-gray-200 rounded-full p-1 shadow-sm">
           <button
             onClick={() => setChartCampus("Manila")}
-            className={`px-6 py-2 text-sm font-bold rounded-full transition-colors ${
-              chartCampus === "Manila"
-                ? "bg-yellow-400 text-white shadow-md"
-                : "text-gray-600"
+            className={`px-5 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+              chartCampus === "Manila" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-100"
             }`}
           >
             Manila Campus
           </button>
           <button
             onClick={() => setChartCampus("Quezon City")}
-            className={`px-6 py-2 text-sm font-bold rounded-full transition-colors ${
-              chartCampus === "Quezon City"
-                ? "bg-yellow-400 text-white shadow-md"
-                : "text-gray-600"
+            className={`px-5 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+              chartCampus === "Quezon City" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-100"
             }`}
           >
             Quezon City Campus
@@ -535,147 +325,99 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* --- Main Content --- */}
-        <div className="lg:col-span-2 space-y-6">
-          <ChartContainer
-            title={`Application Volume - ${chartCampus}`}
-            icon={<Calendar size={20} className="text-gray-500" />}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={timeSeriesData}
-                margin={{ top: 5, right: 20, left: -10, bottom: 0 }}
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Application Volume Chart */}
+        <ChartContainer
+          title={`Application Volume - ${chartCampus}`}
+          icon={<Calendar size={18} />}
+          className="lg:col-span-2" // Make this chart wider
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={timeSeriesData} margin={{ top: 5, right: 20, left: -5, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#FBBF24" stopOpacity={0.6}/>
+                  <stop offset="95%" stopColor="#FBBF24" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false}/> {/* Hide vertical grid lines */}
+              <XAxis dataKey="date" fontSize={11} tick={{ fill: "#6B7280" }} stroke="#D1D5DB" axisLine={false} tickLine={false} />
+              <YAxis fontSize={11} tick={{ fill: "#6B7280" }} stroke="#D1D5DB" axisLine={false} tickLine={false} allowDecimals={false}/>
+              <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: '0.5rem' }} />
+              <Area type="monotone" dataKey="count" stroke="#F59E0B" fillOpacity={1} fill="url(#colorCount)" name="Applications" strokeWidth={2}/>
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartContainer>
+
+        {/* Status Pie Chart */}
+        <ChartContainer
+          title={`Applicant Status - ${chartCampus}`}
+          icon={<BarChart3 size={18} />}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={statusData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="45%" // Adjust vertical position
+                innerRadius={55}
+                outerRadius={75}
+                paddingAngle={3}
+                labelLine={false}
+                // Simplified label
+                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                 fontSize={11}
               >
-                <defs>
-                  <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor="#FBBF24"
-                      stopOpacity={0.6}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="#FBBF24"
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis
-                  dataKey="date"
-                  fontSize={12}
-                  tick={{ fill: "#6B7280" }}
-                  stroke="#D1D5DB"
-                />
-                <YAxis
-                  fontSize={12}
-                  tick={{ fill: "#6B7280" }}
-                  stroke="#D1D5DB"
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #E5E7EB",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  stroke="#F59E0B"
-                  fill="url(#colorCount)"
-                  name="Applications"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </div>
+                {statusData.map((entry) => (
+                  <Cell
+                    key={`cell-${entry.name}`}
+                    fill={STATUS_COLORS[entry.name] || STATUS_COLORS['Submitted']} // Use fallback color
+                    className="outline-none focus:outline-none"
+                    stroke="none" // Remove stroke between segments
+                  />
+                ))}
+              </Pie>
+              <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}/>
+               <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartContainer>
 
-        {/* --- Right Sidebar --- */}
-        <aside className="lg:col-span-1 space-y-6">
-          <ChartContainer
-            title={`Applicant Status - ${chartCampus}`}
-            icon={<BarChart3 size={20} className="text-gray-500" />}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  labelLine={false}
-                  label={(props) => {
-                    const percent = (props as any).percent || 0;
-                    const name = (props as any).name || '';
-                    return `${name}: ${(percent * 100).toFixed(0)}%`;
-                  }}
-                >
-                  {statusData.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill={
-                        STATUS_COLORS[
-                          entry.name as keyof typeof STATUS_COLORS
-                        ]
-                      }
-                      className="outline-none"
-                    />
-                  ))}
-                </Pie>
-                <Legend
-                  iconType="circle"
-                  formatter={(value) => (
-                    <span className="text-gray-700">{value}</span>
-                  )}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+         {/* Top Programs Bar Chart */}
+        <ChartContainer
+          title={`Top Programs - ${chartCampus}`}
+          icon={<GraduationCap size={18} />}
+          className="lg:col-span-3" // Make this chart span full width on new row
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={programData}
+              layout="vertical" // Keep vertical layout
+              margin={{ top: 0, right: 30, left: 10, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" horizontal={false} /> {/* Hide horizontal grid lines */}
+              <XAxis type="number" tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={60} // Adjust width for labels
+                tick={{ fill: "#6B7280" }}
+                fontSize={11}
+                stroke="#D1D5DB"
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: '0.5rem' }}/>
+              {/* <Legend /> */}
+              <Bar dataKey="count" name="Applicants" fill="#3B82F6" barSize={20} radius={[0, 4, 4, 0]}/> {/* Add radius */}
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartContainer>
 
-            {/* Logins (30 days) chart removed as requested */}
-
-          <ChartContainer
-            title={`Top Programs - ${chartCampus}`}
-            icon={<GraduationCap size={20} className="text-gray-500" />}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={programData}
-                layout="vertical"
-                margin={{ top: 0, right: 10, left: 10, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis
-                  type="number"
-                  tick={{ fill: "#6B7280" }}
-                  fontSize={12}
-                  stroke="#D1D5DB"
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={50}
-                  tick={{ fill: "#6B7280" }}
-                  fontSize={12}
-                  stroke="#D1D5DB"
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #E5E7EB",
-                  }}
-                />
-                <Bar dataKey="count" name="Applicants" fill="#3B82F6" />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </aside>
-      </main>
+      </div>
     </div>
   );
 }
