@@ -292,7 +292,7 @@ export default function AdminManagement({ currentUser }: AdminManagementProps) {
 
       console.warn("[AdminManagement] Attempting to delete admin profile:", selectedAdmin.email, "ID:", selectedAdmin.id);
       // Use browser confirm for safety before proceeding
-      if (!confirm(`ARE YOU SURE you want to delete the admin profile for ${selectedAdmin.name} (${selectedAdmin.email})? This action only removes them from the admin list and cannot be undone easily.`)) {
+      if (!confirm(`ARE YOU SURE you want to delete the admin profile for ${selectedAdmin.name} (${selectedAdmin.email})?`)) {
             setShowDeleteModal(false); // Close modal if cancelled
             return;
       }
@@ -567,7 +567,7 @@ export default function AdminManagement({ currentUser }: AdminManagementProps) {
               // Success Message View
               <div className="text-center">
                  <p className="text-lg font-medium text-green-600 mb-4">✅ Admin Created Successfully!</p>
-                 <p className="text-sm text-gray-600">Please provide these credentials to the new admin. They **must** change the password on first login.</p>
+                 <p className="text-sm text-gray-600">Please provide these credentials to the new admin. They must change the password on first login.</p>
                  <div className="bg-gray-100 p-4 rounded-lg mt-4 text-left text-sm border border-gray-200 space-y-1">
                      <p><strong>Email:</strong> {createdAdminInfo.email}</p>
                      <p><strong>Temporary Password:</strong> <code className="bg-gray-200 px-2 py-1 rounded text-red-600 font-semibold">{createdAdminInfo.temporaryPassword}</code></p>
@@ -608,7 +608,7 @@ export default function AdminManagement({ currentUser }: AdminManagementProps) {
              <h3 className="text-xl font-semibold mb-4 text-red-600">🚨 Confirm Deletion</h3>
              <p className="text-gray-600 mb-1">Are you absolutely sure you want to delete the admin profile for:</p>
              <p className="font-bold text-center my-2">{selectedAdmin.name} ({selectedAdmin.email})?</p>
-             <p className="text-sm text-red-700 bg-red-50 p-2 rounded border border-red-200 mb-6">This action removes their record from the admin list and cannot be undone. Their login credentials might still exist in the authentication system.</p>
+             <p className="text-sm text-red-700 bg-red-50 p-2 rounded border border-red-200 mb-6">This action removes their record from the admin list and cannot be undone.</p>
              {/* Modal Action Buttons */}
              <div className="flex justify-end space-x-3 mt-8">
                <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 disabled:opacity-50" disabled={modalLoading}>Cancel</button>
