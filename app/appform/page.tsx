@@ -9,6 +9,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import InitialForm from "./a";
 import PersonalInformationForm from "./b";
 import PrioritiesGoalsForm from "./c-h";
+import BackgroundAchievementsForm from "./d"; //missing page
 import CreativeWorksForm from "./i";
 import LifelongLearningForm from "./j";
 import SelfReportForm from "./selfassessment";
@@ -145,7 +146,17 @@ export default function ApplicationFormPage() {
         selfAssessment: { jobLearning: "", teamworkLearning: "", selfLearning: "", workBenefits: "", essay: "" }
     });
 
-    const stepTitles = ["Initial Info", "Personal", "Goals", "Creative Works", "Learning", "Self Assessment", "Submit"];
+    const stepTitles = [
+  "Initial Info",
+  "Personal",
+  "Goals",
+  "Background & Achievements", // d.tsx
+  "Creative Works",
+  "Learning",
+  "Self Assessment",
+  "Submit",
+];
+
     const totalSteps = stepTitles.length;
 
     // Load data from localStorage on mount
@@ -329,16 +340,92 @@ export default function ApplicationFormPage() {
         }
 
         switch (currentStep) {
-            case 1: return <InitialForm formData={formData} setFormData={setFormData} nextStep={nextStep} />;
-            case 2: return <PersonalInformationForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-            case 3: return <PrioritiesGoalsForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-            case 4: return <CreativeWorksForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-            case 5: return <LifelongLearningForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-            case 6: return <SelfReportForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />;
-            case 7: return <FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} />;
-            case 8: return <SuccessScreen />;
-            default: return <div>Form complete or invalid step.</div>;
-        }
+  case 1:
+    return (
+      <InitialForm
+        formData={formData}
+        setFormData={setFormData}
+        nextStep={nextStep}
+      />
+    );
+
+  case 2:
+    return (
+      <PersonalInformationForm
+        formData={formData}
+        setFormData={setFormData}
+        nextStep={nextStep}
+        prevStep={prevStep}
+      />
+    );
+
+  case 3:
+    return (
+      <PrioritiesGoalsForm
+        formData={formData}
+        setFormData={setFormData}
+        nextStep={nextStep}
+        prevStep={prevStep}
+      />
+    );
+
+  case 4:
+    return (
+      <BackgroundAchievementsForm
+        formData={formData}
+        setFormData={setFormData}
+        nextStep={nextStep}
+        prevStep={prevStep}
+      />
+    );
+
+  case 5:
+    return (
+      <CreativeWorksForm
+        formData={formData}
+        setFormData={setFormData}
+        nextStep={nextStep}
+        prevStep={prevStep}
+      />
+    );
+
+  case 6:
+    return (
+      <LifelongLearningForm
+        formData={formData}
+        setFormData={setFormData}
+        nextStep={nextStep}
+        prevStep={prevStep}
+      />
+    );
+
+  case 7:
+    return (
+      <SelfReportForm
+        formData={formData}
+        setFormData={setFormData}
+        nextStep={nextStep}
+        prevStep={prevStep}
+      />
+    );
+
+  case 8:
+    return (
+      <FinalReviewStep
+        nextStep={handleSubmit}
+        prevStep={prevStep}
+        signaturePadRef={signaturePadRef}
+        isSubmitting={isSubmitting}
+      />
+    );
+
+  case 9:
+    return <SuccessScreen />;
+
+  default:
+    return <div>Form complete or invalid step.</div>;
+}
+
     };
 
     return (
