@@ -13,12 +13,14 @@ export async function POST(request: Request) {
     const formData = await request.formData();
 
     const name = formData.get("name") as string | null;
+    // TODO: Add an email field to the form and use it here.
+    const email = formData.get("email") as string | null;
     const degree = formData.get("degree") as string | null;
     const campus = formData.get("campus") as string | null;
     const folderLink = formData.get("folderLink") as string | null;
     const photoFile = formData.get("photo") as File | Blob | null;
 
-    if (!name || !degree || !campus || !folderLink || !photoFile) {
+    if (!name || !degree || !campus || !folderLink || !photoFile || !email) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
     // Get public URL correctly from data.publicUrl
     const { data: publicUrlData } = supabase.storage
       .from("application-photos")
-      .getPublicUrl(fileName);
+    .getPublicUrl(fileName);
 
     const photoUrl = publicUrlData?.publicUrl || null;
 
@@ -48,6 +50,7 @@ export async function POST(request: Request) {
       .from("applications")
       .insert([{
         name,
+        email,
         degree,
         campus,
         folder_link: folderLink,
@@ -57,6 +60,24 @@ export async function POST(request: Request) {
     if (dbError) {
       return NextResponse.json({ error: dbError.message }, { status: 500 });
     }
+
+    // Send confirmation email
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recipient: email,
+          templateId: 1
+        }),
+      });
+    } catch (emailError) {
+      console.error('Failed to send confirmation email:', emailError);
+      // Do not block the response for the user if email sending fails
+    }
+
 
     return NextResponse.json({ message: "Application saved successfully" });
   } catch (error: any) {
