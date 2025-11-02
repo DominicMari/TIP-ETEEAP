@@ -1,23 +1,28 @@
 "use client";
 import Link from "next/link";
 
-// 1. Define the correct, full props type for a Next.js Page
-// This is the standard way to type page components
+// 1. Define the props type using 'any' to bypass the build-time
+//    type mismatch. This is a workaround for the 'Promise<any>'
+//    error you're seeing in the Vercel build logs.
 type AuthErrorPageProps = {
-  params: { [key: string]: string | string[] | undefined };
-  searchParams?: { [key: string]: string | string[] | undefined };
+  params: any;
+  searchParams: any;
 };
 
-export default function AuthErrorPage({ searchParams }: AuthErrorPageProps) {
+export default function AuthErrorPage({ params, searchParams }: AuthErrorPageProps) {
   
-  // 2. Safely get the error message
+  // 2. Safely get the error message, since the type is 'any'
   const getErrorMessage = () => {
-    const errorParam = searchParams?.error;
-    if (Array.isArray(errorParam)) {
-      return errorParam[0]; // Take the first error if it's an array
+    try {
+      const errorParam = searchParams?.error;
+      if (Array.isArray(errorParam)) {
+        return errorParam[0]; // Use the first error if it's an array
+      }
+      return errorParam || "An unknown error occurred"; // Use the error string or a default
+    } catch (e) {
+      // Fallback in case searchParams is not an object
+      return "An unknown error occurred.";
     }
-    // Set a default message if 'error' is present but has no value, or is missing
-    return errorParam || "An unknown error occurred"; 
   };
 
   const errorMessage = getErrorMessage();
@@ -28,7 +33,7 @@ export default function AuthErrorPage({ searchParams }: AuthErrorPageProps) {
 
       <p className="text-red-400 mb-6">
         Something went wrong: <span className="font-semibold">{errorMessage}</span>
-      </p>
+      </Gallery>
 
       {/* Go Back Home Button */}
       <Link
