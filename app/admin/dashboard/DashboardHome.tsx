@@ -13,16 +13,17 @@ import {
 
 // --- Type Definitions ---
 interface Applicant {
-  application_id: string; // Corrected from id: number
+  application_id: string;
   created_at: string;
   degree_applied_for: string | null;
   campus: string | null;
   status: string | null;
   user_id?: string;
 }
-interface ProgramData { name: string; count: number; }
-interface StatusData { name: string; value: number; }
-interface TimeSeriesData { date: string; count: number; }
+// These interfaces are good for reference but we won't use them as explicit return types for useMemo
+// interface ProgramData { name: string; count: number; }
+// interface StatusData { name: string; value: number; }
+// interface TimeSeriesData { date: string; count: number; }
 
 // --- Constants ---
 const STATUS_COLORS: Record<string, string> = {
@@ -162,19 +163,16 @@ export default function DashboardHome() {
     };
   }, [allApplicants]);
 
-  // ✅ **FIXED LOGIC HERE**
   const chartApplicants = useMemo(() => {
     const normalizedChartCampus = chartCampus.toLowerCase(); // "manila" or "quezon city"
     
     const filtered = allApplicants.filter((app) => {
-      // "qc" or "manila" (or null, trimmed and lowercased)
-      const normalizedAppCampus = app.campus?.trim().toLowerCase(); 
+      const normalizedAppCampus = app.campus?.trim().toLowerCase(); // "qc" or "manila"
       
       if (normalizedChartCampus === 'quezon city') {
         // If user clicked "Quezon City" button, look for "qc" in the data
         return normalizedAppCampus === 'qc';
       }
-      // Otherwise (user clicked "Manila"), do a direct match
       return normalizedAppCampus === normalizedChartCampus;
     });
 
@@ -183,7 +181,9 @@ export default function DashboardHome() {
   }, [allApplicants, chartCampus]);
 
 
-  const programData = useMemo((): ProgramData[] => {
+  // Data for "Top Programs" chart
+  // ✅ FIX: Removed explicit :ProgramData[] return type
+  const programData = useMemo(() => {
     const byDegree = chartApplicants.reduce((acc, app) => {
       const degreeKey = app.degree_applied_for || "N/A";
       const shortName = programMap[degreeKey] || degreeKey;
@@ -197,7 +197,9 @@ export default function DashboardHome() {
       .slice(0, 7);
   }, [chartApplicants]);
 
-  const statusData = useMemo((): StatusData[] => {
+  // Data for "Applicant Status" chart
+  // ✅ FIX: Removed explicit :StatusData[] return type
+  const statusData = useMemo(() => {
     const counts = chartApplicants.reduce((acc, a) => {
         const status = a.status || 'Submitted';
         acc[status] = (acc[status] || 0) + 1;
@@ -211,7 +213,9 @@ export default function DashboardHome() {
     })).filter(entry => entry.value > 0);
   }, [chartApplicants]);
 
-  const timeSeriesData = useMemo((): TimeSeriesData[] => {
+  // Data for "Application Volume" chart (time series)
+  // ✅ FIX: Removed explicit :TimeSeriesData[] return type
+  const timeSeriesData = useMemo(() => {
     const byDate = chartApplicants.reduce((acc, app) => {
       try {
           const dateStr = new Date(app.created_at).toISOString().split("T")[0];
@@ -331,7 +335,7 @@ export default function DashboardHome() {
                 outerRadius={75}
                 paddingAngle={3}
                 labelLine={false}
-                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                 label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
                  fontSize={11}
               >
                 {statusData.map((entry) => (
