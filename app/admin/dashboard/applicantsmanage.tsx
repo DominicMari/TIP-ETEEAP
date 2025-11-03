@@ -3,7 +3,8 @@
 import { useEffect, useState, FC, ReactNode } from "react";
 // 1. Use the shared Supabase client
 import supabase from "../../../lib/supabase/client"; // Adjust path if needed
-import { Loader2, Eye, Check, X, Clock, AlertCircle } from "lucide-react";
+// 🔽 1. IMPORTED Trash2 ICON
+import { Loader2, Eye, Check, X, Clock, AlertCircle, Trash2 } from "lucide-react";
 
 // 2. Updated interface to match your 'applications' table
 interface Applicant {
@@ -46,6 +47,8 @@ export default function ApplicantsManage() {
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null); // Track which status is updating
+  // 🔽 2. ADDED NEW STATE TO TRACK DELETION
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // --- Data Fetching ---
   useEffect(() => {
@@ -93,6 +96,7 @@ export default function ApplicantsManage() {
   const handleStatusChange = async (applicationId: string, newStatus: string) => {
     console.log(`[ApplicantsManage] Updating application ${applicationId} to status ${newStatus}`);
     setUpdatingStatusId(applicationId); // Indicate loading for this specific row
+    setError(null); // Clear previous errors
 
     // 4. Update the 'status' column in the 'applications' table
     // ⚠️ RLS Policy: Admins must have 'UPDATE' permission on 'applications'.
@@ -120,6 +124,54 @@ export default function ApplicantsManage() {
     }
   };
 
+  // 🔽 3. ADDED NEW HANDLER FUNCTION FOR DELETE
+  /**
+   * Deletes an application after user confirmation.
+   * @param applicationId The ID of the application to delete.
+   * @param applicantName The name of the applicant for the confirmation dialog.
+   */
+  const handleDelete = async (applicationId: string, applicantName: string | null) => {
+    // Show a confirmation dialog to prevent accidental deletion
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete the application for "${
+        applicantName || "this applicant"
+      }"? This action cannot be undone.`
+    );
+
+    if (!confirmed) {
+      console.log("[ApplicantsManage] Delete cancelled.");
+      return; // Stop if user clicks "Cancel"
+    }
+
+    console.log(`[ApplicantsManage] Deleting application ${applicationId}...`);
+    setDeletingId(applicationId); // Show loading state for this row
+    setError(null); // Clear previous errors
+
+    // 5. Delete from the 'applications' table
+    // ⚠️ RLS Policy: Admins must have 'DELETE' permission on 'applications'.
+    const { error: deleteError } = await supabase
+      .from("applications")
+      .delete() // The delete operation
+      .eq("application_id", applicationId); // Match the correct ID
+
+    setDeletingId(null); // Stop loading state regardless of outcome
+
+    if (deleteError) {
+      console.error("Error deleting application:", deleteError.message);
+      setError(
+        `Failed to delete application for ${
+          applicantName || applicationId
+        }: ${deleteError.message}. Check RLS.`
+      );
+    } else {
+      console.log(`[ApplicantsManage] Application ${applicationId} deleted successfully.`);
+      // Remove the applicant from the local state to update the UI
+      setApplicants(prevApplicants =>
+        prevApplicants.filter(app => app.application_id !== applicationId)
+      );
+    }
+  };
+
   // --- Render Logic ---
 
   if (loading) {
@@ -142,7 +194,7 @@ export default function ApplicantsManage() {
 
   return (
     <div className="space-y-6">
-       <ErrorAlert /> {/* Display error if exists */}
+        <ErrorAlert /> {/* Display error if exists */}
       <div className="text-sm text-gray-600">Total Applications: {applicants.length}</div>
       <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
         <table className="min-w-full bg-white divide-y divide-gray-200">
@@ -191,39 +243,58 @@ export default function ApplicantsManage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{app.campus || "N/A"}</td>
                   {/* Date Submitted */}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                     {/* Use application_date or created_at */}
-                     {app.application_date ? new Date(app.application_date).toLocaleDateString() :
-                      app.created_at ? new Date(app.created_at).toLocaleDateString() : "N/A"}
+                       {/* Use application_date or created_at */}
+                       {app.application_date ? new Date(app.application_date).toLocaleDateString() :
+                       app.created_at ? new Date(app.created_at).toLocaleDateString() : "N/A"}
                   </td>
                   {/* Status Dropdown */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                       {updatingStatusId === app.application_id && <Loader2 className="h-4 w-4 animate-spin text-gray-400"/>}
-                       <select
-                         value={app.status || "Submitted"} // Default to 'Submitted' if null
-                         onChange={(e) => handleStatusChange(app.application_id, e.target.value)}
-                         disabled={updatingStatusId === app.application_id} // Disable while updating this row
-                         className={`text-xs font-semibold rounded-full px-2.5 py-1 border-none outline-none ring-1 ring-inset focus:ring-2 focus:ring-yellow-500 disabled:opacity-70 disabled:cursor-not-allowed ${
-                           STATUS_COLORS[app.status || "Submitted"]
-                         }`}
-                       >
-                         {STATUS_OPTIONS.map(status => (
-                           <option key={status} value={status}>{status}</option>
-                         ))}
-                       </select>
+                        {/* 🔽 4. SPINNER ACTIVATES FOR STATUS UPDATE OR DELETE */}
+                        {(updatingStatusId === app.application_id || deletingId === app.application_id) && <Loader2 className="h-4 w-4 animate-spin text-gray-400"/>}
+                        <select
+                          value={app.status || "Submitted"} // Default to 'Submitted' if null
+                          onChange={(e) => handleStatusChange(app.application_id, e.target.value)}
+                          // 🔽 4. DISABLE IF UPDATING OR DELETING
+                          disabled={updatingStatusId === app.application_id || deletingId === app.application_id}
+                          className={`text-xs font-semibold rounded-full px-2.5 py-1 border-none outline-none ring-1 ring-inset focus:ring-2 focus:ring-yellow-500 disabled:opacity-70 disabled:cursor-not-allowed ${
+                            STATUS_COLORS[app.status || "Submitted"]
+                          }`}
+                        >
+                          {STATUS_OPTIONS.map(status => (
+                            <option key={status} value={status}>{status}</option>
+                          ))}
+                        </select>
                     </div>
                   </td>
                   {/* Actions */}
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {/* View Details Button */}
-                    <button
-                      onClick={() => handleViewDetails(app)}
-                      className="text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors duration-150"
-                      title="View Full Application Details"
-                    >
-                      <Eye size={16} />
-                      View Details
-                    </button>
+                    {/* 🔽 4. WRAPPED BUTTONS IN A FLEX DIV */}
+                    <div className="flex items-center gap-4">
+                      {/* View Details Button */}
+                      <button
+                        onClick={() => handleViewDetails(app)}
+                        className="text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors duration-150 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        title="View Full Application Details"
+                        // 🔽 4. DISABLE IF DELETING
+                        disabled={deletingId === app.application_id}
+                      >
+                        <Eye size={16} />
+                        View Details
+                      </button>
+
+                      {/* 🔽 4. NEW DELETE BUTTON */}
+                      <button
+                        onClick={() => handleDelete(app.application_id, app.applicant_name)}
+                        className="text-red-600 hover:text-red-800 flex items-center gap-1 transition-colors duration-150 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        title="Delete Application"
+                        // 🔽 4. DISABLE IF UPDATING STATUS OR DELETING
+                        disabled={updatingStatusId === app.application_id || deletingId === app.application_id}
+                      >
+                        <Trash2 size={16} />
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -244,24 +315,25 @@ export default function ApplicantsManage() {
 }
 
 // --- View Details Modal Component (Adapted for 'applications' table) ---
+// (No changes needed in ViewApplicantModal or InfoItem components)
 const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void; }> = ({ applicant, onClose }) => {
 
-   // Helper to render JSONB data cleanly
-   const renderJsonData = (data: any) => {
-       if (!data) return <p className="text-gray-500 italic text-xs">N/A</p>;
-       try {
-           // Check if it's already an object/array (might be parsed by Supabase client)
-           if (typeof data === 'object') {
-               return <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto"><code>{JSON.stringify(data, null, 2)}</code></pre>;
-           }
-           // Try parsing if it's a string
-           const parsed = JSON.parse(data);
-           return <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto"><code>{JSON.stringify(parsed, null, 2)}</code></pre>;
-       } catch (e) {
-           // If parsing fails, display as string
-           return <p className="text-gray-700 text-xs">{String(data)}</p>;
-       }
-   };
+    // Helper to render JSONB data cleanly
+    const renderJsonData = (data: any) => {
+        if (!data) return <p className="text-gray-500 italic text-xs">N/A</p>;
+        try {
+            // Check if it's already an object/array (might be parsed by Supabase client)
+            if (typeof data === 'object') {
+                return <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto"><code>{JSON.stringify(data, null, 2)}</code></pre>;
+            }
+            // Try parsing if it's a string
+            const parsed = JSON.parse(data);
+            return <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto"><code>{JSON.stringify(parsed, null, 2)}</code></pre>;
+        } catch (e) {
+            // If parsing fails, display as string
+            return <p className="text-gray-700 text-xs">{String(data)}</p>;
+        }
+    };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in backdrop-blur-sm">
@@ -341,9 +413,3 @@ const InfoItem: FC<{ label: string; value?: ReactNode; children?: ReactNode }> =
     {children}
   </div>
 );
-
-// Add animation CSS (if not already present globally)
-/*
-@keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-.animate-fade-in { animation: fade-in 0.2s ease-out; }
-*/

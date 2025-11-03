@@ -20,10 +20,6 @@ interface Applicant {
   status: string | null;
   user_id?: string;
 }
-// These interfaces are good for reference but we won't use them as explicit return types for useMemo
-// interface ProgramData { name: string; count: number; }
-// interface StatusData { name: string; value: number; }
-// interface TimeSeriesData { date: string; count: number; }
 
 // --- Constants ---
 const STATUS_COLORS: Record<string, string> = {
@@ -68,6 +64,7 @@ const ChartContainer: FC<{ title: string; icon: ReactNode; children: ReactNode; 
   </div>
 );
 
+// (Il tuo fix per StatCard è corretto e rimane invariato)
 const StatCard: FC<{ title: string; value: string | number; icon: ReactNode }> = ({
   title, value, icon,
 }) => (
@@ -75,8 +72,8 @@ const StatCard: FC<{ title: string; value: string | number; icon: ReactNode }> =
     <div className="flex-shrink-0">
       <div className="bg-yellow-100 text-yellow-600 p-3 rounded-full">{icon}</div>
     </div>
-    <div className="flex-1">
-      <p className="text-sm text-gray-500 font-medium mb-1 truncate">{title}</p>
+    <div className="flex-1 flex flex-col">
+      <p className="text-sm text-gray-500 font-medium truncate">{title}</p>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
     </div>
   </div>
@@ -100,9 +97,9 @@ export default function DashboardHome() {
       try {
         console.log("[DashboardHome] Fetching data...");
         const [
-            applicationsRes,
-            userLoginHistoryRes,
-            adminLoginHistoryRes
+          applicationsRes,
+          userLoginHistoryRes,
+          adminLoginHistoryRes
         ] = await Promise.all([
           supabase
             .from("applications")
@@ -182,7 +179,6 @@ export default function DashboardHome() {
 
 
   // Data for "Top Programs" chart
-  // ✅ FIX: Removed explicit :ProgramData[] return type
   const programData = useMemo(() => {
     const byDegree = chartApplicants.reduce((acc, app) => {
       const degreeKey = app.degree_applied_for || "N/A";
@@ -198,7 +194,6 @@ export default function DashboardHome() {
   }, [chartApplicants]);
 
   // Data for "Applicant Status" chart
-  // ✅ FIX: Removed explicit :StatusData[] return type
   const statusData = useMemo(() => {
     const counts = chartApplicants.reduce((acc, a) => {
         const status = a.status || 'Submitted';
@@ -214,13 +209,12 @@ export default function DashboardHome() {
   }, [chartApplicants]);
 
   // Data for "Application Volume" chart (time series)
-  // ✅ FIX: Removed explicit :TimeSeriesData[] return type
   const timeSeriesData = useMemo(() => {
     const byDate = chartApplicants.reduce((acc, app) => {
       try {
           const dateStr = new Date(app.created_at).toISOString().split("T")[0];
           if (dateStr) {
-             acc[dateStr] = (acc[dateStr] || 0) + 1;
+              acc[dateStr] = (acc[dateStr] || 0) + 1;
           }
       } catch (e) {
          console.warn("Invalid date format in application:", app.created_at, e);
@@ -249,20 +243,23 @@ export default function DashboardHome() {
      return (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 text-red-700">
           <div className="flex items-center">
-             <AlertCircle className="h-6 w-6 mr-3" />
-             <div>
+              <AlertCircle className="h-6 w-6 mr-3" />
+              <div>
                 <p className="font-bold">Error Loading Dashboard</p>
                 <p>{error}</p>
-             </div>
+              </div>
           </div>
         </div>
-     );
+      );
   }
 
   return (
     <div className="space-y-6">
       {/* Stat Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+      {/* 🔽🔽🔽 --- CSS FIX IS HERE --- 🔽🔽🔽 */}
+      {/* Changed grid to have max 3 cols on large screens, making cards wider */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* 🔼🔼🔼 --- END OF CSS FIX --- 🔼🔼🔼 */}
         <StatCard title="Total Applications" value={applicationStats.total} icon={<Users size={20} />} />
         <StatCard title="Approved" value={applicationStats.approved} icon={<CheckCircle size={20} />} />
         <StatCard title="Pending / Submitted" value={applicationStats.pending} icon={<Clock size={20} />} />
@@ -335,8 +332,8 @@ export default function DashboardHome() {
                 outerRadius={75}
                 paddingAngle={3}
                 labelLine={false}
-                 label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
-                 fontSize={11}
+                label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
+                fontSize={11}
               >
                 {statusData.map((entry) => (
                   <Cell

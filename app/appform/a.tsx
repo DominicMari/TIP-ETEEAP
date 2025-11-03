@@ -114,27 +114,43 @@ export default function InitialForm({
 
           {/* Degree */}
           <div>
-            <label className="block mb-2 text-sm font-semibold text-black">
-              Degree Applied For:
-            </label>
-            <select
-              // ✅ FIX: Use the key d.tsx expects
-              name="degreeAppliedFor"
-              value={formData.degreeAppliedFor || ""}
-              onChange={handleChange}
-              className={`w-full border rounded-lg px-3 py-2 text-black ${
-                errors.degreeAppliedFor ? "border-red-500" : "border-gray-400"
-              }`}
-            >
-              <option value="">Select degree</option>
-              <option value="BSCS">BSCS (Computer Science)</option>
-              {/* ... other options */}
-            </select>
-            {errors.degreeAppliedFor && (
-              <p className="text-red-500 text-sm mt-1">{errors.degreeAppliedFor}</p>
-            )}
+            <div>
+              <label className="block mb-2 text-sm font-semibold text-black">
+                Degree Applied For:
+              </label>
+              <select
+                // ✅ FIX: Use the key d.tsx expects
+                name="degreeAppliedFor"
+                value={formData.degreeAppliedFor || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.degreeAppliedFor ? "border-red-500" : "border-gray-400"
+                }`}
+              >
+                <option value="">Select degree</option>
+                <option value="BSCS">BSCS (Computer Science)</option>
+                
+                {/* --- Here are the new options --- */}
+                <option value="BSIS">BSIS (Information Systems)</option>
+                <option value="BSIT">BSIT (Information Technology)</option>
+                <option value="BSCpE">BSCpE (Computer Engineering)</option>
+                <option value="BSIE">BSIE (Industrial Engineering)</option>
+
+                {/* Using optgroup to match the grouping in your image */}
+                <optgroup label="Bachelor of Science in Business Administration">
+                  <option value="BSBA-LSCM">BSBA (Logistics and Supply Chain Management)</option>
+                  <option value="BSBA-FM">BSBA (Financial Management)</option>
+                  <option value="BSBA-HRM">BSBA (Human Resources Management)</option>
+                  <option value="BSBA-MM">BSBA (Marketing Management)</option>
+                </optgroup>
+                {/* --- End of new options --- */}
+
+              </select>
+              {errors.degreeAppliedFor && (
+                <p className="text-red-500 text-sm mt-1">{errors.degreeAppliedFor}</p>
+              )}
+            </div>
           </div>
-        </div>
 
         {/* Photo */}
         <div className="flex flex-col items-center justify-center">
