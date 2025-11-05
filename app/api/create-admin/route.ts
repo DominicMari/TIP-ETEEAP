@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     const loginUrl = process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/admin` : 'http://localhost:3000/admin';
 
     await resend.emails.send({
-      from: 'ETEEAP Admin Portal <onboarding@resend.dev>',
+      from: 'ETEEAP Admin Portal <admin@tipeteeap.online>',
       to: email,
       subject: 'Your ETEEAP Admin Account Has Been Created',
       html: `

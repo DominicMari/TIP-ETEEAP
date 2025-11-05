@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Resend } from 'resend';
-import { render } from '@react-email/render';
 import { EmailTemplate } from '@/app/emails/template'; 
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM_EMAIL = 'onboarding@resend.dev'; // Your verified domain
+const FROM_EMAIL = 'admin@tipeteeap.online'; // Your verified domain
 
 export async function POST(req: NextRequest) {
   const supabase = createRouteHandlerClient({ cookies });
