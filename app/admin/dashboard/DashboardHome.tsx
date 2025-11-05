@@ -12,6 +12,14 @@ import {
 } from "lucide-react";
 
 // --- Type Definitions ---
+interface PortfolioSubmission {
+  id: number;
+  created_at: string;
+  status: string;
+  degree_program: string;
+  campus: string;
+}
+
 interface Applicant {
   application_id: string;
   created_at: string;
@@ -84,9 +92,11 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allApplicants, setAllApplicants] = useState<Applicant[]>([]);
+  const [allPortfolioSubmissions, setAllPortfolioSubmissions] = useState<PortfolioSubmission[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
   const [totalAdmins, setTotalAdmins] = useState(0);
   const [chartCampus, setChartCampus] = useState<"Manila" | "Quezon City">("Manila");
+  const [dataType, setDataType] = useState<"applicants" | "portfolios">("applicants");
 
   // Fetch all necessary data on mount
   useEffect(() => {
@@ -98,12 +108,16 @@ export default function DashboardHome() {
         console.log("[DashboardHome] Fetching data...");
         const [
           applicationsRes,
+          portfolioSubmissionsRes,
           userLoginHistoryRes,
           adminLoginHistoryRes
         ] = await Promise.all([
           supabase
             .from("applications")
             .select("application_id, created_at, status, degree_applied_for, campus"),
+          supabase
+            .from("portfolio_submissions")
+            .select("id, created_at, status, degree_program, campus"),
           supabase
             .from("user_login_history")
             .select("email, user_id"),
@@ -115,6 +129,9 @@ export default function DashboardHome() {
         if (applicationsRes.error) throw new Error(`Applications fetch failed: ${applicationsRes.error.message}`);
         const applications = applicationsRes.data || [];
 
+        if (portfolioSubmissionsRes.error) throw new Error(`Portfolio submissions fetch failed: ${portfolioSubmissionsRes.error.message}`);
+        const portfolioSubmissions = portfolioSubmissionsRes.data || [];
+
         if (userLoginHistoryRes.error) throw new Error(`User login history fetch failed: ${userLoginHistoryRes.error.message}`);
         const userLoginsData = userLoginHistoryRes.data || [];
 
@@ -123,6 +140,7 @@ export default function DashboardHome() {
 
         if (isMounted) {
           setAllApplicants(applications as Applicant[]);
+          setAllPortfolioSubmissions(portfolioSubmissions as PortfolioSubmission[]);
           const uniqueUserEmails = new Set(userLoginsData.map(log => log.email).filter(Boolean));
           setTotalUsers(uniqueUserEmails.size);
           const uniqueAdminEmails = new Set(adminLoginsData.map(log => log.email).filter(Boolean));
@@ -151,37 +169,57 @@ export default function DashboardHome() {
 
   // --- Calculations ---
 
-  const applicationStats = useMemo(() => {
-    return {
-      total: allApplicants.length,
-      approved: allApplicants.filter((a) => a.status === "Approved").length,
-      pending: allApplicants.filter((a) => a.status === "Pending" || a.status === "Submitted").length,
-      declined: allApplicants.filter((a) => a.status === "Declined").length,
-    };
-  }, [allApplicants]);
+  const currentStats = useMemo(() => {
+    if (dataType === "applicants") {
+      return {
+        total: allApplicants.length,
+        approved: allApplicants.filter((a) => a.status === "Approved").length,
+        pending: allApplicants.filter((a) => a.status === "Pending" || a.status === "Submitted").length,
+        declined: allApplicants.filter((a) => a.status === "Declined").length,
+      };
+    } else { // dataType === "portfolios"
+      return {
+        total: allPortfolioSubmissions.length,
+        approved: allPortfolioSubmissions.filter((p) => p.status === "Approved").length,
+        pending: allPortfolioSubmissions.filter((p) => p.status === "Pending" || p.status === "Submitted").length,
+        declined: allPortfolioSubmissions.filter((p) => p.status === "Declined").length,
+      };
+    }
+  }, [allApplicants, allPortfolioSubmissions, dataType]);
 
-  const chartApplicants = useMemo(() => {
+  const filteredChartData = useMemo(() => {
     const normalizedChartCampus = chartCampus.toLowerCase(); // "manila" or "quezon city"
-    
-    const filtered = allApplicants.filter((app) => {
-      const normalizedAppCampus = app.campus?.trim().toLowerCase(); // "qc" or "manila"
-      
-      if (normalizedChartCampus === 'quezon city') {
-        // If user clicked "Quezon City" button, look for "qc" in the data
-        return normalizedAppCampus === 'qc';
-      }
-      return normalizedAppCampus === normalizedChartCampus;
-    });
 
-    console.log(`[DashboardHome] Filtering for "${chartCampus}": Found ${filtered.length} of ${allApplicants.length} total.`);
-    return filtered;
-  }, [allApplicants, chartCampus]);
+    if (dataType === "applicants") {
+      const filtered = allApplicants.filter((app) => {
+        const normalizedAppCampus = app.campus?.trim().toLowerCase(); // "qc" or "manila"
+
+        if (normalizedChartCampus === 'quezon city') {
+          return normalizedAppCampus === 'qc';
+        }
+        return normalizedAppCampus === normalizedChartCampus;
+      });
+      console.log(`[DashboardHome] Filtering applicants for "${chartCampus}": Found ${filtered.length} of ${allApplicants.length} total.`);
+      return filtered;
+    } else { // dataType === "portfolios"
+      const filtered = allPortfolioSubmissions.filter((portfolio) => {
+        const normalizedPortfolioCampus = portfolio.campus?.trim().toLowerCase();
+
+        if (normalizedChartCampus === 'quezon city') {
+          return normalizedPortfolioCampus === 'qc';
+        }
+        return normalizedPortfolioCampus === normalizedChartCampus;
+      });
+      console.log(`[DashboardHome] Filtering portfolios for "${chartCampus}": Found ${filtered.length} of ${allPortfolioSubmissions.length} total.`);
+      return filtered;
+    }
+  }, [allApplicants, allPortfolioSubmissions, chartCampus, dataType]);
 
 
   // Data for "Top Programs" chart
   const programData = useMemo(() => {
-    const byDegree = chartApplicants.reduce((acc, app) => {
-      const degreeKey = app.degree_applied_for || "N/A";
+    const byDegree = filteredChartData.reduce((acc, item) => {
+      const degreeKey = dataType === "applicants" ? (item as Applicant).degree_applied_for || "N/A" : (item as PortfolioSubmission).degree_program || "N/A";
       const shortName = programMap[degreeKey] || degreeKey;
       acc[shortName] = (acc[shortName] || 0) + 1;
       return acc;
@@ -191,12 +229,12 @@ export default function DashboardHome() {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 7);
-  }, [chartApplicants]);
+  }, [filteredChartData, dataType]);
 
   // Data for "Applicant Status" chart
   const statusData = useMemo(() => {
-    const counts = chartApplicants.reduce((acc, a) => {
-        const status = a.status || 'Submitted';
+    const counts = filteredChartData.reduce((acc, item) => {
+        const status = item.status || 'Submitted';
         acc[status] = (acc[status] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
@@ -206,18 +244,18 @@ export default function DashboardHome() {
         name: name,
         value: counts[name] || 0
     })).filter(entry => entry.value > 0);
-  }, [chartApplicants]);
+  }, [filteredChartData]);
 
   // Data for "Application Volume" chart (time series)
   const timeSeriesData = useMemo(() => {
-    const byDate = chartApplicants.reduce((acc, app) => {
+    const byDate = filteredChartData.reduce((acc, item) => {
       try {
-          const dateStr = new Date(app.created_at).toISOString().split("T")[0];
+          const dateStr = new Date(item.created_at).toISOString().split("T")[0];
           if (dateStr) {
               acc[dateStr] = (acc[dateStr] || 0) + 1;
           }
       } catch (e) {
-         console.warn("Invalid date format in application:", app.created_at, e);
+         console.warn("Invalid date format in data:", item.created_at, e);
       }
       return acc;
     }, {} as Record<string, number>);
@@ -225,7 +263,7 @@ export default function DashboardHome() {
     return Object.entries(byDate)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [chartApplicants]);
+  }, [filteredChartData]);
 
 
   // --- Render Logic ---
@@ -260,16 +298,17 @@ export default function DashboardHome() {
       {/* Changed grid to have max 3 cols on large screens, making cards wider */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* 🔼🔼🔼 --- END OF CSS FIX --- 🔼🔼🔼 */}
-        <StatCard title="Total Applications" value={applicationStats.total} icon={<Users size={20} />} />
-        <StatCard title="Approved" value={applicationStats.approved} icon={<CheckCircle size={20} />} />
-        <StatCard title="Pending / Submitted" value={applicationStats.pending} icon={<Clock size={20} />} />
-        <StatCard title="Declined" value={applicationStats.declined} icon={<XCircle size={20} />} />
+        <StatCard title={dataType === "applicants" ? "Total Applications" : "Total Submissions"} value={currentStats.total} icon={<Users size={20} />} />
+        <StatCard title="Approved" value={currentStats.approved} icon={<CheckCircle size={20} />} />
+        <StatCard title="Pending / Submitted" value={currentStats.pending} icon={<Clock size={20} />} />
+        <StatCard title="Declined" value={currentStats.declined} icon={<XCircle size={20} />} />
         <StatCard title="Total Unique Users" value={totalUsers} icon={<LogIn size={20} />} />
         <StatCard title="Total Unique Admins" value={totalAdmins} icon={<ShieldUser size={20} />} />
       </div>
 
-      {/* Campus Switch */}
-      <div className="flex justify-center md:justify-start">
+      {/* Campus and Data Type Switches */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        {/* Campus Switch */}
         <div className="inline-flex items-center bg-white border border-gray-200 rounded-full p-1 shadow-sm">
           <button
             onClick={() => setChartCampus("Manila")}
@@ -288,13 +327,33 @@ export default function DashboardHome() {
             Quezon City Campus
           </button>
         </div>
+
+        {/* Data Type Switch */}
+        <div className="inline-flex items-center bg-white border border-gray-200 rounded-full p-1 shadow-sm">
+          <button
+            onClick={() => setDataType("applicants")}
+            className={`px-5 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+              dataType === "applicants" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Application Submissions
+          </button>
+          <button
+            onClick={() => setDataType("portfolios")}
+            className={`px-5 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+              dataType === "portfolios" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Portfolio Submissions
+          </button>
+        </div>
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Application Volume Chart */}
         <ChartContainer
-          title={`Application Volume - ${chartCampus}`}
+          title={`${dataType === "applicants" ? "Application" : "Portfolio Submission"} Volume - ${chartCampus}`}
           icon={<Calendar size={18} />}
           className="lg:col-span-2"
         >
@@ -317,7 +376,7 @@ export default function DashboardHome() {
 
         {/* Status Pie Chart */}
         <ChartContainer
-          title={`Applicant Status - ${chartCampus}`}
+          title={`${dataType === "applicants" ? "Applicant" : "Portfolio"} Status - ${chartCampus}`}
           icon={<BarChart3 size={18} />}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -352,7 +411,7 @@ export default function DashboardHome() {
 
          {/* Top Programs Bar Chart */}
         <ChartContainer
-          title={`Top Programs - ${chartCampus}`}
+          title={`Top ${dataType === "applicants" ? "Programs" : "Portfolio Programs"} - ${chartCampus}`}
           icon={<GraduationCap size={18} />}
           className="lg:col-span-3"
         >

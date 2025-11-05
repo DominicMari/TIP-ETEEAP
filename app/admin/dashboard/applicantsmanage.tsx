@@ -160,6 +160,8 @@ export default function ApplicantsManage() {
   // 🔽 --- NEW: State for search and filtering ---
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // --- Data Fetching ---
   useEffect(() => {
@@ -184,24 +186,31 @@ export default function ApplicantsManage() {
     fetchApplicants();
   }, []);
 
-  // 🔽 --- NEW: Memoized filtering logic ---
+  // Memoized filtering logic
   const filteredApplicants = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
     
     return applicants.filter(app => {
-      // Check status filter
       const statusMatch = statusFilter === 'All' || (app.status || 'Submitted') === statusFilter;
-
-      // Check search term
       const searchMatch = (
         app.applicant_name?.toLowerCase().includes(lowerSearchTerm) ||
         app.email_address?.toLowerCase().includes(lowerSearchTerm) ||
         app.degree_applied_for?.toLowerCase().includes(lowerSearchTerm)
       );
-
       return statusMatch && searchMatch;
     });
   }, [applicants, searchTerm, statusFilter]);
+
+  // Memoized pagination logic
+  const paginatedApplicants = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredApplicants.slice(startIndex, endIndex);
+  }, [filteredApplicants, currentPage]);
+
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredApplicants.length / itemsPerPage);
+  }, [filteredApplicants]);
 
   // --- Event Handlers ---
   const handleViewDetails = (applicant: Applicant) => {
@@ -324,7 +333,7 @@ export default function ApplicantsManage() {
                 </td>
               </tr>
             ) : (
-              filteredApplicants.map((app) => (
+              paginatedApplicants.map((app) => (
                 <tr key={app.application_id} className='text-black hover:bg-gray-50 transition-colors duration-150'>
                   <td className='px-6 py-4 whitespace-nowrap'>
                     <div className='flex items-center'>
@@ -380,6 +389,12 @@ export default function ApplicantsManage() {
           </tbody>
         </table>
       </div>
+
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+      />
 
       {/* View Details Modal */}
       {isModalOpen && selectedApplicant && (
@@ -991,6 +1006,42 @@ const ActionsMenu: FC<{
           </button>
         </div>
       )}
+    </div>
+  );
+};
+
+const PaginationControls: FC<{
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}> = ({ currentPage, totalPages, onPageChange }) => {
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  return (
+    <div className="flex justify-center items-center space-x-2 mt-6">
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Previous
+      </button>
+      {pageNumbers.map((page) => (
+        <button
+          key={page}
+          onClick={() => onPageChange(page)}
+          className={`px-4 py-2 text-sm font-medium rounded-lg ${currentPage === page ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+        >
+          {page}
+        </button>
+      ))}
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Next
+      </button>
     </div>
   );
 };
