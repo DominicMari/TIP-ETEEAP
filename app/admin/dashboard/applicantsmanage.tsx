@@ -10,8 +10,93 @@ import {
   AlertCircle, 
   Search,
   ChevronDown,
-  MoreHorizontal
+  MoreHorizontal,
+  Eye,
+  Trash2
 } from 'lucide-react';
+
+interface DegreePriority {
+  priority: string;
+  program: string;
+}
+
+interface CreativeWork {
+  title?: string;
+  link?: string;
+  description?: string;
+}
+
+interface AssessmentItem {
+  [key: string]: string; // Key-value pairs for assessment
+}
+
+interface EducationBackgroundEntry {
+  school_name?: string;
+  degree?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+interface EducationBackgroundData {
+  tertiary?: EducationBackgroundEntry[];
+  secondary?: EducationBackgroundEntry[];
+  elementary?: EducationBackgroundEntry[];
+  technical?: EducationBackgroundEntry[];
+}
+
+interface NonFormalEducationItem {
+  name?: string;
+  description?: string;
+}
+
+interface Certification {
+  title?: string;
+  rating?: string;
+  certifyingBody?: string;
+  dateCertified?: string;
+}
+
+interface Publication {
+  title?: string;
+  publisher?: string;
+  datePublished?: string;
+}
+
+interface Invention {
+  title?: string;
+  inventors?: string;
+  patentNumber?: string;
+  dateIssued?: string;
+}
+
+interface WorkExperienceEntry {
+  company_name?: string;
+  position?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+interface WorkExperienceData {
+  employment?: WorkExperienceEntry[];
+  consultancy?: WorkExperienceEntry[];
+  selfEmployment?: WorkExperienceEntry[];
+}
+
+interface Recognition {
+  title?: string;
+  description?: string;
+}
+
+interface ProfessionalDevelopmentEntry {
+  title?: string;
+  description?: string;
+}
+
+interface ProfessionalDevelopmentData {
+  memberships?: ProfessionalDevelopmentEntry[];
+  projects?: ProfessionalDevelopmentEntry[];
+  research?: ProfessionalDevelopmentEntry[];
+}
 
 // 2. Updated interface to match your 'applications' table
 interface Applicant {
@@ -35,6 +120,14 @@ interface Applicant {
   lifelong_learning: any | null;
   self_assessment: any | null;
   status: string | null;
+  education_background: any | null;
+  non_formal_education: any | null;
+  certifications: any | null;
+  publications: any | null;
+  inventions: any | null;
+  work_experiences: any | null;
+  recognitions: any | null;
+  professional_development: any | null;
 }
 
 // --- Constants ---
@@ -272,22 +365,14 @@ export default function ApplicantsManage() {
                       </select>
                     </div>
                   </td>
-                  <td className='px-6 py-4 text-sm font-medium'>
-                    <div className='flex items-center justify-center gap-2'>
-                      <button
-                        onClick={() => handleViewDetails(app)}
-                        className='text-blue-600 hover:text-blue-800 transition-colors duration-150 disabled:text-gray-400 disabled:cursor-not-allowed font-semibold'
-                        disabled={deletingId === app.application_id}
-                      >
-                        View
-                      </button>
-                      <ActionsMenu
-                        applicant={app}
-                        onDelete={handleDelete}
-                        isDeleting={deletingId === app.application_id}
-                        isUpdating={updatingStatusId === app.application_id}
-                      />
-                    </div>
+                  <td className='px-6 py-4 text-sm font-medium text-center'>
+                    <ActionsMenu
+                      applicant={app}
+                      onView={handleViewDetails}
+                      onDelete={handleDelete}
+                      isDeleting={deletingId === app.application_id}
+                      isUpdating={updatingStatusId === app.application_id}
+                    />
                   </td>
                 </tr>
               ))
@@ -340,7 +425,7 @@ const PageHeader: FC<{
           placeholder='Search name, email...'
           value={searchTerm}
           onChange={onSearchChange}
-          className='w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500'
+          className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-black"
         />
         <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400' />
       </div>
@@ -460,13 +545,36 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
           </div>
           
           {/* Right Column (Content) */}
-          <div className='flex-1 p-8 overflow-y-auto space-y-8'>
-            <GoalStatement data={applicant.goal_statement} />
-            <DegreePriorities data={applicant.degree_priorities} />
-            <AssessmentList title='Self Assessment' data={applicant.self_assessment} />
-            <AssessmentList title='Lifelong Learning' data={applicant.lifelong_learning} />
-            <CreativeWorks data={applicant.creative_works} />
-            <Signature data={applicant.signature_url} />
+          <div className='flex-1 p-8 overflow-y-auto'>
+            <CollapsibleSection title="Goal Statement" isOpenDefault={true}>
+              <GoalStatement data={applicant.goal_statement} />
+            </CollapsibleSection>
+            <CollapsibleSection title="Education Background">
+                <EducationBackground data={applicant.education_background} />
+            </CollapsibleSection>
+            <CollapsibleSection title="Work Experiences">
+                <WorkExperiences data={applicant.work_experiences} />
+            </CollapsibleSection>
+            <CollapsibleSection title="Professional Development">
+                <ProfessionalDevelopment data={applicant.professional_development} />
+            </CollapsibleSection>
+            <GenericList data={applicant.non_formal_education} title="Non-Formal Education" />
+            <CollapsibleSection title="Certifications"><Certifications data={applicant.certifications} /></CollapsibleSection>
+            <GenericList data={applicant.publications} title="Publications" />
+            <GenericList data={applicant.inventions} title="Inventions" />
+            <GenericList data={applicant.recognitions} title="Recognitions" />
+            <CollapsibleSection title="Self Assessment">
+              <AssessmentList data={applicant.self_assessment} />
+            </CollapsibleSection>
+            <CollapsibleSection title="Lifelong Learning">
+              <AssessmentList data={applicant.lifelong_learning} />
+            </CollapsibleSection>
+            <CollapsibleSection title="Creative Works / Portfolio">
+              <CreativeWorks data={applicant.creative_works} />
+            </CollapsibleSection>
+            <CollapsibleSection title="Applicant Signature">
+              <Signature data={applicant.signature_url} />
+            </CollapsibleSection>
           </div>
         </div>
 
@@ -488,11 +596,11 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
 
 // Simple Card for left sidebar
 const InfoCard: FC<{ title: string; children: ReactNode }> = ({ title, children }) => (
-  <div className='bg-white rounded-xl shadow-sm border border-gray-200 p-4'>
-    <h4 className='text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3'>
+  <div className='bg-white rounded-xl shadow-md border border-gray-200 p-5'>
+    <h4 className='text-sm font-bold text-gray-500 uppercase tracking-wider mb-4'>
       {title}
     </h4>
-    <div className='space-y-3'>{children}</div>
+    <div className='space-y-4'>{children}</div>
   </div>
 );
 
@@ -519,50 +627,20 @@ const GoalStatement: FC<{ data: any }> = ({ data }) => {
   try { content = JSON.parse(data); } catch (e) {}
 
   return (
-    <section>
-      <h3 className='text-xl font-bold text-gray-800 mb-4'>Goal Statement</h3>
-      <div className='prose prose-sm max-w-none text-gray-700'>
-        {typeof content === 'string' ? (
-          <p>{content}</p>
-        ) : (
-          <p className='italic text-gray-500'>Could not parse goal statement.</p>
-        )}
-      </div>
-    </section>
+    <div className='prose prose-base max-w-none text-gray-800'>
+      {typeof content === 'string' ? (
+        <p>{content}</p>
+      ) : (
+        <p className='italic text-gray-500'>Could not parse goal statement.</p>
+      )}
+    </div>
   );
 };
 
-// Renders Degree Priorities (Assumes an array of strings)
-const DegreePriorities: FC<{ data: any }> = ({ data }) => {
-  let priorities = data;
-  if (!priorities) return null;
-  try { priorities = JSON.parse(data); } catch (e) {}
 
-  if (!Array.isArray(priorities) || priorities.length === 0) {
-    return (
-      <section>
-        <h3 className='text-xl font-bold text-gray-800 mb-4'>Degree Priorities</h3>
-        <p className='italic text-gray-500 text-sm'>No priorities listed.</p>
-      </section>
-    );
-  }
-
-  return (
-    <section>
-      <h3 className='text-xl font-bold text-gray-800 mb-4'>Degree Priorities</h3>
-      <ol className='list-decimal list-inside space-y-2 pl-2'>
-        {priorities.map((item, index) => (
-          <li key={index} className='text-base text-gray-700'>
-            <span className='font-semibold'>{item.priority || `Priority ${index + 1}`}:</span> {item.degree || String(item)}
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-};
 
 // Renders Assessment/Learning (Assumes an object of key/value pairs)
-const AssessmentList: FC<{ title: string, data: any }> = ({ title, data }) => {
+const AssessmentList: FC<{ data: any }> = ({ data }) => {
   let items = data;
   if (!items) return null;
   try { items = JSON.parse(data); } catch (e) {}
@@ -581,17 +659,14 @@ const AssessmentList: FC<{ title: string, data: any }> = ({ title, data }) => {
   };
 
   return (
-    <section>
-      <h3 className='text-2xl font-bold text-gray-800 mb-4'>{title}</h3>
-      <dl className='space-y-4'>
+      <dl className='space-y-3'>
         {entries.map(([key, value]) => (
-          <div key={key} className='p-5 bg-gray-50 rounded-lg shadow-sm'>
-            <dt className='text-lg font-semibold text-gray-800'>{formatKey(key)}</dt>
-            <dd className='text-lg text-gray-700 mt-1'>{String(value)}</dd>
+          <div key={key} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
+            <dt className='text-sm font-semibold text-gray-600 capitalize'>{formatKey(key)}</dt>
+            <dd className='text-base text-gray-800 mt-1'>{String(value)}</dd>
           </div>
         ))}
       </dl>
-    </section>
   );
 };
 
@@ -602,27 +677,22 @@ const CreativeWorks: FC<{ data: any }> = ({ data }) => {
   if (!works) return null;
   try { works = JSON.parse(data); } catch (e) {}
   
-  if (!Array.isArray(works) || works.length === 0) return null;
+  if (!Array.isArray(works) || works.length === 0) {
+    return null;
+  }
 
   return (
-    <section>
-      <h3 className='text-xl font-bold text-gray-800 mb-4'>Creative Works / Portfolio</h3>
-      <div className='space-y-4'>
+      <div className='space-y-3'>
         {works.map((work, index) => (
-          <div key={index} className='p-4 bg-gray-50 rounded-lg'>
-            <a 
-              href={work.link || '#'} 
-              target='_blank' 
-              rel='noopener noreferrer' 
-              className='text-lg font-semibold text-blue-600 hover:underline'
-            >
+          <div key={index} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
+            <p className='text-base font-bold text-gray-800'>
               {work.title || `Work #${index + 1}`}
-            </a>
-            <p className='text-sm text-gray-600 mt-1'>{work.description}</p>
+            </p>
+            {work.link && <p className='text-sm text-blue-600'>{work.link}</p>}
+            <p className='text-sm text-gray-700 mt-1'>{work.description}</p>
           </div>
         ))}
       </div>
-    </section>
   );
 };
 
@@ -631,8 +701,6 @@ const Signature: FC<{ data: string | null }> = ({ data }) => {
   if (!data) return null;
 
   return (
-    <section>
-      <h3 className='text-xl font-bold text-gray-800 mb-4'>Applicant Signature</h3>
       <div className='border rounded-lg p-2 bg-gray-100 max-w-md'>
         <img
           src={data}
@@ -640,16 +708,240 @@ const Signature: FC<{ data: string | null }> = ({ data }) => {
           className='w-full h-auto object-contain'
         />
       </div>
-    </section>
   );
 };
 
+const Certifications: FC<{ data: any }> = ({ data }) => {
+  let parsedData: any[] | null = null;
+
+  if (Array.isArray(data)) {
+    parsedData = data;
+  } else if (typeof data === 'string') {
+    try {
+      const result = JSON.parse(data);
+      if (Array.isArray(result)) {
+        parsedData = result;
+      }
+    } catch (e) {
+      // Not valid JSON
+    }
+  }
+
+  if (!parsedData || parsedData.length === 0) {
+    return <p className="italic text-gray-500 text-sm">No information provided.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {parsedData.map((cert, index) => (
+        <div key={index} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <p className="text-base font-bold text-gray-800">{cert.title}</p>
+          {cert.rating && <p className="text-sm text-gray-700">Rating: {cert.rating}</p>}
+          <p className="text-sm text-gray-500 italic mt-1">
+            Certified by {cert.certifyingBody} on {cert.dateCertified ? new Date(cert.dateCertified).toLocaleDateString() : 'N/A'}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const CollapsibleSection: FC<{ title: string; children: ReactNode; isOpenDefault?: boolean }> = ({ title, children, isOpenDefault = false }) => {
+  const [isOpen, setIsOpen] = useState(isOpenDefault);
+
+  if (!title) return null;
+
+  return (
+    <div className="border border-gray-200 rounded-lg shadow-sm mb-4">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex justify-between items-center p-4 bg-gray-50 hover:bg-gray-100 text-lg font-semibold text-gray-800"
+      >
+        <span>{title}</span>
+        <ChevronDown
+          className={`w-6 h-6 text-gray-500 transition-transform duration-200 ${
+            isOpen ? "transform rotate-180" : ""
+          }`}
+        />
+      </button>
+      {isOpen && <div className="p-4 bg-white">{children || <p className="italic text-gray-500 text-sm">No data available for this section.</p>}</div>}
+    </div>
+  );
+};
+
+const GenericList: FC<{ data: any[] | string; title?: string }> = ({ data, title }) => {
+  let parsedData: any[] | null = null;
+
+  if (Array.isArray(data)) {
+    parsedData = data;
+  } else if (typeof data === 'string') {
+    try {
+      const result = JSON.parse(data);
+      if (Array.isArray(result)) {
+        parsedData = result;
+      }
+    } catch (e) {
+      // Not valid JSON, treat as no data
+    }
+  }
+
+  const hasData = parsedData && parsedData.length > 0;
+  
+  const content = (
+    hasData ? (
+      <div className="space-y-3">
+        {parsedData?.map((item, index) => (
+          <div key={index} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+            {typeof item === 'object' && item !== null ? (
+              Object.entries(item).map(([key, value]) => (
+                <p key={key} className="text-sm text-gray-700">
+                  <span className="font-semibold capitalize text-gray-600">{key.replace(/_/g, ' ')}:</span> {value != null ? String(value) : 'N/A'}
+                </p>
+              ))
+            ) : (
+              <p className="text-sm text-gray-700">{String(item)}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="italic text-gray-500 text-sm">No information provided, In addition.</p>
+    )
+  );
+
+  if (title) {
+    return <CollapsibleSection title={title}>{content}</CollapsibleSection>;
+  }
+
+  return content;
+};
+
+const EducationBackground: FC<{ data: any }> = ({ data }) => {
+  let educationData = data;
+  if (!educationData) return null;
+  if (typeof educationData === 'string') {
+    try {
+      educationData = JSON.parse(educationData);
+    } catch (e) {
+      return null; // Or some error message
+    }
+  }
+
+  const { tertiary, secondary, elementary, technical } = educationData || {};
+
+  const sections = [
+    { title: 'Tertiary', data: tertiary },
+    { title: 'Secondary', data: secondary },
+    { title: 'Elementary', data: elementary },
+    { title: 'Technical', data: technical },
+  ];
+
+  const hasContent = sections.some(sec => Array.isArray(sec.data) && sec.data.length > 0);
+
+  if (!hasContent) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      {sections.map(section => (
+        (Array.isArray(section.data) && section.data.length > 0) && (
+          <div key={section.title}>
+            <h4 className="font-semibold text-gray-700 mb-2">{section.title}</h4>
+            <GenericList data={section.data} />
+          </div>
+        )
+      ))}
+    </div>
+  );
+};
+
+const WorkExperiences: FC<{ data: any }> = ({ data }) => {
+  let workData = data;
+  if (!workData) return null;
+  if (typeof workData === 'string') {
+    try {
+      workData = JSON.parse(workData);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const { employment, consultancy, selfEmployment } = workData || {};
+
+  const sections = [
+    { title: 'Employment', data: employment },
+    { title: 'Consultancy', data: consultancy },
+    { title: 'Self-Employment', data: selfEmployment },
+  ];
+
+  const hasContent = sections.some(sec => Array.isArray(sec.data) && sec.data.length > 0);
+
+  if (!hasContent) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      {sections.map(section => (
+        (Array.isArray(section.data) && section.data.length > 0) && (
+          <div key={section.title}>
+            <h4 className="font-semibold text-gray-700 mb-2">{section.title}</h4>
+            <GenericList data={section.data} />
+          </div>
+        )
+      ))}
+    </div>
+  );
+};
+
+const ProfessionalDevelopment: FC<{ data: any }> = ({ data }) => {
+  let devData = data;
+  if (!devData) return null;
+  if (typeof devData === 'string') {
+    try {
+      devData = JSON.parse(devData);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const { memberships, projects, research } = devData || {};
+
+  const sections = [
+    { title: 'Memberships', data: memberships },
+    { title: 'Projects', data: projects },
+    { title: 'Research', data: research },
+  ];
+
+  const hasContent = sections.some(sec => Array.isArray(sec.data) && sec.data.length > 0);
+
+  if (!hasContent) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      {sections.map(section => (
+        (Array.isArray(section.data) && section.data.length > 0) && (
+          <div key={section.title}>
+            <h4 className="font-semibold text-gray-700 mb-2">{section.title}</h4>
+            <GenericList data={section.data} />
+          </div>
+        )
+      ))}
+    </div>
+  );
+};
+
+
 const ActionsMenu: FC<{
   applicant: Applicant;
+  onView: (applicant: Applicant) => void; // Added onView
   onDelete: (applicationId: string, applicantName: string | null) => void;
   isDeleting: boolean;
   isUpdating: boolean;
-}> = ({ applicant, onDelete, isDeleting, isUpdating }) => {
+}> = ({ applicant, onView, onDelete, isDeleting, isUpdating }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -659,30 +951,42 @@ const ActionsMenu: FC<{
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [menuRef]);
 
   return (
-    <div className='relative' ref={menuRef}>
+    <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className='p-2 rounded-full hover:bg-gray-200 transition-colors'
+        className="p-2 rounded-full hover:bg-gray-200 data-[state=open]:bg-gray-200 transition-colors"
+        data-state={isOpen ? "open" : "closed"}
         disabled={isDeleting || isUpdating}
       >
-        <MoreHorizontal size={20} />
+        <MoreHorizontal size={18} />
       </button>
       {isOpen && (
-        <div className='absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border'>
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border">
+          <button
+            onClick={() => {
+              onView(applicant);
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+          >
+            <Eye size={16} />
+            View Details
+          </button>
           <button
             onClick={() => {
               onDelete(applicant.application_id, applicant.applicant_name);
               setIsOpen(false);
             }}
-            className='block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50'
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
           >
+            <Trash2 size={16} />
             Delete Application
           </button>
         </div>
