@@ -1461,7 +1461,7 @@ export default function BackgroundAchievementsForm({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          handleSubmit();
+          handleSubmit(e);
         }}
         className="bg-white shadow-lg rounded-2xl flex flex-col overflow-y-auto"
         style={{ width: "896px", height: "803.5px" }}
