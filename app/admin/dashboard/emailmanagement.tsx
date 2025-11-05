@@ -1,9 +1,9 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import supabaseBrowserClient from '@/lib/supabase/client';
 
 import dynamic from 'next/dynamic';
-import { CheckCircle, XCircle, ChevronLeft, AlertTriangle, Loader2, Mail, Plus, Edit2, Search, RefreshCw, FileText, History } from 'lucide-react';
+import { CheckCircle, XCircle, ChevronLeft, AlertTriangle, Loader2, Mail, Plus, Edit2, Search, RefreshCw, FileText, History, Trash2 } from 'lucide-react';
 
 // Dynamically import ReactQuill to avoid SSR issues
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
@@ -43,6 +43,52 @@ type MessageState = { type: 'success' | 'error'; text: string } | null;
 type TemplateView = 'list' | 'editor';
 
 // --- Helper Components ---
+
+// Confirmation Modal Component
+interface ConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+}
+
+const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-black">
+        <h3 className="text-lg font-semibold mb-4">{title}</h3>
+        <p className="text-sm text-gray-700 mb-6">{message}</p>
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /**
  * Renders a colored status badge with an icon and hover tooltip for errors.
@@ -102,12 +148,20 @@ const EmailManagement = () => {
   // "Templates" Tab State
   const [templateView, setTemplateView] = useState<TemplateView>('list');
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  const [templateMessage, setTemplateMessage] = useState<MessageState>(null);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [lastDeletedTemplate, setLastDeletedTemplate] = useState<{ template: Template; originalIndex: number } | null>(null);
+  const [showUndoNotification, setShowUndoNotification] = useState(false);
+  const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // "History" Tab State
   const [historySearch, setHistorySearch] = useState('');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'Sent' | 'Failed'>('all');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [highlightedLogId, setHighlightedLogId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const emailsPerPage = 10;
 
   // --- Data Fetching and Effects ---
 
@@ -224,46 +278,140 @@ const EmailManagement = () => {
 
   const handleSaveTemplate = async (formData: { name: string, subject: string, content: string }) => {
     const isEditing = !!editingTemplate;
-    let updatedTemplates;
+    setTemplateMessage(null);
+
+    let updatedTemplatesLocally: Template[];
 
     if (isEditing) {
-      updatedTemplates = templates.map(t => 
+      updatedTemplatesLocally = templates.map(t => 
         t.id === editingTemplate.id ? { ...t, ...formData } : t
       );
     } else {
       const newTemplate: Template = { id: Date.now(), ...formData };
-      updatedTemplates = [...templates, newTemplate];
+      updatedTemplatesLocally = [...templates, newTemplate];
     }
 
     try {
       const response = await fetch('/api/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedTemplates),
+        body: JSON.stringify(updatedTemplatesLocally),
       });
 
+      const result = await response.json();
+
       if (response.ok) {
-        setTemplates(updatedTemplates);
+        setTemplates(updatedTemplatesLocally);
+        setTemplateMessage({ type: 'success', text: `Template "${formData.name}" ${isEditing ? 'updated' : 'created'} successfully!` });
         setTemplateView('list');
         setEditingTemplate(null);
       } else {
-        console.error('Failed to save templates');
+        setTemplateMessage({ type: 'error', text: `Failed to save template: ${result.error || 'Unknown error'}` });
+        console.error('Failed to save templates:', result.error);
       }
     } catch (error) {
+      setTemplateMessage({ type: 'error', text: 'An unexpected error occurred while saving the template.' });
       console.error('Failed to save templates:', error);
     }
   };
 
-  const handleApplyTemplate = () => {
-    if (!selectedTemplateId) return;
-    const template = templates.find(t => t.id === parseInt(selectedTemplateId));
-    if (template) {
-      setSubject(template.subject);
-      setCustomMessage(template.content);
-    }
+  const handleDeleteTemplate = (templateId: number, templateName: string) => {
+    setTemplateToDelete({ id: templateId, name: templateName });
+    setIsConfirmModalOpen(true);
   };
 
-  // --- Child Components / Render Functions ---
+      const confirmDelete = async () => {
+        if (!templateToDelete) return;
+    
+        const { id: templateId, name: templateName } = templateToDelete;
+        setTemplateMessage(null);
+        setIsConfirmModalOpen(false);
+        setTemplateToDelete(null);
+    
+        // Clear any existing undo timer
+        if (undoTimerRef.current) {
+          clearTimeout(undoTimerRef.current);
+        }
+    
+        try {
+          const response = await fetch(`/api/templates?id=${templateId}`, {
+            method: 'DELETE',
+          });
+    
+          if (response.ok) {
+            // Find the original index before filtering
+            const originalIndex = templates.findIndex(t => t.id === templateId);
+            const deletedTemplateData = templates.find(t => t.id === templateId);
+    
+            setTemplates(prev => prev.filter(t => t.id !== templateId));
+            setTemplateMessage({ type: 'success', text: `Template "${templateName}" deleted successfully!` });
+    
+            if (deletedTemplateData && originalIndex !== -1) {
+              setLastDeletedTemplate({ template: deletedTemplateData, originalIndex });
+              setShowUndoNotification(true);
+              undoTimerRef.current = setTimeout(() => {
+                setShowUndoNotification(false);
+                setLastDeletedTemplate(null);
+              }, 5000); // Hide undo notification after 5 seconds
+            }
+          } else {
+            const result = await response.json();
+            setTemplateMessage({ type: 'error', text: `Failed to delete template: ${result.error || 'Unknown error'}` });
+            console.error('Failed to delete template:', result.error);
+          }
+            } catch (error) {
+              setTemplateMessage({ type: 'error', text: 'An unexpected error occurred while deleting the template.' });
+              console.error('Failed to delete template:', error);
+            }
+          };
+        
+          const handleUndoDelete = async () => {
+            if (!lastDeletedTemplate) return;
+        
+            // Clear the auto-hide timer if undo is clicked
+            if (undoTimerRef.current) {
+              clearTimeout(undoTimerRef.current);
+            }
+        
+            setTemplateMessage(null);
+            setShowUndoNotification(false);
+        
+            const { template: restoredTemplate, originalIndex } = lastDeletedTemplate;
+        
+            // Re-insert the template into the local state at its original position
+            const newTemplates = [...templates];
+            newTemplates.splice(originalIndex, 0, restoredTemplate);
+        
+            try {
+              const response = await fetch('/api/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newTemplates),
+              });
+        
+              if (response.ok) {
+                setTemplates(newTemplates);
+                setLastDeletedTemplate(null);
+                setTemplateMessage({ type: 'success', text: `Template "${restoredTemplate.name}" restored successfully!` });
+              } else {
+                const result = await response.json();
+                setTemplateMessage({ type: 'error', text: `Failed to undo deletion: ${result.error || 'Unknown error'}` });
+                console.error('Failed to undo deletion:', result.error);
+              }
+            } catch (error) {
+              setTemplateMessage({ type: 'error', text: 'An unexpected error occurred while undoing deletion.' });
+              console.error('Failed to undo deletion:', error);
+            }
+          };
+        
+          const handleApplyTemplate = () => {
+            if (!selectedTemplateId) return;
+            const template = templates.find(t => t.id === parseInt(selectedTemplateId));
+            if (template) {
+              setSubject(template.subject);
+              setCustomMessage(template.content);
+            }
+          };  // --- Child Components / Render Functions ---
 
   const TemplateEditor = () => {
     const [name, setName] = useState(editingTemplate?.name || '');
@@ -489,6 +637,34 @@ const EmailManagement = () => {
               Create New Template
             </button>
           </div>
+          {templateMessage && (
+            <div className={`flex items-center gap-2 p-3 rounded-md text-sm ${templateMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {templateMessage.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+              <p>{templateMessage.text}</p>
+            </div>
+          )}
+          {showUndoNotification && lastDeletedTemplate && (
+            <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-4 rounded-lg shadow-lg flex items-center gap-4 z-50">
+              <span>Template "{lastDeletedTemplate.template.name}" deleted.</span>
+              <button
+                onClick={handleUndoDelete}
+                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-md text-sm font-medium"
+              >
+                Undo
+              </button>
+            </div>
+          )}
+          {showUndoNotification && lastDeletedTemplate && (
+            <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-4 rounded-lg shadow-lg flex items-center gap-4 z-50">
+              <span>Template "{lastDeletedTemplate.template.name}" deleted.</span>
+              <button
+                onClick={handleUndoDelete}
+                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-md text-sm font-medium"
+              >
+                Undo
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {templates.map(template => (
               <div key={template.id} className="p-5 border rounded-xl shadow-sm bg-white flex flex-col transition-all duration-300 hover:shadow-lg">
@@ -504,6 +680,12 @@ const EmailManagement = () => {
                   >
                     <Edit2 className="w-4 h-4" /> Edit
                   </button>
+                  <button 
+                    onClick={() => handleDeleteTemplate(template.id, template.name)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 className="w-4 h-4" /> Delete
+                  </button>
                 </div>
               </div>
             ))}
@@ -512,6 +694,14 @@ const EmailManagement = () => {
       ) : (
         <TemplateEditor />
       )}
+      <ConfirmationModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="Confirm Deletion"
+        message={`Are you sure you want to permanently delete the template "${templateToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+      />
     </div>
   );
 
@@ -521,78 +711,110 @@ const EmailManagement = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const renderHistoryView = () => (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-grow">
-          <input
-            type="text"
-            placeholder="Search by recipient..."
-            value={historySearch}
-            onChange={(e) => setHistorySearch(e.target.value)}
-            className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm text-gray-900"
-          />
-          <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+  const renderHistoryView = () => {
+    const indexOfLastEmail = currentPage * emailsPerPage;
+    const indexOfFirstEmail = indexOfLastEmail - emailsPerPage;
+    const currentEmails = filteredEmailLog.slice(indexOfFirstEmail, indexOfLastEmail);
+
+    const totalPages = Math.ceil(filteredEmailLog.length / emailsPerPage);
+
+    const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-grow">
+            <input
+              type="text"
+              placeholder="Search by recipient..."
+              value={historySearch}
+              onChange={(e) => setHistorySearch(e.target.value)}
+              className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm text-gray-900"
+            />
+            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </div>
+          <select
+            value={historyStatusFilter}
+            onChange={(e) => setHistoryStatusFilter(e.target.value as any)}
+            className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm bg-white text-black"
+          >
+            <option value="all">All Statuses</option>
+            <option value="Sent">Sent</option>
+            <option value="Failed">Failed</option>
+          </select>
+          <button
+            onClick={() => fetchEmailLogs()}
+            disabled={isHistoryLoading}
+            className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-wait"
+          >
+            <RefreshCw className={`w-4 h-4 ${isHistoryLoading ? 'animate-spin' : ''}`} />
+            {isHistoryLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
-        <select
-          value={historyStatusFilter}
-          onChange={(e) => setHistoryStatusFilter(e.target.value as any)}
-          className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm bg-white text-black"
-        >
-          <option value="all">All Statuses</option>
-          <option value="Sent">Sent</option>
-          <option value="Failed">Failed</option>
-        </select>
-        <button
-          onClick={() => fetchEmailLogs()}
-          disabled={isHistoryLoading}
-          className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-wait"
-        >
-          <RefreshCw className={`w-4 h-4 ${isHistoryLoading ? 'animate-spin' : ''}`} />
-          {isHistoryLoading ? 'Refreshing...' : 'Refresh'}
-        </button>
-      </div>
-      <div className="overflow-x-auto">
-        {/* Inject the animation styles */}
-        <style>{highlightAnimation}</style>
-        <div className="align-middle inline-block min-w-full shadow overflow-hidden sm:rounded-lg border-b border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEmailLog.length === 0 ? (
+        <div className="overflow-x-auto">
+          {/* Inject the animation styles */}
+          <style>{highlightAnimation}</style>
+          <div className="align-middle inline-block min-w-full shadow overflow-hidden sm:rounded-lg border-b border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={4} className="text-center py-10 text-gray-500">No logs found.</td>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                 </tr>
-              ) : (
-                filteredEmailLog.map((log) => (
-                  <tr 
-                    key={log.id} 
-                    className={`${
-                      highlightedLogId === log.id ? 'animate-flash' : ''
-                    } transition-colors`}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">{log.recipient}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.subject}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={log.status} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(log.created_at).toLocaleString()}</td>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {currentEmails.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-10 text-gray-500">No logs found.</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  currentEmails.map((log) => (
+                    <tr 
+                      key={log.id} 
+                      className={`${
+                        highlightedLogId === log.id ? 'animate-flash' : ''
+                      } transition-colors`}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">{log.recipient}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.subject}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={log.status} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(log.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+        {/* Pagination Controls */}
+        {filteredEmailLog.length > emailsPerPage && (
+          <div className="flex justify-center items-center space-x-2 mt-4">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // --- Main Render ---
 

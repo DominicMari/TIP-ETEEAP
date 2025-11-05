@@ -1,51 +1,96 @@
-import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
+// Example of how your /api/templates route should handle POST requests
+import fs from 'fs';
 import path from 'path';
 
-const dataDir = path.join(process.cwd(), 'data');
-const templatesFilePath = path.join(dataDir, 'templates.json');
+const templatesFilePath = path.join(process.cwd(), 'data', 'templates.json');
 
-// Helper to ensure directory exists
-async function ensureDirExists() {
+export async function POST(req: Request) {
   try {
-    await fs.mkdir(dataDir, { recursive: true });
+    const updatedTemplates = await req.json(); // Get the new list of templates from the request body
+
+    // Write the updated templates array back to the JSON file
+    fs.writeFileSync(templatesFilePath, JSON.stringify(updatedTemplates, null, 2), 'utf-8');
+
+    return new Response(JSON.stringify(updatedTemplates), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   } catch (error) {
-    console.error('Error creating data directory:', error);
-    throw new Error('Could not create data directory.');
+    console.error('Error updating templates.json:', error);
+    return new Response(JSON.stringify({ error: 'Failed to update templates' }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   }
 }
 
+// You should also have a GET handler to read the templates
 export async function GET() {
   try {
-    await ensureDirExists(); // Ensure directory exists before reading
-    const data = await fs.readFile(templatesFilePath, 'utf-8');
-    const templates = JSON.parse(data);
-    return NextResponse.json(templates);
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      // File doesn't exist, return empty array which is fine
-      return NextResponse.json([]);
-    }
-    console.error('Error reading templates:', error);
-    return NextResponse.json({ error: 'Failed to read templates' }, { status: 500 });
+    const templates = JSON.parse(fs.readFileSync(templatesFilePath, 'utf-8'));
+    return new Response(JSON.stringify(templates), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (error) {
+    console.error('Error reading templates.json:', error);
+    return new Response(JSON.stringify({ error: 'Failed to read templates' }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function DELETE(req: Request) {
   try {
-    const templates = await req.json();
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
 
-    // Basic validation
-    if (!Array.isArray(templates)) {
-      return NextResponse.json({ error: 'Invalid data format. Expected an array of templates.' }, { status: 400 });
+    if (!id) {
+      return new Response(JSON.stringify({ error: 'Template ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    await ensureDirExists();
-    await fs.writeFile(templatesFilePath, JSON.stringify(templates, null, 2));
-    
-    return NextResponse.json({ message: 'Templates saved successfully' });
-  } catch (error: any) {
-    console.error('Error saving templates:', error);
-    return NextResponse.json({ error: 'Failed to save templates' }, { status: 500 });
+    let templates: any[] = [];
+    if (fs.existsSync(templatesFilePath)) {
+      templates = JSON.parse(fs.readFileSync(templatesFilePath, 'utf-8'));
+    }
+
+    const initialLength = templates.length;
+    const updatedTemplates = templates.filter(t => t.id !== parseInt(id));
+
+    if (updatedTemplates.length === initialLength) {
+      return new Response(JSON.stringify({ error: 'Template not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    fs.writeFileSync(templatesFilePath, JSON.stringify(updatedTemplates, null, 2), 'utf-8');
+
+    return new Response(JSON.stringify({ message: 'Template deleted successfully' }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (error) {
+    console.error('Error deleting template from templates.json:', error);
+    return new Response(JSON.stringify({ error: 'Failed to delete template' }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   }
 }

@@ -1,14 +1,14 @@
 [
   {
-    "id": 1762151773462,
-    "name": "sadas",
-    "subject": "dasdasd",
-    "content": "<p>Start writing your template here...a=</p><p><br></p><p>asdasd</p><p><br></p><p><br></p><p><strong>asdasj</strong></p><p>sadja</p>"
-  },
-  {
     "id": 1762157186502,
     "name": "Congratulations",
     "subject": "Approved",
     "content": "<p>hello amigo</p><p>I would like you to know that your application is <u>APPROVED</u>. </p><p><br></p><p><strong><em>Cheers mate</em></strong></p><p><strong><em>Da TEAM</em></strong></p>"
+  },
+  {
+    "id": 1762362069925,
+    "name": "Decline",
+    "subject": "Application Decline",
+    "content": "<p><strong>Start writing your template here...</strong></p><p><br></p><p><br></p><p>Hello there</p>"
   }
 ]
