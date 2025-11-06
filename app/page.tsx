@@ -5,7 +5,7 @@ import supabase from "../lib/supabase/client"; // Adjust path if needed (e.g., '
 import { signIn, useSession } from "next-auth/react";
 // import Link from 'next/link'; // Not directly needed here, but needed in Footer component
 import Header from "./components/header";
-import Footer from "./components/footer"; // ✅ Re-import the Footer component
+import Footer from "./components/footer";
 import Assessment from "./components/assessment";
 import WhoCanEnroll from "./components/whocanenroll";
 import Main from "./components/mainsection";
@@ -36,7 +36,6 @@ export default function Page() {
   // Effect runs when session status changes (Upsert User & Log History)
   useEffect(() => {
     const handleLoginEvents = async () => {
-      // ... (useEffect logic remains the same - handles upsert and history logging using shared supabase client) ...
        if (status === 'authenticated' && session?.user && !loginEventProcessed) {
         setLoginEventProcessed(true);
         const user = session.user;
@@ -79,21 +78,21 @@ export default function Page() {
   }, [session, status, loginEventProcessed]);
 
   // --- Handlers ---
-  const handleFormClick = (formType: "application" | "portfolio", redirectUrl: string) => { /* ... */
-      if (session) { window.location.href = redirectUrl; }
-      else { setShowModal(true); setModalType(formType); setCurrentImage(0); }
+  const handleFormClick = (formType: "application" | "portfolio", redirectUrl: string) => {
+     if (session) { window.location.href = redirectUrl; }
+     else { setShowModal(true); setModalType(formType); setCurrentImage(0); }
   };
-  const handleNextImage = () => { /* ... */
-      if (!modalType) return;
-      setCurrentImage((prev) => (prev + 1) % images[modalType].length);
+  const handleNextImage = () => {
+     if (!modalType) return;
+     setCurrentImage((prev) => (prev + 1) % images[modalType].length);
   };
-  const handlePrevImage = () => { /* ... */
-      if (!modalType) return;
-      setCurrentImage((prev) => (prev - 1 + images[modalType].length) % images[modalType].length);
+  const handlePrevImage = () => {
+     if (!modalType) return;
+     setCurrentImage((prev) => (prev - 1 + images[modalType].length) % images[modalType].length);
   };
-  const handleSignInClick = () => { /* ... */
-      setShowModal(false);
-      setShowLogin(true);
+  const handleSignInClick = () => {
+     setShowModal(false);
+     setShowLogin(true);
   };
 
   // --- Render ---
@@ -110,7 +109,13 @@ export default function Page() {
                 <button onClick={() => setShowLogin(false)} className="absolute top-3 right-3 text-gray-400 hover:text-white" aria-label="Close login modal"> <X size={24} /> </button>
                 <h2 className="text-2xl font-bold mb-4">Login to Continue</h2>
                 <p className="text-gray-400 mb-6">Please sign in to access the forms and begin your application.</p>
-                <button onClick={() => signIn("google")} className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+                {/* ✅✅✅ THIS IS THE FIX ✅✅✅
+                  We added { prompt: "select_account" } to the signIn function.
+                */}
+                <button 
+                  onClick={() => signIn("google", { prompt: "select_account" })} 
+                  className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+                >
                   <img src="/assets/googleicon.png" alt="Google" className="w-6 h-6" /> Sign in with Google
                 </button>
               </div>
@@ -149,7 +154,6 @@ export default function Page() {
           </section>
       </main>
 
-      {/* ✅ Use the imported Footer component */}
       <Footer />
 
     </div>
