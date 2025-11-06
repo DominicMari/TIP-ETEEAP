@@ -48,7 +48,9 @@ export default function Header() {
           </div>
         ) : (
           <button
-            onClick={() => signIn("google")}
+            // ✅ THIS IS THE FIX
+            // Added { prompt: "select_account" } to force account selection
+            onClick={() => signIn("google", { prompt: "select_account" })}
             className="bg-yellow-400 text-black font-semibold py-2 px-4 rounded-lg hover:bg-yellow-300 transition"
           >
             Login
