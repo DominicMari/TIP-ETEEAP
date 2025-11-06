@@ -354,8 +354,7 @@ export default function ApplicantsManage() {
                   <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.degree_applied_for || 'N/A'}</td>
                   <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.campus || 'N/A'}</td>
                   <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>
-                    {app.application_date ? new Date(app.application_date).toLocaleDateString() :
-                     app.created_at ? new Date(app.created_at).toLocaleDateString() : 'N/A'}
+                    {formatDate(app.application_date || app.created_at)}
                   </td>
                   <td className='px-6 py-4 whitespace-nowrap'>
                     <div className='flex items-center gap-2'>
@@ -464,6 +463,29 @@ const PageHeader: FC<{
 );
 
 
+const formatDate = (dateString: string | null | undefined, includeTime = false): string => {
+    if (!dateString) {
+      return 'N/A';
+    }
+    try {
+      const date = new Date(dateString);
+        return dateString;
+      }
+      const options: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      };
+      if (includeTime) {
+        options.hour = '2-digit';
+        options.minute = '2-digit';
+      }
+      return new Intl.DateTimeFormat('en-US', options).format(date);
+    } catch (e) {
+      return dateString;
+    }
+  };
+
 // 🔽 --- IMPROVED: View Details Modal ---
 const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
   applicant,
@@ -529,12 +551,11 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
             <InfoCard title='Application Info'>
               <InfoItem 
                 label='Date Submitted' 
-                value={applicant.application_date ? new Date(applicant.application_date).toLocaleDateString() : 
-                       applicant.created_at ? new Date(applicant.created_at).toLocaleString() : 'N/A'} 
+                value={formatDate(applicant.application_date || applicant.created_at, true)} 
               />
               <InfoItem 
                 label='Last Updated' 
-                value={applicant.updated_at ? new Date(applicant.updated_at).toLocaleString() : 'N/A'}
+                value={formatDate(applicant.updated_at, true)}
               />
                   <InfoItem label='Portfolio/Folder Link'>
                     <a
@@ -753,7 +774,7 @@ const Certifications: FC<{ data: any }> = ({ data }) => {
           <p className="text-base font-bold text-gray-800">{cert.title}</p>
           {cert.rating && <p className="text-sm text-gray-700">Rating: {cert.rating}</p>}
           <p className="text-sm text-gray-500 italic mt-1">
-            Certified by {cert.certifyingBody} on {cert.dateCertified ? new Date(cert.dateCertified).toLocaleDateString() : 'N/A'}
+            Certified by {cert.certifyingBody} on {formatDate(cert.dateCertified)}
           </p>
         </div>
       ))}
@@ -810,7 +831,7 @@ const GenericList: FC<{ data: any[] | string; title?: string }> = ({ data, title
             {typeof item === 'object' && item !== null ? (
               Object.entries(item).map(([key, value]) => (
                 <p key={key} className="text-sm text-gray-700">
-                  <span className="font-semibold capitalize text-gray-600">{key.replace(/_/g, ' ')}:</span> {value != null ? String(value) : 'N/A'}
+                  <span className="font-semibold text-gray-600">{key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}:</span> {/date/i.test(key) ? formatDate(value as string) : value != null ? String(value) : 'N/A'}
                 </p>
               ))
             ) : (
@@ -893,7 +914,7 @@ const WorkExperiences: FC<{ data: any }> = ({ data }) => {
   const hasContent = sections.some(sec => Array.isArray(sec.data) && sec.data.length > 0);
 
   if (!hasContent) {
-    return null;
+    return <p className="italic text-gray-500 text-sm">No information provided, In addition.</p>;
   }
 
   return (
@@ -932,7 +953,7 @@ const ProfessionalDevelopment: FC<{ data: any }> = ({ data }) => {
   const hasContent = sections.some(sec => Array.isArray(sec.data) && sec.data.length > 0);
 
   if (!hasContent) {
-    return null;
+    return <p className="italic text-gray-500 text-sm">No information provided, In addition.</p>;
   }
 
   return (
@@ -948,6 +969,8 @@ const ProfessionalDevelopment: FC<{ data: any }> = ({ data }) => {
     </div>
   );
 };
+
+
 
 
 const ActionsMenu: FC<{

@@ -17,7 +17,6 @@ interface PortfolioSubmission {
   created_at: string;
   status: string;
   degree_program: string;
-  campus: string;
 }
 
 interface Applicant {
@@ -117,7 +116,7 @@ export default function DashboardHome() {
             .select("application_id, created_at, status, degree_applied_for, campus"),
           supabase
             .from("portfolio_submissions")
-            .select("id, created_at, status, degree_program, campus"),
+            .select("id, created_at, status, degree_program"),
           supabase
             .from("user_login_history")
             .select("email, user_id"),
@@ -188,12 +187,10 @@ export default function DashboardHome() {
   }, [allApplicants, allPortfolioSubmissions, dataType]);
 
   const filteredChartData = useMemo(() => {
-    const normalizedChartCampus = chartCampus.toLowerCase(); // "manila" or "quezon city"
-
     if (dataType === "applicants") {
+      const normalizedChartCampus = chartCampus.toLowerCase();
       const filtered = allApplicants.filter((app) => {
-        const normalizedAppCampus = app.campus?.trim().toLowerCase(); // "qc" or "manila"
-
+        const normalizedAppCampus = app.campus?.trim().toLowerCase();
         if (normalizedChartCampus === 'quezon city') {
           return normalizedAppCampus === 'qc';
         }
@@ -202,16 +199,7 @@ export default function DashboardHome() {
       console.log(`[DashboardHome] Filtering applicants for "${chartCampus}": Found ${filtered.length} of ${allApplicants.length} total.`);
       return filtered;
     } else { // dataType === "portfolios"
-      const filtered = allPortfolioSubmissions.filter((portfolio) => {
-        const normalizedPortfolioCampus = portfolio.campus?.trim().toLowerCase();
-
-        if (normalizedChartCampus === 'quezon city') {
-          return normalizedPortfolioCampus === 'qc';
-        }
-        return normalizedPortfolioCampus === normalizedChartCampus;
-      });
-      console.log(`[DashboardHome] Filtering portfolios for "${chartCampus}": Found ${filtered.length} of ${allPortfolioSubmissions.length} total.`);
-      return filtered;
+      return allPortfolioSubmissions;
     }
   }, [allApplicants, allPortfolioSubmissions, chartCampus, dataType]);
 
@@ -294,10 +282,7 @@ export default function DashboardHome() {
   return (
     <div className="space-y-6">
       {/* Stat Cards Row */}
-      {/* 🔽🔽🔽 --- CSS FIX IS HERE --- 🔽🔽🔽 */}
-      {/* Changed grid to have max 3 cols on large screens, making cards wider */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {/* 🔼🔼🔼 --- END OF CSS FIX --- 🔼🔼🔼 */}
         <StatCard title={dataType === "applicants" ? "Total Applications" : "Total Submissions"} value={currentStats.total} icon={<Users size={20} />} />
         <StatCard title="Approved" value={currentStats.approved} icon={<CheckCircle size={20} />} />
         <StatCard title="Pending / Submitted" value={currentStats.pending} icon={<Clock size={20} />} />
@@ -309,24 +294,26 @@ export default function DashboardHome() {
       {/* Campus and Data Type Switches */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         {/* Campus Switch */}
-        <div className="inline-flex items-center bg-white border border-gray-200 rounded-full p-1 shadow-sm">
-          <button
-            onClick={() => setChartCampus("Manila")}
-            className={`px-5 py-1.5 text-sm font-semibold rounded-full transition-colors ${
-              chartCampus === "Manila" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            Manila Campus
-          </button>
-          <button
-            onClick={() => setChartCampus("Quezon City")}
-            className={`px-5 py-1.5 text-sm font-semibold rounded-full transition-colors ${
-              chartCampus === "Quezon City" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            Quezon City Campus
-          </button>
-        </div>
+        {dataType === 'applicants' && (
+          <div className="inline-flex items-center bg-white border border-gray-200 rounded-full p-1 shadow-sm">
+            <button
+              onClick={() => setChartCampus("Manila")}
+              className={`px-5 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+                chartCampus === "Manila" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              Manila Campus
+            </button>
+            <button
+              onClick={() => setChartCampus("Quezon City")}
+              className={`px-5 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+                chartCampus === "Quezon City" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              Quezon City Campus
+            </button>
+          </div>
+        )}
 
         {/* Data Type Switch */}
         <div className="inline-flex items-center bg-white border border-gray-200 rounded-full p-1 shadow-sm">
@@ -353,7 +340,7 @@ export default function DashboardHome() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Application Volume Chart */}
         <ChartContainer
-          title={`${dataType === "applicants" ? "Application" : "Portfolio Submission"} Volume - ${chartCampus}`}
+          title={dataType === 'applicants' ? `Application Volume - ${chartCampus}` : 'Portfolio Submission Volume'}
           icon={<Calendar size={18} />}
           className="lg:col-span-2"
         >
@@ -376,7 +363,7 @@ export default function DashboardHome() {
 
         {/* Status Pie Chart */}
         <ChartContainer
-          title={`${dataType === "applicants" ? "Applicant" : "Portfolio"} Status - ${chartCampus}`}
+          title={dataType === 'applicants' ? `Applicant Status - ${chartCampus}` : 'Portfolio Status'}
           icon={<BarChart3 size={18} />}
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -411,7 +398,7 @@ export default function DashboardHome() {
 
          {/* Top Programs Bar Chart */}
         <ChartContainer
-          title={`Top ${dataType === "applicants" ? "Programs" : "Portfolio Programs"} - ${chartCampus}`}
+          title={dataType === 'applicants' ? `Top Programs - ${chartCampus}` : 'Top Portfolio Programs'}
           icon={<GraduationCap size={18} />}
           className="lg:col-span-3"
         >

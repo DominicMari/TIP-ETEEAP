@@ -26,7 +26,6 @@ interface PortfolioSubmission {
   user_id: string;
   full_name: string;
   degree_program: string;
-  campus: string;
   portfolio_link: string;
   photo_url: string;
   signature: string;
@@ -218,7 +217,6 @@ export default function PortfolioSubmissions() {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Applicant</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Degree</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Campus</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Submitted</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -227,7 +225,7 @@ export default function PortfolioSubmissions() {
           <tbody className="divide-y divide-gray-200">
             {paginatedSubmissions.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-gray-500">
+                <td colSpan={5} className="p-6 text-center text-gray-500">
                   No submissions found
                   {searchTerm && " matching your search."}
                   {statusFilter !== "All" && ` with status "${statusFilter}".`}
@@ -259,7 +257,6 @@ export default function PortfolioSubmissions() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{sub.degree_program || "N/A"}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{sub.campus || "N/A"}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {sub.created_at ? new Date(sub.created_at).toLocaleDateString() : "N/A"}
                   </td>
@@ -405,7 +402,6 @@ const ViewSubmissionModal: FC<{ submission: PortfolioSubmission; onClose: () => 
             <p className="text-lg text-gray-600">
               {submission.degree_program || "N/A"}
             </p>
-            <p className="text-sm text-gray-500">{submission.campus} Campus</p>
             <div 
               className={`mt-2 text-sm font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${
                 STATUS_COLORS[submission.status]
