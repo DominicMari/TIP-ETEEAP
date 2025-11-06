@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+// ✅ 1. IMPORT THE SHARED CLIENT
+import supabase from "@/lib/supabase/client";
 import { useSession } from "next-auth/react";
-import { PenTool, Loader2 } from "lucide-react";
+// ✅ 2. IMPORT Link and ArrowLeft
+import Link from "next/link";
+import { PenTool, Loader2, ArrowLeft } from "lucide-react";
 import SignatureCanvas from 'react-signature-canvas';
 import InitialForm from "./a";
 import PersonalInformationForm from "./b";
@@ -12,13 +15,12 @@ import BackgroundAchievementsForm from "./d"; //missing page
 import CreativeWorksForm from "./i";
 import LifelongLearningForm from "./j";
 import SelfReportForm from "./selfassessment";
-import { useRouter } from 'next/navigation'; // For the "Disagree" button
-import DataPrivacyConsent from './undertaking'; // Import the new component
+import { useRouter } from 'next/navigation';
+import DataPrivacyConsent from './undertaking';
 
-// ✅ 2. Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// ❌ 3. REMOVED the local, broken client
+// const supabaseUrl = ...
+// const supabase = createClient(...)
 
 const getTodayDateISO = () => {
     const today = new Date();
@@ -27,8 +29,9 @@ const getTodayDateISO = () => {
 
 // --- Pagination Component ---
 function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: number; totalSteps: number; stepTitles: string[] }) {
-    // ... (Your existing Pagination code)
-    if (currentStep > totalSteps + 1) return null;
+    // ✅ 4. FIX: Hide pagination on the Success screen (step 9)
+    if (currentStep > totalSteps) return null; // Was totalSteps + 1
+
     const steps = stepTitles.map((title, index) => ({ number: index + 1, title }));
     return (
         <div className="w-full max-w-5xl mb-8">
@@ -54,20 +57,35 @@ function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: numb
 }
 
 // --- Success Screen Component ---
-function SuccessScreen() {
-    // ... (Component code is unchanged)
+// ✅ 5. UPDATED SuccessScreen with new buttons
+function SuccessScreen({ onEdit }: { onEdit: () => void }) {
     return (
-        <div className="bg-white shadow-lg rounded-2xl w-full max-w-3xl p-12 text-center">
+        <div className="bg-white shadow-lg rounded-2xl w-full max-w-3xl p-12 text-center flex flex-col items-center">
             <div className="text-6xl mb-4">🎉</div>
             <h1 className="text-3xl font-bold text-black mb-4">Application Submitted!</h1>
-            <p className="text-gray-600">Thank you for completing the form. We have received your application and will review it shortly.</p>
+            <p className="text-gray-600 mb-8">Thank you for completing the form. We have received your application and will review it shortly.</p>
+            
+            <div className="flex items-center gap-4 mt-4">
+                <button
+                    type="button"
+                    onClick={onEdit}
+                    className="bg-gray-200 text-black font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                    Make a New Application
+                </button>
+                <Link
+                    href="/" // Link to homepage
+                    className="bg-yellow-500 text-white font-semibold py-2 px-6 rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                    Back to Homepage
+                </Link>
+            </div>
         </div>
     );
 }
 
 // --- Final Review Step Component ---
 function FinalReviewStep({ nextStep, prevStep, signaturePadRef, isSubmitting }: {
-    // ... (Component code is unchanged)
     nextStep: () => void,
     prevStep: () => void,
     signaturePadRef: React.RefObject<SignatureCanvas | null>,
@@ -139,15 +157,10 @@ export default function ApplicationFormPage() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const signaturePadRef = useRef<SignatureCanvas>(null);
-
-    // --- ✅ 1. HOOKS MOVED INSIDE & STATE CHANGED ---
-    const [hasConsented, setHasConsented] = useState(false); // Default to false
-    // We no longer need isLoadingConsent
+    const [hasConsented, setHasConsented] = useState(false); 
     const router = useRouter();
-    // ---
 
-    // [Inside ApplicationFormPage component]
-    const [formData, setFormData] = useState({
+    const defaultFormData = {
         initial: { name: "", degree: "", campus: "", date: getTodayDateISO(), folderLink: "", photo: null as File | null },
         personalInfo: { fullAddress: "", mobile: "", email: "", birthDate: "", age: null as number | null },
         goals: { degrees: [""], statement: "" },
@@ -162,7 +175,9 @@ export default function ApplicationFormPage() {
         creativeWorks: [{ title: "", institution: "", dates: "" }],
         lifelongLearning: { hobbies: "", skills: "", workActivities: "", volunteer: "", travels: "" },
         selfAssessment: { jobLearning: "", teamworkLearning: "", selfLearning: "", workBenefits: "", essay: "" }
-    });
+    };
+    
+    const [formData, setFormData] = useState(defaultFormData);
 
     const stepTitles = [
         "Initial Info",
@@ -175,61 +190,46 @@ export default function ApplicationFormPage() {
         "Submit",
     ];
 
-    const totalSteps = stepTitles.length;
+    const totalSteps = stepTitles.length; // 8 steps
 
     // Load data from localStorage on mount
     useEffect(() => {
         try {
             const savedData = localStorage.getItem('applicationFormData');
             const savedStep = localStorage.getItem('applicationFormStep');
+            // ✅ 6. ADDED: Check for saved consent
+            const savedConsent = localStorage.getItem('dataPrivacyConsent');
+
+            // Restore consent first
+            if (savedConsent === 'true') {
+                setHasConsented(true);
+            }
 
             if (savedData) {
                 const parsedData = JSON.parse(savedData);
-
-                // ✅ FIX: Robustly merge the loaded data
+                
                 setFormData(prev => {
-                    // Start with a clean copy of the default state
                     const newState = JSON.parse(JSON.stringify(prev));
-
-                    // Safely merge each top-level key
                     (Object.keys(prev) as Array<keyof typeof prev>).forEach(key => {
                         if (parsedData[key] !== undefined) {
                             if (typeof newState[key] === 'object' && !Array.isArray(newState[key]) && newState[key] !== null) {
-                                // It's an object (like initial, personalInfo, goals)
-                                // Merge it, but don't allow null to overwrite the object
                                 newState[key] = { ...prev[key], ...(parsedData[key] || {}) };
                             } else {
-                                // It's a primitive, array, or null
-                                // Allow parsedData to overwrite
                                 newState[key] = parsedData[key];
                             }
                         }
                     });
 
-                    // --- Post-Merge Sanity Checks (The real fix) ---
-                    // This ensures the nested objects have the correct structure
-                    // no matter what localStorage had.
-
-                    // 1. Ensure 'initial' is correct
+                    // --- Post-Merge Sanity Checks ---
                     newState.initial = { ...prev.initial, ...(newState.initial || {}) };
-                    newState.initial.photo = prev.initial.photo; // Always reset file
-
-                    // 2. Ensure 'goals' is correct and 'degrees' is an array
+                    newState.initial.photo = prev.initial.photo;
                     newState.goals = { ...prev.goals, ...(newState.goals || {}) };
-                    if (!Array.isArray(newState.goals.degrees)) {
-                        newState.goals.degrees = [""]; // Force it to be an array
-                    }
-
-                    // 3. Ensure 'personalInfo' is correct
+                    if (!Array.isArray(newState.goals.degrees)) newState.goals.degrees = [""];
                     newState.personalInfo = { ...prev.personalInfo, ...(newState.personalInfo || {}) };
-
-                    // 4. Ensure other nested objects are correct
                     newState.education = { ...prev.education, ...(newState.education || {}) };
                     newState.work = { ...prev.work, ...(newState.work || {}) };
                     newState.lifelongLearning = { ...prev.lifelongLearning, ...(newState.lifelongLearning || {}) };
                     newState.selfAssessment = { ...prev.selfAssessment, ...(newState.selfAssessment || {}) };
-
-                    // 5. Ensure array keys are arrays
                     if (!Array.isArray(newState.nonFormal)) newState.nonFormal = [];
                     if (!Array.isArray(newState.certifications)) newState.certifications = [];
                     if (!Array.isArray(newState.publications)) newState.publications = [];
@@ -242,40 +242,43 @@ export default function ApplicationFormPage() {
             }
             if (savedStep) {
                 const step = parseInt(savedStep, 10);
-                if (step < totalSteps + 2) {
+                if (step < totalSteps + 2) { // 9 + 1 = 10
                     setCurrentStep(step);
                 }
             }
         } catch (error) {
             console.error("Failed to load form data from local storage", error);
-            // If loading fails, clear the bad data
             localStorage.removeItem('applicationFormData');
             localStorage.removeItem('applicationFormStep');
+            localStorage.removeItem('dataPrivacyConsent'); // Clear consent on error too
         }
     }, []); // Run only once on mount
-
-    // --- ✅ 2. REMOVED USEEFFECT THAT CHECKED CONSENT ---
-    // (That useEffect is no longer here)
 
     // Save data to localStorage when it changes
     useEffect(() => {
         // Only save data if user has consented
-        if (hasConsented && currentStep < totalSteps + 2) {
+        if (hasConsented && currentStep < totalSteps + 2) { // 8 + 2 = 10
             const dataToSave = JSON.parse(JSON.stringify(formData));
-
-            // ✅ FIX: Check if dataToSave.initial exists first
             if (dataToSave.initial && dataToSave.initial.photo) {
                 delete dataToSave.initial.photo;
             }
             localStorage.setItem('applicationFormData', JSON.stringify(dataToSave));
             localStorage.setItem('applicationFormStep', currentStep.toString());
         }
-    }, [formData, currentStep, hasConsented]); // Added hasConsented dependency
+    }, [formData, currentStep, hasConsented, totalSteps]);
 
     const nextStep = () => setCurrentStep((prev) => prev + 1);
     const prevStep = () => setCurrentStep((prev) => prev - 1);
 
-    // Helper to update a specific slice of state
+    // ✅ 7. ADDED: Handler to reset form
+    const startNewApplication = () => {
+        setFormData(defaultFormData); // Reset state
+        setCurrentStep(1); // Go to step 1
+        localStorage.removeItem('applicationFormData');
+        localStorage.removeItem('applicationFormStep');
+        // We keep the consent
+    };
+
     const createFormUpdater = (key: keyof typeof formData) => {
         return (data: any) => {
             setFormData((prev) => ({
@@ -285,49 +288,41 @@ export default function ApplicationFormPage() {
         };
     };
 
-    // Create a specific handler for each step
     const handleInitialChange = createFormUpdater('initial');
     const handlePersonalChange = createFormUpdater('personalInfo');
     const handleGoalsChange = createFormUpdater('goals');
-
-    // This one handler will update all keys from d.tsx
     const handleBackgroundChange = (updatedData: any) => {
         setFormData(prev => ({
             ...prev,
-            ...updatedData // Assumes d.tsx passes back { education: ..., work: ..., etc. }
+            ...updatedData
         }));
     };
-
     const handleCreativeWorksChange = createFormUpdater('creativeWorks');
     const handleLearningChange = createFormUpdater('lifelongLearning');
     const handleSelfAssessmentChange = createFormUpdater('selfAssessment');
 
-    // --- ✅ 3. MODIFIED CONSENT HANDLER FUNCTIONS ---
+    // Consent handlers
     const handleConsentAgree = () => {
-        // We no longer save to localStorage. Just set the state.
         setHasConsented(true);
+        // ✅ 8. ADDED: Save consent to localStorage
+        localStorage.setItem('dataPrivacyConsent', 'true');
     };
 
     const handleConsentDisagree = () => {
-        // Send the user back to the dashboard or home page
-        router.push('/'); // <-- You can change this path
+        router.push('/');
     };
-    // ---
 
-    // ✅ The handleSubmit function WITH the UUID lookup and console.log
+    // The handleSubmit function
     const handleSubmit = async () => {
         setIsSubmitting(true);
 
-        // --- 1. Validation ---
-        if (!session?.user?.email || !session?.user?.id) { // Also check for id
+        if (!session?.user?.email || !session?.user?.id) {
             alert("You must be logged in to submit.");
             setIsSubmitting(false);
             return;
         }
 
-        // ✅ Add console.log here as requested
         console.log("Current session user ID (from NextAuth):", session.user.id);
-
         const signatureDataUrl = signaturePadRef.current?.toDataURL('image/png');
         if (signaturePadRef.current?.isEmpty() || !signatureDataUrl) {
             alert("Signature is empty.");
@@ -338,16 +333,13 @@ export default function ApplicationFormPage() {
         if (!photoFile) {
             alert("1x1 Photo is missing from Step 1.");
             setIsSubmitting(false);
+            setCurrentStep(1); // Send user back to step 1
             return;
         }
 
         try {
-            // --- 2. Look up the Supabase UUID using the email ---
-            // ⚠️ Make sure 'users' is the correct table name and 'id' is the column with the Supabase UUID
             console.log(`Looking up user with email: ${session.user.email}`);
-
-
-
+            
             const { data: userData, error: userError } = await supabase
                 .from('users')
                 .select('id')
@@ -363,43 +355,43 @@ export default function ApplicationFormPage() {
             if (!userData?.id) {
                 throw new Error(`Could not find a matching user in the database for email ${session.user.email}. Please ensure your account is properly set up.`);
             }
-            const supabaseUserId = userData.id; // This is the correct UUID
-            console.log("Found Supabase User UUID:", supabaseUserId); // Debug log for found UUID
+            const supabaseUserId = userData.id;
+            console.log("Found Supabase User UUID:", supabaseUserId);
 
-            // --- 3. Upload Photo using the correct UUID ---
+            // Upload Photo
             const photoFilePath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
-            console.log("Uploading photo to:", photoFilePath); // Debug log for upload path
+            console.log("Uploading photo to:", photoFilePath);
             const { data: photoUploadData, error: photoUploadError } = await supabase.storage
                 .from('application_files')
                 .upload(photoFilePath, photoFile, { upsert: true });
             if (photoUploadError) {
-                console.error("Photo upload error details:", photoUploadError); // Log specific upload error
+                console.error("Photo upload error details:", photoUploadError);
                 throw photoUploadError;
             }
             const { data: photoUrlData } = supabase.storage.from('application_files').getPublicUrl(photoUploadData.path);
-            console.log("Photo uploaded to URL:", photoUrlData.publicUrl); // Debug log for photo URL
+            console.log("Photo uploaded to URL:", photoUrlData.publicUrl);
 
-            // --- 4. Upload Signature using the correct UUID ---
+            // Upload Signature
             const response = await fetch(signatureDataUrl);
             const blob = await response.blob();
             const signatureFile = new File([blob], `signature_${Date.now()}.png`, { type: "image/png" });
             const signatureFilePath = `${supabaseUserId}/signature_${signatureFile.name}`;
-            console.log("Uploading signature to:", signatureFilePath); // Debug log for upload path
+            console.log("Uploading signature to:", signatureFilePath);
 
             const { data: sigUploadData, error: sigUploadError } = await supabase.storage
                 .from('application_files')
                 .upload(signatureFilePath, signatureFile, { upsert: true });
             if (sigUploadError) {
-                console.error("Signature upload error details:", sigUploadError); // Log specific upload error
+                console.error("Signature upload error details:", sigUploadError);
                 throw sigUploadError;
             }
             const { data: sigUrlData } = supabase.storage.from('application_files').getPublicUrl(sigUploadData.path);
-            console.log("Signature uploaded to URL:", sigUrlData.publicUrl); // Debug log for signature URL
+            console.log("Signature uploaded to URL:", sigUrlData.publicUrl);
 
-            // --- 5. Prepare and Insert Data using the correct UUID ---
-            console.log("Preparing data for insertion with user_id:", supabaseUserId); // Debug log before insert
+            // Prepare and Insert Data
+            console.log("Preparing data for insertion with user_id:", supabaseUserId);
             const insertPayload = {
-                user_id: supabaseUserId, // ✅ Use the UUID found in the lookup
+                user_id: supabaseUserId,
                 applicant_name: formData.initial.name,
                 degree_applied_for: formData.initial.degree,
                 campus: formData.initial.campus,
@@ -417,7 +409,6 @@ export default function ApplicationFormPage() {
                 self_assessment: formData.selfAssessment,
                 photo_url: photoUrlData.publicUrl,
                 signature_url: sigUrlData.publicUrl,
-                // --- 👇 ADDED KEYS FROM d.tsx ---
                 education_background: formData.education,
                 non_formal_education: formData.nonFormal,
                 certifications: formData.certifications,
@@ -425,29 +416,26 @@ export default function ApplicationFormPage() {
                 inventions: formData.inventions,
                 work_experiences: formData.work,
                 recognitions: formData.recognitions,
-                // ---------------------------------
                 professional_development: formData.professional_development,
             };
-            console.log("Insert Payload:", insertPayload); // Log the data being sent
+            console.log("Insert Payload:", insertPayload);
 
             const { error: insertError } = await supabase
                 .from('applications')
                 .insert(insertPayload);
 
             if (insertError) {
-                console.error("Database insert error details:", insertError); // Log specific insert error
-                throw insertError;
+                console.error("Database insert error details:", insertError);
+                throw insertError; // Throw the error to be caught below
             }
-            console.log("Data inserted successfully!"); // Debug log for success
+            console.log("Data inserted successfully!");
 
-            // --- 6. Success ---
+            // Success
             localStorage.removeItem('applicationFormData');
             localStorage.removeItem('applicationFormStep');
-            // ✅ REMOVED the line that cleared consent
-            nextStep(); // Move to success screen
+            nextStep(); // Move to success screen (step 9)
 
         } catch (error) {
-            // Catch errors from any step (lookup, upload, insert)
             console.error("Error during submission process:", (error as Error).message);
             alert(`Submission failed: ${(error as Error).message}`);
         } finally {
@@ -457,7 +445,6 @@ export default function ApplicationFormPage() {
 
     // --- Render Logic ---
     const renderStep = () => {
-        // ... (Your existing renderStep logic, including the loading state)
         if (isSubmitting) {
             return (
                 <div className="bg-white shadow-lg rounded-2xl w-full max-w-3xl p-12 text-center">
@@ -470,104 +457,49 @@ export default function ApplicationFormPage() {
 
         switch (currentStep) {
             case 1:
-                return (
-                    <InitialForm
-                        formData={formData.initial} // Pass the 'initial' slice
-                        setFormData={handleInitialChange} // Pass the 'initial' handler
-                        nextStep={nextStep}
-                    />
-                );
-
+                return ( <InitialForm formData={formData.initial} setFormData={handleInitialChange} nextStep={nextStep} /> );
             case 2:
-                return (
-                    <PersonalInformationForm
-                        formData={formData.personalInfo} // Pass the 'personalInfo' slice
-                        setFormData={handlePersonalChange} // Pass the 'personalInfo' handler
-                        nextStep={nextStep}
-                        prevStep={prevStep}
-                    />
-                );
-
+                return ( <PersonalInformationForm formData={formData.personalInfo} setFormData={handlePersonalChange} nextStep={nextStep} prevStep={prevStep} /> );
             case 3:
-                return (
-                    <PrioritiesGoalsForm
-                        formData={formData.goals} // Pass the 'goals' slice
-                        setFormData={handleGoalsChange} // Pass the 'goals' handler
-                        nextStep={nextStep}
-                        prevStep={prevStep}
-                    />
-                );
-
+                return ( <PrioritiesGoalsForm formData={formData.goals} setFormData={handleGoalsChange} nextStep={nextStep} prevStep={prevStep} /> );
             case 4:
-                // d.tsx is complex. We pass the relevant slices and the main setter
-                return (
-                    <BackgroundAchievementsForm
-                        formData={formData} // Pass the whole object so it can read all its keys
-                        setFormData={setFormData} // Pass the main setter
-                        nextStep={nextStep}
-                        prevStep={prevStep}
-                    />
-                );
-
+                return ( <BackgroundAchievementsForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} /> );
             case 5:
-                return (
-                    <CreativeWorksForm
-                        formData={formData.creativeWorks} // Pass the 'creativeWorks' slice
-                        setFormData={handleCreativeWorksChange} // Pass the 'creativeWorks' handler
-                        nextStep={nextStep}
-                        prevStep={prevStep}
-                    />
-                );
-
+                return ( <CreativeWorksForm formData={formData.creativeWorks} setFormData={handleCreativeWorksChange} nextStep={nextStep} prevStep={prevStep} /> );
             case 6:
-                return (
-                    <LifelongLearningForm
-                        formData={formData.lifelongLearning} // Pass the 'lifelongLearning' slice
-                        setFormData={handleLearningChange} // Pass the 'lifelongLearning' handler
-                        nextStep={nextStep}
-                        prevStep={prevStep}
-                    />
-                );
-
+                return ( <LifelongLearningForm formData={formData.lifelongLearning} setFormData={handleLearningChange} nextStep={nextStep} prevStep={prevStep} /> );
             case 7:
-                return (
-                    <SelfReportForm
-                        formData={formData.selfAssessment} // Pass the 'selfAssessment' slice
-                        setFormData={handleSelfAssessmentChange} // Pass the 'selfAssessment' handler
-                        nextStep={nextStep}
-                        prevStep={prevStep}
-                    />
-                );
-
+                return ( <SelfReportForm formData={formData.selfAssessment} setFormData={handleSelfAssessmentChange} nextStep={nextStep} prevStep={prevStep} /> );
             case 8:
-                // ... (This case is correct)
-                return (
-                    <FinalReviewStep
-                        nextStep={handleSubmit}
-                        prevStep={prevStep}
-                        signaturePadRef={signaturePadRef}
-                        isSubmitting={isSubmitting}
-                    />
-                );
-
+                return ( <FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} /> );
+            // ✅ 9. Pass the new reset handler to the SuccessScreen
             case 9:
-                return <SuccessScreen />;
-
+                return <SuccessScreen onEdit={startNewApplication} />;
             default:
                 return <div>Form complete or invalid step.</div>;
         }
-
     };
 
-    // --- ✅ 4. UPDATED FINAL RETURN ---
+    // --- FINAL RETURN ---
     return (
         <div className="min-h-screen flex flex-col justify-center items-center bg-gray-100 p-6 font-sans">
             
-            {/* We no longer need the 'isLoadingConsent' check */}
-
             {hasConsented ? (
                 // --- If they HAVE consented, show the form ---
                 <>
+                    {/* ✅ 10. ADDED: Back to Home button (hides on success) */}
+                    {currentStep <= totalSteps && ( // 8 <= 8
+                        <div className="w-full max-w-5xl mb-4">
+                            <Link 
+                                href="/" 
+                                className="flex items-center text-sm text-gray-600 hover:text-black font-semibold transition-colors"
+                            >
+                                <ArrowLeft size={16} className="mr-1" />
+                                Back to Home Page
+                            </Link>
+                        </div>
+                    )}
+
                     <Pagination currentStep={currentStep} totalSteps={totalSteps} stepTitles={stepTitles} />
                     {renderStep()}
                 </>
