@@ -469,6 +469,7 @@ const formatDate = (dateString: string | null | undefined, includeTime = false):
     }
     try {
       const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
         return dateString;
       }
       const options: Intl.DateTimeFormatOptions = {
