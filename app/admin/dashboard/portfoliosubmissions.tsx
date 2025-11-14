@@ -19,14 +19,23 @@ import {
   Trash2
 } from "lucide-react";
 
-// 1. Interface for PortfolioSubmission
+// 1. NEW interface for the file objects in the JSONB array
+interface PortfolioFile {
+  key: string;
+  label: string;
+  url: string;
+}
+
+// 2. UPDATED Interface for PortfolioSubmission
 interface PortfolioSubmission {
   id: number;
   created_at: string;
   user_id: string;
   full_name: string;
   degree_program: string;
-  portfolio_link: string;
+  campus: string; // <-- ADDED (was missing from type)
+  // portfolio_link: string; // <-- REMOVED
+  portfolio_files: PortfolioFile[] | null; // <-- ADDED
   photo_url: string;
   signature: string;
   status: string;
@@ -93,11 +102,18 @@ export default function PortfolioSubmissions() {
   const filteredSubmissions = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
     
+    // ✅✅✅ THIS IS THE FIX ✅✅✅
+    // Add a "guard clause" to ensure 'submissions' is an array before filtering.
+    if (!Array.isArray(submissions)) {
+      return [];
+    }
+    
     return submissions.filter(sub => {
       const statusMatch = statusFilter === "All" || sub.status === statusFilter;
       const searchMatch = (
         sub.full_name?.toLowerCase().includes(lowerSearchTerm) ||
-        sub.degree_program?.toLowerCase().includes(lowerSearchTerm)
+        sub.degree_program?.toLowerCase().includes(lowerSearchTerm) ||
+        sub.campus?.toLowerCase().includes(lowerSearchTerm)
       );
       return statusMatch && searchMatch;
     });
@@ -115,7 +131,7 @@ export default function PortfolioSubmissions() {
   }, [filteredSubmissions]);
 
 
-  // --- Event Handlers ---
+  // --- Event Handlers (unchanged) ---
   const handleViewDetails = (submission: PortfolioSubmission) => {
     setSelectedSubmission(submission);
     setIsModalOpen(true);
@@ -210,13 +226,14 @@ export default function PortfolioSubmissions() {
         onStatusChange={(e) => setStatusFilter(e.target.value)}
       />
 
-      {/* --- Main Table --- */}
+      {/* --- Main Table (unchanged) --- */}
       <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
         <table className="min-w-full bg-white divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Applicant</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Degree</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Campus</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Submitted</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -225,7 +242,7 @@ export default function PortfolioSubmissions() {
           <tbody className="divide-y divide-gray-200">
             {paginatedSubmissions.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-gray-500">
+                <td colSpan={6} className="p-6 text-center text-gray-500">
                   No submissions found
                   {searchTerm && " matching your search."}
                   {statusFilter !== "All" && ` with status "${statusFilter}".`}
@@ -257,6 +274,7 @@ export default function PortfolioSubmissions() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{sub.degree_program || "N/A"}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{sub.campus || "N/A"}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {sub.created_at ? new Date(sub.created_at).toLocaleDateString() : "N/A"}
                   </td>
@@ -299,7 +317,6 @@ export default function PortfolioSubmissions() {
         onPageChange={setCurrentPage}
       />
 
-      {/* View Details Modal */}
       {isModalOpen && selectedSubmission && (
         <ViewSubmissionModal
           submission={selectedSubmission}
@@ -310,7 +327,7 @@ export default function PortfolioSubmissions() {
   );
 }
 
-// --- Page Header Component ---
+// --- Page Header Component (unchanged) ---
 const PageHeader: FC<{
   title: string;
   submissionCount: number;
@@ -339,7 +356,7 @@ const PageHeader: FC<{
       <div className="relative w-full md:w-64">
         <input
           type="text"
-          placeholder="Search name, degree..."
+          placeholder="Search name, degree, campus..."
           value={searchTerm}
           onChange={onSearchChange}
           className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-black"
@@ -365,7 +382,7 @@ const PageHeader: FC<{
 );
 
 
-// --- View Details Modal Component ---
+// --- View Details Modal Component (unchanged) ---
 const ViewSubmissionModal: FC<{ submission: PortfolioSubmission; onClose: () => void }> = ({
   submission,
   onClose,
@@ -417,30 +434,43 @@ const ViewSubmissionModal: FC<{ submission: PortfolioSubmission; onClose: () => 
               label="Date Submitted" 
               value={submission.created_at ? new Date(submission.created_at).toLocaleString() : "N/A"} 
             />
-            <InfoItem label="Portfolio Link">
-              <a
-                href={submission.portfolio_link || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`break-all flex items-center gap-1 ${
-                  submission.portfolio_link
-                    ? "text-blue-600 hover:underline"
-                    : "text-black pointer-events-none"
-                }`}
-              >
-                {submission.portfolio_link ? "View Portfolio" : "N/A"}
-                {submission.portfolio_link && <ExternalLink size={14} />}
-              </a>
-            </InfoItem>
+            <InfoItem 
+              label="Campus" 
+              value={submission.campus || "N/A"} 
+            />
           </InfoCard>
 
+          <InfoCard title="Uploaded Portfolio Files">
+            {submission.portfolio_files && submission.portfolio_files.length > 0 ? (
+              <ul className="space-y-3 pl-2">
+                {submission.portfolio_files.map((file) => (
+                  <li key={file.key}>
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-900 hover:underline"
+                    >
+                      <ExternalLink size={14} />
+                      <span className="truncate">{file.label || "Unnamed File"}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="italic text-gray-500 text-sm">
+                No portfolio files were uploaded with this submission.
+              </p>
+            )}
+          </InfoCard>
+          
           <InfoCard title="Internal Data">
             <InfoItem label="Submission ID" value={submission.id} />
             <InfoItem label="User ID" value={submission.user_id} />
           </InfoCard>
 
           <section>
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Applicant Signature</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Applicant Signature</h3>
             <div className="border rounded-lg p-2 bg-gray-100 max-w-md mx-auto">
               {submission.signature ? (
                 <img
@@ -472,7 +502,7 @@ const ViewSubmissionModal: FC<{ submission: PortfolioSubmission; onClose: () => 
 };
 
 
-// --- Helper Components for Modal ---
+// --- Helper Components for Modal (unchanged) ---
 const InfoCard: FC<{ title: string; children: ReactNode }> = ({ title, children }) => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
     <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
@@ -495,7 +525,7 @@ const InfoItem: FC<{ label: string; value?: ReactNode; children?: ReactNode }> =
 );
 
 
-// --- Actions Menu Component ---
+// --- Actions Menu Component (unchanged) ---
 const ActionsMenu: FC<{
   submission: PortfolioSubmission;
   onView: (submission: PortfolioSubmission) => void;
@@ -556,12 +586,18 @@ const ActionsMenu: FC<{
   );
 };
 
+// --- Pagination Controls Component (unchanged) ---
 const PaginationControls: FC<{
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
 }> = ({ currentPage, totalPages, onPageChange }) => {
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  // Don't render pagination if there's only one page
+  if (totalPages <= 1) {
+    return null;
+  }
 
   return (
     <div className="flex justify-center items-center space-x-2 mt-6">
