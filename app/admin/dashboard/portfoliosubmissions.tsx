@@ -42,6 +42,35 @@ interface PortfolioSubmission {
 }
 
 // --- Constants ---
+
+// Helper to calculate Portfolio completion based on requirements
+const getPortfolioProgress = (submission: PortfolioSubmission): number => {
+  let score = 0;
+  const totalSteps = 4;
+
+  // Step 1: Basic Details (Name, Degree, Campus)
+  if (submission.full_name && submission.degree_program && submission.campus) {
+    score++;
+  }
+
+  // Step 2: Passport Photo
+  if (submission.photo_url && submission.photo_url.trim() !== '') {
+    score++;
+  }
+
+  // Step 3: Signature
+  if (submission.signature && submission.signature.trim() !== '') {
+    score++;
+  }
+
+  // Step 4: Portfolio Files (Must have at least one file uploaded)
+  if (submission.portfolio_files && Array.isArray(submission.portfolio_files) && submission.portfolio_files.length > 0) {
+    score++;
+  }
+
+  return (score / totalSteps) * 100;
+};
+
 const STATUS_OPTIONS = ["All", "Submitted", "Pending", "Approved", "Declined"];
 const STATUS_COLORS: Record<string, string> = {
   Submitted: "bg-blue-100 text-blue-800 ring-blue-300",
@@ -278,23 +307,49 @@ export default function PortfolioSubmissions() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {sub.created_at ? new Date(sub.created_at).toLocaleDateString() : "N/A"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {(updatingStatusId === sub.id || deletingId === sub.id) && <Loader2 className="h-4 w-4 animate-spin text-gray-400"/>}
-                      <select
-                        value={sub.status}
-                        onChange={(e) => handleStatusChange(sub.id, e.target.value)}
-                        disabled={updatingStatusId === sub.id || deletingId === sub.id}
-                        className={`text-xs font-semibold rounded-full px-2.5 py-1 border-none outline-none ring-1 ring-inset focus:ring-2 focus:ring-yellow-500 disabled:opacity-70 disabled:cursor-not-allowed ${
-                          STATUS_COLORS[sub.status]
-                        }`}
-                      >
-                        {STATUS_OPTIONS.filter(s => s !== "All").map(status => (
-                          <option key={status} value={status}>{status}</option>
-                        ))}
-                      </select>
+              <td className="px-6 py-4 whitespace-nowrap min-w-[200px]">
+                {/* NEW: Progress Bar Container */}
+                <div className="flex flex-col gap-2">
+                  
+                  {/* Percentage Text & Bar */}
+                  <div className="w-full">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-medium text-gray-500">Completeness</span>
+                      <span className="font-bold text-gray-700">
+                        {Math.round(getPortfolioProgress(sub))}%
+                      </span>
                     </div>
-                  </td>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className={`h-2.5 rounded-full transition-all duration-500 ${
+                          getPortfolioProgress(sub) >= 100 ? 'bg-green-500' : 
+                          getPortfolioProgress(sub) >= 50 ? 'bg-yellow-400' : 'bg-red-400'
+                        }`} 
+                        style={{ width: `${getPortfolioProgress(sub)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* EXISTING: Status Dropdown (Wrapped in a div for layout) */}
+                  <div className="flex items-center gap-2 mt-1">
+                    {(updatingStatusId === sub.id || deletingId === sub.id) && (
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-400"/>
+                    )}
+                    <select
+                      value={sub.status}
+                      onChange={(e) => handleStatusChange(sub.id, e.target.value)}
+                      disabled={updatingStatusId === sub.id || deletingId === sub.id}
+                      className={`text-xs font-semibold rounded-full px-2.5 py-1 border-none outline-none ring-1 ring-inset focus:ring-2 focus:ring-yellow-500 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer ${
+                        STATUS_COLORS[sub.status]
+                      }`}
+                    >
+                      {STATUS_OPTIONS.filter(s => s !== "All").map(status => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </td>
                   <td className="px-6 py-4 text-sm font-medium text-center">
                     <ActionsMenu
                       submission={sub}

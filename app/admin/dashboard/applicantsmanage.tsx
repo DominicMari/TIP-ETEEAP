@@ -131,6 +131,54 @@ interface Applicant {
 }
 
 // --- Constants ---
+
+// Helper to check if a field has valid data (parsing JSON if needed)
+const hasData = (data: any): boolean => {
+  if (!data) return false;
+  try {
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    // If it's an array, check if it has items
+    if (Array.isArray(parsed)) return parsed.length > 0;
+    // If it's an object, check if it has keys
+    if (typeof parsed === 'object') return Object.keys(parsed).length > 0;
+    // If string, check length
+    return String(parsed).trim().length > 0;
+  } catch (e) {
+    return false;
+  }
+};
+
+// Calculate percentage based on 8 steps
+const getCompletionPercentage = (app: Applicant): number => {
+  let completedSteps = 0;
+
+  // Step 1: Degree Applied / Priorities (Usually Step 1)
+  if (app.degree_applied_for || hasData(app.degree_priorities)) completedSteps++;
+
+  // Step 2: Education Background
+  if (hasData(app.education_background)) completedSteps++;
+
+  // Step 3: Work Experience
+  if (hasData(app.work_experiences)) completedSteps++;
+
+  // Step 4: Professional Development (Seminars/Trainings)
+  if (hasData(app.professional_development)) completedSteps++;
+
+  // Step 5: Certifications or Non-Formal Education
+  if (hasData(app.certifications) || hasData(app.non_formal_education)) completedSteps++;
+
+  // Step 6: Recognitions, Publications, or Inventions
+  if (hasData(app.recognitions) || hasData(app.publications) || hasData(app.inventions)) completedSteps++;
+
+  // Step 7: Creative Works / Portfolio
+  if (hasData(app.creative_works)) completedSteps++;
+
+  // Step 8: Goal Statement or Self-Assessment (Essay parts)
+  if (hasData(app.goal_statement) || hasData(app.self_assessment)) completedSteps++;
+
+  return (completedSteps / 8) * 100;
+};
+
 const STATUS_OPTIONS = ['All', 'Submitted', 'Pending', 'Approved', 'Declined'];
 const STATUS_COLORS: Record<string, string> = {
   Submitted: 'bg-gray-100 text-gray-800 ring-gray-300',
@@ -356,21 +404,45 @@ export default function ApplicantsManage() {
                   <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>
                     {formatDate(app.application_date || app.created_at)}
                   </td>
-                  <td className='px-6 py-4 whitespace-nowrap'>
-                    <div className='flex items-center gap-2'>
-                      {(updatingStatusId === app.application_id || deletingId === app.application_id) && <Loader2 className='h-4 w-4 animate-spin text-gray-400'/>}
-                      <select
-                        value={app.status || 'Submitted'}
-                        onChange={(e) => handleStatusChange(app.application_id, e.target.value)}
-                        disabled={updatingStatusId === app.application_id || deletingId === app.application_id}
-                        className={`text-xs font-semibold rounded-full px-2.5 py-1 border-none outline-none ring-1 ring-inset focus:ring-2 focus:ring-yellow-500 disabled:opacity-70 disabled:cursor-not-allowed ${
-                          STATUS_COLORS[app.status || 'Submitted']
-                        }`}
-                      >
-                        {STATUS_OPTIONS.filter(s => s !== 'All').map(status => ( // Don't show 'All' in dropdown
-                          <option key={status} value={status}>{status}</option>
-                        ))}
-                      </select>
+                  <td className='px-6 py-4 whitespace-nowrap min-w-[200px]'>
+                    {/* Progress Bar Container */}
+                    <div className="flex flex-col gap-2">
+                      
+                      {/* Percentage Text & Bar */}
+                      <div className="w-full">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-medium text-gray-500">Progress</span>
+                          <span className="font-bold text-gray-700">
+                            {Math.round(getCompletionPercentage(app))}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                          <div 
+                            className={`h-2.5 rounded-full transition-all duration-500 ${
+                              getCompletionPercentage(app) >= 100 ? 'bg-green-500' : 
+                              getCompletionPercentage(app) >= 50 ? 'bg-yellow-400' : 'bg-red-400'
+                            }`} 
+                            style={{ width: `${getCompletionPercentage(app)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Original Status Dropdown (Kept for functionality) */}
+                      <div className='flex items-center gap-2 mt-1'>
+                        {(updatingStatusId === app.application_id || deletingId === app.application_id) && <Loader2 className='h-3 w-3 animate-spin text-gray-400'/>}
+                        <select
+                          value={app.status || 'Submitted'}
+                          onChange={(e) => handleStatusChange(app.application_id, e.target.value)}
+                          disabled={updatingStatusId === app.application_id || deletingId === app.application_id}
+                          className={`text-[10px] font-bold uppercase rounded-md px-2 py-0.5 border-none outline-none ring-1 ring-inset cursor-pointer ${
+                            STATUS_COLORS[app.status || 'Submitted']
+                          }`}
+                        >
+                          {STATUS_OPTIONS.filter(s => s !== 'All').map(status => (
+                            <option key={status} value={status}>{status}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </td>
                   <td className='px-6 py-4 text-sm font-medium text-center'>
