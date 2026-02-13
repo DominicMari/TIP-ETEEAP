@@ -286,7 +286,7 @@ function FormalEducationSection({
                     {key !== "secondary" && key !== "elementary" && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Degree Program{" "}
+                          Degree Program (ex: BSCS, BSIT){" "}
                           {key === "tertiary" && (
                             <span className="text-red-500">*</span>
                           )}
