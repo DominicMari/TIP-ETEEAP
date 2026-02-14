@@ -12,12 +12,12 @@ const DEGREE_RULES: DegreeRule[] = [
   {
     id: 'BSCS',
     name: 'Bachelor of Science in Computer Science',
-    keywords: ['algorithm', 'theory', 'machine learning', 'ai', 'logic', 'math', 'science', 'computational', 'research', 'develop', 'coding', 'artificial intelligence'],
+    keywords: ['algorithm', 'theory', 'machine learning', 'ai', 'logic', 'math', 'science', 'computational', 'research', 'develop', 'coding', 'artificial intelligence', 'data'],
   },
   {
     id: 'BSIS',
     name: 'Bachelor of Science in Information Systems',
-    keywords: ['business process', 'enterprise', 'database', 'analyst', 'crm', 'erp', 'management system', 'corporate data', 'audit', 'strategy', 'information'],
+    keywords: ['business process', 'enterprise', 'database', 'analyst', 'crm', 'erp', 'management system', 'corporate data', 'audit', 'strategy', 'information', 'data'],
   },
   {
     id: 'BSIT',
