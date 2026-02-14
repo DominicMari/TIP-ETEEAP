@@ -14,7 +14,7 @@ import PrioritiesGoalsForm from "./c-h";
 import BackgroundAchievementsForm from "./d"; //missing page
 import CreativeWorksForm from "./i";
 import LifelongLearningForm from "./j";
-import SelfReportForm from "./selfassessment";
+import PortfolioForm from "./portfolio";
 import { useRouter } from 'next/navigation';
 import DataPrivacyConsent from './undertaking';
 
@@ -174,7 +174,8 @@ export default function ApplicationFormPage() {
         professional_development: { memberships: [], projects: [], research: [] },
         creativeWorks: [{ title: "", institution: "", dates: "" }],
         lifelongLearning: { hobbies: "", skills: "", workActivities: "", volunteer: "", travels: "" },
-        selfAssessment: { jobLearning: "", teamworkLearning: "", selfLearning: "", workBenefits: "", essay: "" }
+        portfolio: [] as any[],
+        portfolioFiles: [] as any[]
     };
     
     const [formData, setFormData] = useState(defaultFormData);
@@ -186,7 +187,7 @@ export default function ApplicationFormPage() {
         "Background & Achievements", // d.tsx
         "Creative Works",
         "Learning",
-        "Self Assessment",
+        "Portfolio",
         "Submit",
     ];
 
@@ -229,7 +230,7 @@ export default function ApplicationFormPage() {
                     newState.education = { ...prev.education, ...(newState.education || {}) };
                     newState.work = { ...prev.work, ...(newState.work || {}) };
                     newState.lifelongLearning = { ...prev.lifelongLearning, ...(newState.lifelongLearning || {}) };
-                    newState.selfAssessment = { ...prev.selfAssessment, ...(newState.selfAssessment || {}) };
+                    if (!Array.isArray(newState.portfolio)) newState.portfolio = [];
                     if (!Array.isArray(newState.nonFormal)) newState.nonFormal = [];
                     if (!Array.isArray(newState.certifications)) newState.certifications = [];
                     if (!Array.isArray(newState.publications)) newState.publications = [];
@@ -299,7 +300,7 @@ export default function ApplicationFormPage() {
     };
     const handleCreativeWorksChange = createFormUpdater('creativeWorks');
     const handleLearningChange = createFormUpdater('lifelongLearning');
-    const handleSelfAssessmentChange = createFormUpdater('selfAssessment');
+    const handlePortfolioChange = createFormUpdater('portfolio');
 
     // Consent handlers
     const handleConsentAgree = () => {
@@ -406,7 +407,7 @@ export default function ApplicationFormPage() {
                 degree_priorities: formData.goals.degrees,
                 creative_works: formData.creativeWorks,
                 lifelong_learning: formData.lifelongLearning,
-                self_assessment: formData.selfAssessment,
+                portfolio: formData.portfolio,
                 photo_url: photoUrlData.publicUrl,
                 signature_url: sigUrlData.publicUrl,
                 education_background: formData.education,
@@ -469,7 +470,7 @@ export default function ApplicationFormPage() {
             case 6:
                 return ( <LifelongLearningForm formData={formData.lifelongLearning} setFormData={handleLearningChange} nextStep={nextStep} prevStep={prevStep} /> );
             case 7:
-                return ( <SelfReportForm formData={formData.selfAssessment} setFormData={handleSelfAssessmentChange} nextStep={nextStep} prevStep={prevStep} /> );
+                return ( <PortfolioForm formData={formData} setFormData={(data: any) => setFormData({ ...formData, ...data })} nextStep={nextStep} prevStep={prevStep} /> );
             case 8:
                 return ( <FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} /> );
             // ✅ 9. Pass the new reset handler to the SuccessScreen

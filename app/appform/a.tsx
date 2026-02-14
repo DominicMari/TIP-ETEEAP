@@ -98,7 +98,7 @@ export default function InitialForm({
           {/* Name */}
           <div className="mb-4">
             <label className="block mb-2 text-sm font-semibold text-black">
-              Name of the Applicant:
+              Name of the Applicant: <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -118,7 +118,7 @@ export default function InitialForm({
           <div>
             <div>
               <label className="block mb-2 text-sm font-semibold text-black">
-                Degree Applied For:
+                Degree Applied For: <span className="text-red-500">*</span>
               </label>
               <select
                 name="degree" // Use 'degree'
@@ -189,7 +189,7 @@ export default function InitialForm({
       {/* Campus */}
       <div className="mb-4">
         <label className="block mb-2 text-sm font-semibold text-black">
-          Campus:
+          Campus: <span className="text-red-500">*</span>
         </label>
         <select
           name="campus" // Use 'campus'
@@ -211,7 +211,7 @@ export default function InitialForm({
       {/* Folder Link */}
       <div className="mb-4">
         <label className="block mb-2 text-sm font-semibold text-black">
-          Folder Link (e.g., Google Drive):
+          Folder Link (e.g., Google Drive): <span className="text-red-500">*</span>
         </label>
         <input
           type="url"
@@ -237,4 +237,3 @@ export default function InitialForm({
     </form>
   );
 }
-

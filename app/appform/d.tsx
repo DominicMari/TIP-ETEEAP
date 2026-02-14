@@ -352,10 +352,10 @@ function FormalEducationSection({
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Start Date
+                            Start Month/Year
                           </label>
                           <input
-                            type="date"
+                            type="month"
                             value={entry.startDate}
                             onChange={(e) =>
                               onChange(key, idx, "startDate", e.target.value)
@@ -370,10 +370,10 @@ function FormalEducationSection({
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            End Date
+                            End Month/Year
                           </label>
                           <input
-                            type="date"
+                            type="month"
                             value={entry.endDate}
                             onChange={(e) =>
                               onChange(key, idx, "endDate", e.target.value)
@@ -486,10 +486,10 @@ function NonFormalEducationSection({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
+                    Start Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.startDate}
                     onChange={(e) => onChange(idx, "startDate", e.target.value)}
                     className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white"
@@ -497,10 +497,10 @@ function NonFormalEducationSection({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
+                    End Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.endDate}
                     onChange={(e) => onChange(idx, "endDate", e.target.value)}
                     className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white"
@@ -597,7 +597,7 @@ function CertificationSection({
                 Date Certified
               </label>
               <input
-                type="date"
+                type="month"
                 value={entry.dateCertified}
                 onChange={(e) =>
                   onChange(idx, "dateCertified", e.target.value)
@@ -812,7 +812,7 @@ function InventionSection({
                 Date of Application
               </label>
               <input
-                type="date"
+                type="month"
                 value={inv.applicationDate}
                 onChange={(e) =>
                   onChange(idx, "applicationDate", e.target.value)
@@ -953,10 +953,10 @@ function WorkExperienceSection({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
+                    Start Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.startDate}
                     onChange={(e) =>
                       onEmploymentChange(idx, "startDate", e.target.value)
@@ -966,10 +966,10 @@ function WorkExperienceSection({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
+                    End Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.endDate}
                     onChange={(e) =>
                       onEmploymentChange(idx, "endDate", e.target.value)
@@ -1066,10 +1066,10 @@ function WorkExperienceSection({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
+                    Start Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.startDate}
                     onChange={(e) =>
                       onConsultancyChange(idx, "startDate", e.target.value)
@@ -1079,10 +1079,10 @@ function WorkExperienceSection({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
+                    End Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.endDate}
                     onChange={(e) =>
                       onConsultancyChange(idx, "endDate", e.target.value)
@@ -1166,10 +1166,10 @@ function WorkExperienceSection({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
+                    Start Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.startDate}
                     onChange={(e) =>
                       onSelfEmploymentChange(idx, "startDate", e.target.value)
@@ -1179,10 +1179,10 @@ function WorkExperienceSection({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
+                    End Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.endDate}
                     onChange={(e) =>
                       onSelfEmploymentChange(idx, "endDate", e.target.value)
@@ -1309,10 +1309,10 @@ function RecognitionSection({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
+                    Start Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={rec.startDate}
                     onChange={(e) => onChange(idx, "startDate", e.target.value)}
                     className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white"
@@ -1320,10 +1320,10 @@ function RecognitionSection({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
+                    End Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={rec.endDate}
                     onChange={(e) => onChange(idx, "endDate", e.target.value)}
                     className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white"
@@ -1435,10 +1435,10 @@ function ProfessionalDevelopmentSection({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
+                    Start Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.startDate}
                     onChange={(e) =>
                       onChange("memberships", idx, "startDate", e.target.value)
@@ -1448,10 +1448,10 @@ function ProfessionalDevelopmentSection({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
+                    End Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.endDate}
                     onChange={(e) =>
                       onChange("memberships", idx, "endDate", e.target.value)
@@ -1537,10 +1537,10 @@ function ProfessionalDevelopmentSection({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
+                    Start Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.startDate}
                     onChange={(e) =>
                       onChange("projects", idx, "startDate", e.target.value)
@@ -1550,10 +1550,10 @@ function ProfessionalDevelopmentSection({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
+                    End Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.endDate}
                     onChange={(e) =>
                       onChange("projects", idx, "endDate", e.target.value)
@@ -1652,10 +1652,10 @@ function ProfessionalDevelopmentSection({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
+                    Start Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.startDate}
                     onChange={(e) =>
                       onChange("research", idx, "startDate", e.target.value)
@@ -1665,10 +1665,10 @@ function ProfessionalDevelopmentSection({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
+                    End Month/Year
                   </label>
                   <input
-                    type="date"
+                    type="month"
                     value={entry.endDate}
                     onChange={(e) =>
                       onChange("research", idx, "endDate", e.target.value)
@@ -1809,13 +1809,11 @@ export default function BackgroundAchievementsForm({
     formData.certifications?.length === 0 &&
       formData.education?.tertiary?.length > 0
   );
-  const [hasNoPublications, setHasNoPublications] = useState(
-    formData.publications?.length === 0 &&
-      formData.education?.tertiary?.length > 0
-  );
-  const [hasNoInventions, setHasNoInventions] = useState(
-    formData.inventions?.length === 0 &&
-      formData.education?.tertiary?.length > 0
+  const [hasNoInventionsAndPublications, setHasNoInventionsAndPublications] = useState(
+    (formData.publications?.length === 0 &&
+      formData.inventions?.length === 0 &&
+      formData.education?.tertiary?.length > 0) ||
+      (formData.publications === undefined && formData.inventions === undefined)
   );
   const [hasNoWork, setHasNoWork] = useState(
     formData.work_experience?.employment?.length === 0 &&
@@ -2256,8 +2254,8 @@ export default function BackgroundAchievementsForm({
       education: finalEducationData,
       non_formal_education: hasNoNonFormal ? [] : nonFormal,
       certifications: hasNoCertifications ? [] : certifications,
-      publications: hasNoPublications ? [] : publications,
-      inventions: hasNoInventions ? [] : inventions,
+      publications: hasNoInventionsAndPublications ? [] : publications,
+      inventions: hasNoInventionsAndPublications ? [] : inventions,
       work_experience: finalWorkData,
       recognitions: hasNoRecognitions ? [] : recognitions,
       professional_development: professional_development,
@@ -2278,8 +2276,8 @@ export default function BackgroundAchievementsForm({
       },
       non_formal_education: hasNoNonFormal ? [] : nonFormal,
       certifications: hasNoCertifications ? [] : certifications,
-      publications: hasNoPublications ? [] : publications,
-      inventions: hasNoInventions ? [] : inventions,
+      publications: hasNoInventionsAndPublications ? [] : publications,
+      inventions: hasNoInventionsAndPublications ? [] : inventions,
       work_experience: {
         employment: hasNoWork ? [] : work.employment,
         consultancy: hasNoWork ? [] : work.consultancy,
@@ -2354,44 +2352,40 @@ export default function BackgroundAchievementsForm({
           )}
         </AccordionItem>
 
-        {/* --- E. Publications --- */}
-        <AccordionItem title="E. Publications (Optional)">
+        {/* --- E & F. Inventions and Publications --- */}
+        <AccordionItem title="E. Inventions and Publications (Optional)">
           <NoneCheckbox
-            id="none-publications"
-            label="I have no Publications to declare."
-            checked={hasNoPublications}
-            onChange={() => setHasNoPublications(!hasNoPublications)}
+            id="none-inventions-publications"
+            label="I have no Inventions and Publications to declare."
+            checked={hasNoInventionsAndPublications}
+            onChange={() => setHasNoInventionsAndPublications(!hasNoInventionsAndPublications)}
           />
-          {!hasNoPublications && (
-            <PublicationSection
-              publications={publications}
-              onChange={handlePublicationChange}
-              onAdd={addPublication}
-              onRemove={removePublication}
-            />
+          {!hasNoInventionsAndPublications && (
+            <>
+              <div className="mb-8">
+                <h4 className="font-semibold text-lg mb-4 text-black">Publications</h4>
+                <PublicationSection
+                  publications={publications}
+                  onChange={handlePublicationChange}
+                  onAdd={addPublication}
+                  onRemove={removePublication}
+                />
+              </div>
+              <div>
+                <h4 className="font-semibold text-lg mb-4 text-black">Inventions</h4>
+                <InventionSection
+                  inventions={inventions}
+                  onChange={handleInventionChange}
+                  onAdd={addInvention}
+                  onRemove={removeInvention}
+                />
+              </div>
+            </>
           )}
         </AccordionItem>
 
-        {/* --- F. Inventions --- */}
-        <AccordionItem title="F. Inventions (Optional)">
-          <NoneCheckbox
-            id="none-inventions"
-            label="I have no Inventions to declare."
-            checked={hasNoInventions}
-            onChange={() => setHasNoInventions(!hasNoInventions)}
-          />
-          {!hasNoInventions && (
-            <InventionSection
-              inventions={inventions}
-              onChange={handleInventionChange}
-              onAdd={addInvention}
-              onRemove={removeInvention}
-            />
-          )}
-        </AccordionItem>
-
-        {/* --- G. Work Experience --- */}
-        <AccordionItem title="G. Work Experience (Optional)">
+        {/* --- F. Work Experience --- */}
+        <AccordionItem title="F. Work Experience (Optional)">
           <NoneCheckbox
             id="none-work"
             label="I have no Work Experience to declare."
@@ -2410,8 +2404,8 @@ export default function BackgroundAchievementsForm({
           )}
         </AccordionItem>
 
-        {/* --- H. Recognitions --- */}
-        <AccordionItem title="H. Recognitions (Optional)">
+        {/* --- G. Recognitions --- */}
+        <AccordionItem title="G. Recognitions (Optional)">
           <NoneCheckbox
             id="none-recognitions"
             label="I have no Recognitions to declare."
@@ -2428,8 +2422,8 @@ export default function BackgroundAchievementsForm({
           )}
         </AccordionItem>
 
-        {/* --- I. Professional Development --- */}
-        <AccordionItem title="I. Professional Development Activities (Optional)">
+        {/* --- H. Professional Development --- */}
+        <AccordionItem title="H. Professional Development Activities (Optional)">
           <NoneCheckbox
             id="none-profdev"
             label="I have no Professional Development Activities to declare."

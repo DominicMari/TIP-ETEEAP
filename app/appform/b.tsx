@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import MonthYearPicker from "./MonthYearPicker";
 
 export default function PersonalInformationForm({
   formData, // This is formData.personalInfo, e.g., { fullAddress: ..., mobile: ..., email: ... }
@@ -108,7 +109,7 @@ export default function PersonalInformationForm({
           {/* Full Address */}
           <div className="col-span-2">
             <label className="block text-sm font-semibold text-black">
-              Full Address:
+              Full Address: <span className="text-red-500">*</span>
             </label>
             <input
               name="fullAddress"
@@ -126,7 +127,7 @@ export default function PersonalInformationForm({
           {/* Mobile */}
           <div>
             <label className="block text-sm font-semibold text-black">
-              Mobile Number:
+              Mobile Number: <span className="text-red-500">*</span>
             </label>
             <input
               name="mobile"
@@ -158,7 +159,7 @@ export default function PersonalInformationForm({
           {/* Email */}
           <div>
             <label className="block text-sm font-semibold text-black">
-              Email:
+              Email: <span className="text-red-500">*</span>
             </label>
             <input
               name="email"
@@ -174,40 +175,57 @@ export default function PersonalInformationForm({
             )}
           </div>
 
-          {/* Date of Birth */}
-          <div>
-            <label className="block text-sm font-semibold text-black">
-              Date of Birth:
-            </label>
-            <input
-              name="birthDate"
-              type="date"
-              value={data.birthDate || ""}
-              onChange={handleDateChange}
-              max={new Date().toISOString().split("T")[0]}
-              className={`w-full border rounded-lg p-2 text-black ${
-                errors.birthDate ? "border-red-500" : "border-gray-400"
-              }`}
-            />
-            {errors.birthDate && (
-              <p className="text-red-500 text-sm mt-1">{errors.birthDate}</p>
-            )}
-          </div>
+          {/* Date of Birth & Age Row */}
+<div className="col-span-2 flex gap-4">
+  
+  {/* Date of Birth */}
+  <div className="flex-1">
+    <label className="block text-sm font-medium text-black mb-1">
+      Date of Birth: <span className="text-red-500">*</span>
+    </label>
+    <input
+      type="date"
+      /* Added text-black and bg-white here */
+      className={`w-full p-2 border rounded-md text-black bg-white focus:outline-none focus:ring-2 ${
+        errors.birthDate ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-200"
+      }`}
+      value={data.birthDate || ""}
+      max={new Date().toISOString().split("T")[0]}
+      onChange={(e) => {
+        const value = e.target.value;
+        const calculatedAge = calculateAge(value);
+        
+        setFormData({
+          ...data,
+          birthDate: value,
+          age: calculatedAge,
+        });
 
-          {/* Age */}
-          <div>
-            <label className="block text-sm font-semibold text-black">
-              Age:
-            </label>
-            <input
-              name="age"
-              type="number"
-              value={data.age || ""}
-              readOnly
-              placeholder="Age (auto-calculated)"
-              className="w-full border rounded-lg p-2 text-black bg-gray-100 cursor-not-allowed"
-            />
-          </div>
+        if (errors.birthDate) setErrors((prev) => ({ ...prev, birthDate: "" }));
+      }}
+      required
+    />
+    {errors.birthDate && (
+      <p className="mt-1 text-xs text-red-500">{errors.birthDate}</p>
+    )}
+  </div>
+
+  {/* Age */}
+  <div className="w-24">
+    <label className="block text-sm font-semibold text-black mb-1">
+      Age:
+    </label>
+    <input
+      name="age"
+      type="text"
+      value={data.age || ""}
+      readOnly
+      placeholder="0"
+      className="w-full p-2 border rounded-md text-black bg-gray-100 cursor-not-allowed text-center"
+    />
+  </div>
+  
+</div>
 
         </div>
       </div>

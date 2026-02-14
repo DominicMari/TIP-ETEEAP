@@ -63,7 +63,7 @@ export default function LifelongLearningForm({
         {/* 1. Hobbies/Leisure Activities */}
         <div className="mb-4">
           <label className="block mb-1 text-sm font-semibold text-black">
-            1. Hobbies/Leisure Activities
+            1. Hobbies/Leisure Activities <span className="text-red-500">*</span>
             <span className="italic font-normal text-gray-600">
               {" "}
               (Leisure activities that involve rating of skills...)
@@ -83,7 +83,7 @@ export default function LifelongLearningForm({
         {/* 2. Special Skills */}
         <div className="mb-4">
           <label className="block mb-1 text-sm font-semibold text-black">
-            2. Special Skills
+            2. Special Skills <span className="text-red-500">*</span>
             <span className="italic font-normal text-gray-600">
               {" "}
               (Note down those special skills...)
@@ -103,7 +103,7 @@ export default function LifelongLearningForm({
         {/* 3. Work-Related Activities */}
         <div className="mb-4">
           <label className="block mb-1 text-sm font-semibold text-black">
-            3. Work-Related Activities
+            3. Work-Related Activities <span className="text-red-500">*</span>
             <span className="italic font-normal text-gray-600">
               {" "}
               (Some work-related activities are occasions for you to learn
@@ -124,7 +124,7 @@ export default function LifelongLearningForm({
         {/* 4. Volunteer Activities */}
         <div className="mb-4">
           <label className="block mb-1 text-sm font-semibold text-black">
-            4. Volunteer Activities
+            4. Volunteer Activities <span className="text-red-500">*</span>
             <span className="italic font-normal text-gray-600">
               {" "}
               (List only volunteer activities that demonstrate learning
@@ -145,7 +145,7 @@ export default function LifelongLearningForm({
         {/* 5. Travels */}
         <div className="mb-4">
           <label className="block mb-1 text-sm font-semibold text-black">
-            5. Travels: Cite places visited and purpose of travel
+            5. Travels: Cite places visited and purpose of travel <span className="text-red-500">*</span>
             <span className="italic font-normal text-gray-600">
               {" "}
               (Include a write-up of the nature of travel undertaken...)

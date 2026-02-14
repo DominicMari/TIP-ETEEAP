@@ -152,7 +152,7 @@ export default function PrioritiesGoalsForm({
         {/* Degree selection */}
         <div className="mb-6">
           <label className="block mb-2 text-sm font-semibold text-black">
-            Degree program(s) being applied for:
+            Degree program(s) being applied for: <span className="text-red-500">*</span>
           </label>
           
           {Array.isArray(formData.degrees) && formData.degrees.map((degree: string, index: number) => (
@@ -201,7 +201,7 @@ export default function PrioritiesGoalsForm({
         {/* Statement field */}
         <div className="mb-4">
           <label className="block mb-2 text-sm font-semibold text-black">
-            Statement of your goals:
+            Statement of your goals: <span className="text-red-500">*</span>
           </label>
           <textarea
             name="statement"

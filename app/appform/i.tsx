@@ -166,7 +166,7 @@ export default function CreativeWorksForm({
               {/* Title */}
               <div className="mb-3">
                 <label className="block text-sm font-semibold text-black mb-1">
-                  Title and Brief Description:
+                  Title and Brief Description: <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -184,7 +184,7 @@ export default function CreativeWorksForm({
               {/* Institution */}
               <div className="mb-3">
                 <label className="block text-sm font-semibold text-black mb-1">
-                  Name and Address of the Institution/Industry/Agency:
+                  Name and Address of the Institution/Industry/Agency: <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -202,7 +202,7 @@ export default function CreativeWorksForm({
               {/* Dates */}
               <div className="mb-3">
                 <label className="block text-sm font-semibold text-black mb-1">
-                  Inclusive Dates of Attendance:
+                  Inclusive Dates of Attendance: <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
