@@ -4,7 +4,8 @@ import { cookies } from 'next/headers';
 
 const TABLE = 'email_logs';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, context: { params: { id: string } }) {
+  const { params } = context;
   const supabase = createRouteHandlerClient({ cookies });
   const id = Number(params.id);
 
