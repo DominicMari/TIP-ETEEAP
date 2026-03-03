@@ -1,51 +1,53 @@
-// /app/api/email-history/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
-import { Resend } from 'resend';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const TABLE = 'email_logs';
 
-// Helper function to map Resend's status to your component's status
-function mapResendStatus(status: string): 'Sent' | 'Failed' | string {
-  if (!status) return 'Unknown'; // <-- Added safety check
-  const lowerStatus = status.toLowerCase();
-
-  if (lowerStatus === 'sent' || lowerStatus === 'delivered') {
-    return 'Sent';
-  }
-  if (lowerStatus === 'bounced' || lowerStatus === 'complained') {
-    return 'Failed';
-  }
-  
-  // For 'delivery_delayed', 'pending', etc.
-  return status.charAt(0).toUpperCase() + status.slice(1);
+function parsePagination(searchParams: URLSearchParams) {
+  const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
+  const offset = parseInt(searchParams.get('offset') || '0', 10);
+  return { limit: Number.isNaN(limit) ? 50 : limit, offset: Number.isNaN(offset) ? 0 : offset };
 }
 
 export async function GET(req: NextRequest) {
-  try {
-    // 1. Fetch the logs from Resend's API
-    const { data, error } = await resend.emails.list();
+  const supabase = createRouteHandlerClient({ cookies });
+  const { searchParams } = new URL(req.url);
 
-    if (error) {
-      console.error('Error fetching email history:', error);
-      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  const status = searchParams.get('status');
+  const recipient = searchParams.get('recipient');
+  const from = searchParams.get('from');
+  const to = searchParams.get('to');
+  const sort = searchParams.get('sort') || 'created_at';
+  const direction = (searchParams.get('direction') || 'desc').toLowerCase() === 'asc';
+  const { limit, offset } = parsePagination(searchParams);
+
+  try {
+    let query = supabase
+      .from(TABLE)
+      .select('id, recipient, subject, status, created_at, sender, error_details', { count: 'exact' })
+      .order(sort, { ascending: direction })
+      .range(offset, offset + limit - 1);
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+    if (recipient) {
+      query = query.ilike('recipient', `%${recipient}%`);
+    }
+    if (from) {
+      query = query.gte('created_at', from);
+    }
+    if (to) {
+      query = query.lte('created_at', to);
     }
 
-    // 2. Map the logs to the format your component expects
-    const logs = data.data || [];
+    const { data, count, error } = await query;
+    if (error) throw error;
 
-    const formattedLogs = logs.map(log => ({
-      id: log.id,
-      // 'log.to' is an array (e.g., ['person@example.com']). Handle it safely.
-recipient: Array.isArray(log.to) ? log.to.join(', ') : log.to || '',subject: log.subject || 'No Subject',
-      status: mapResendStatus(log.last_event),
-      created_at: log.created_at || 'Unknown Date',
-    }));    
-    // 3. Return the formatted logs
-    return NextResponse.json(formattedLogs);
-
-  } catch (error) {
-    console.error('Error in email-history route:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ data: data || [], count: count ?? data?.length ?? 0, limit, offset });
+  } catch (error: any) {
+    console.error('GET /api/email-history error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

@@ -1,21 +1,339 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import supabaseBrowserClient from '@/lib/supabase/client';
+import {
+  fetchTemplates,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  fetchEmailLogs as fetchEmailLogsApi,
+  fetchEmailLog,
+  sendEmail,
+} from '@/lib/emailService';
 
 import dynamic from 'next/dynamic';
-import { CheckCircle, XCircle, ChevronLeft, AlertTriangle, Loader2, Mail, Plus, Edit2, Search, RefreshCw, FileText, History, Trash2, Eye } from 'lucide-react';
+import { CheckCircle, XCircle, ChevronLeft, AlertTriangle, Loader2, Mail, Plus, Edit2, Search, RefreshCw, FileText, History, Trash2, Eye, Send, X, Undo2, Clock, ArrowLeft, ArrowRight, Moon, Sun } from 'lucide-react';
 import { FC, ReactNode } from "react";
 
 // Dynamically import ReactQuill to avoid SSR issues
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
-// keyframes for the highlight animation
-const highlightAnimation = `
+// Simplified toolbar — no image insertion, only essential formatting
+const QUILL_MODULES = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    ['blockquote'],
+    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+    [{ 'indent': '-1' }, { 'indent': '+1' }],
+    ['link'],
+    ['clean']
+  ],
+  clipboard: {
+    matchVisual: false,
+    matchers: [
+      // Strip out images from pasted content
+      ['img', () => ({ ops: [] })],
+    ]
+  },
+};
+
+// Email validation constants
+const EMAIL_VALIDATION = {
+  MIN_SUBJECT_LENGTH: 3,
+  MAX_SUBJECT_LENGTH: 200,
+  MAX_CONTENT_SIZE: 500000, // ~500KB of HTML
+  MIN_CONTENT_LENGTH: 10,
+};
+
+// Utility functions for email validation
+const validateEmailFormat = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validateEmailDomain = (email: string): boolean => {
+  const commonTLDs = ['com', 'org', 'net', 'edu', 'gov', 'mil', 'co', 'io', 'ai', 'app', 'dev'];
+  const domain = email.split('@')[1]?.toLowerCase() || '';
+  const tld = domain.split('.').pop() || '';
+  return commonTLDs.includes(tld) || tld.length >= 2;
+};
+
+const sanitizeHtmlContent = (html: string): string => {
+  // Remove script tags and event handlers
+  let sanitized = html.replace(/<script[^>]*>.*?<\/script>/gi, '');
+  sanitized = sanitized.replace(/on\w+\s*=\s*["'][^"']*["']/gi, '');
+  sanitized = sanitized.replace(/javascript:/gi, '');
+  return sanitized;
+};
+
+const stripHtmlTags = (html: string): string => {
+  return html.replace(/<[^>]+>/g, '');
+};
+
+const getContentLength = (html: string): number => {
+  const text = stripHtmlTags(html);
+  return text.trim().length;
+};
+
+const customStyles = `
   @keyframes flash {
-    0% { background-color: rgba(252, 211, 77, 0.5); } /* yellow-300 with 50% opacity */
+    0% { background-color: rgba(234, 179, 8, 0.15); }
     100% { background-color: transparent; }
   }
   .animate-flash { animation: flash 2s ease-out; }
+  
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-slide-up { animation: slideUp 0.3s ease-out; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+
+  .ql-toolbar.ql-snow {
+    border-top-left-radius: 0.75rem;
+    border-top-right-radius: 0.75rem;
+    border-color: #e5e7eb !important;
+    background: #f9fafb;
+    padding: 8px 12px !important;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    align-items: center;
+  }
+  .ql-toolbar.ql-snow .ql-formats {
+    margin-right: 8px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    padding-right: 8px;
+    border-right: 1px solid #e5e7eb;
+  }
+  .ql-toolbar.ql-snow .ql-formats:last-child {
+    border-right: none;
+    padding-right: 0;
+    margin-right: 0 !important;
+  }
+  .ql-toolbar.ql-snow button {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 4px !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px !important;
+    transition: all 0.15s ease;
+    border: none !important;
+  }
+  .ql-toolbar.ql-snow button:hover {
+    background: #e5e7eb !important;
+  }
+  .ql-toolbar.ql-snow button.ql-active {
+    background: #fef3c7 !important;
+    color: #b45309 !important;
+  }
+  .ql-toolbar.ql-snow button.ql-active .ql-stroke {
+    stroke: #b45309 !important;
+  }
+  .ql-toolbar.ql-snow button.ql-active .ql-fill {
+    fill: #b45309 !important;
+  }
+  .ql-toolbar.ql-snow button:hover .ql-stroke {
+    stroke: #374151 !important;
+  }
+  .ql-toolbar.ql-snow button:hover .ql-fill {
+    fill: #374151 !important;
+  }
+  .ql-toolbar.ql-snow .ql-picker {
+    height: 32px !important;
+    border-radius: 8px !important;
+    transition: all 0.15s ease;
+  }
+  .ql-toolbar.ql-snow .ql-picker-label {
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    padding: 2px 8px !important;
+    display: flex;
+    align-items: center;
+    height: 32px !important;
+    font-size: 0.8125rem;
+    color: #374151;
+    transition: all 0.15s ease;
+    background: white;
+  }
+  .ql-toolbar.ql-snow .ql-picker-label:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db !important;
+  }
+  .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-label {
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+  }
+  .ql-toolbar.ql-snow .ql-picker-options {
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05) !important;
+    padding: 4px !important;
+    margin-top: 4px !important;
+    background: white;
+    overflow: hidden;
+  }
+  .ql-toolbar.ql-snow .ql-picker-item {
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    transition: all 0.1s ease;
+  }
+  .ql-toolbar.ql-snow .ql-picker-item:hover {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+  }
+  .ql-toolbar.ql-snow .ql-picker-item.ql-selected {
+    background: #fef3c7 !important;
+    color: #92400e !important;
+  }
+
+  /* Snow tooltip (link input) — modern styling, preserving Quill positioning */
+  .ql-snow .ql-tooltip {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 14px !important;
+    box-shadow: 0 20px 40px -8px rgba(0,0,0,0.12), 0 4px 12px -2px rgba(0,0,0,0.06) !important;
+    padding: 14px 18px !important;
+    color: #374151 !important;
+    z-index: 9999 !important;
+    white-space: nowrap;
+  }
+  .ql-snow .ql-tooltip::before {
+    font-size: 0.8125rem !important;
+    color: #6b7280 !important;
+    font-weight: 600 !important;
+    margin-right: 8px !important;
+  }
+  .ql-snow .ql-tooltip input[type=text] {
+    border: 1.5px solid #e5e7eb !important;
+    border-radius: 10px !important;
+    padding: 8px 14px !important;
+    font-size: 0.8125rem !important;
+    color: #111827 !important;
+    background: #f9fafb !important;
+    outline: none !important;
+    width: 240px !important;
+    height: auto !important;
+    margin: 0 !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .ql-snow .ql-tooltip input[type=text]:focus {
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15) !important;
+    background: white !important;
+  }
+
+  /* Preview link in view mode */
+  .ql-snow .ql-tooltip a.ql-preview {
+    color: #2563eb !important;
+    text-decoration: none !important;
+    font-size: 0.8125rem !important;
+    max-width: 200px !important;
+    display: inline-block !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    vertical-align: middle !important;
+  }
+
+  /* Edit / Save button */
+  .ql-snow .ql-tooltip a.ql-action {
+    margin-left: 10px !important;
+  }
+  .ql-snow .ql-tooltip a.ql-action::after {
+    content: 'Edit' !important;
+    border-right: none !important;
+    margin-left: 0 !important;
+    padding: 7px 16px !important;
+    background: #f3f4f6 !important;
+    color: #374151 !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 0.8125rem !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    display: inline-block !important;
+    line-height: 1.2 !important;
+    text-decoration: none !important;
+    vertical-align: middle !important;
+  }
+  .ql-snow .ql-tooltip a.ql-action:hover::after {
+    background: #e5e7eb !important;
+  }
+  /* When editing, button says Save with amber style */
+  .ql-snow .ql-tooltip.ql-editing a.ql-action::after {
+    content: 'Save' !important;
+    background: #f59e0b !important;
+    color: #111827 !important;
+  }
+  .ql-snow .ql-tooltip.ql-editing a.ql-action:hover::after {
+    background: #d97706 !important;
+  }
+
+  /* Remove button */
+  .ql-snow .ql-tooltip a.ql-remove {
+    margin-left: 6px !important;
+  }
+  .ql-snow .ql-tooltip a.ql-remove::before {
+    content: 'Remove' !important;
+    padding: 7px 16px !important;
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 0.8125rem !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    display: inline-block !important;
+    line-height: 1.2 !important;
+    text-decoration: none !important;
+    vertical-align: middle !important;
+  }
+  .ql-snow .ql-tooltip a.ql-remove:hover::before {
+    background: #fecaca !important;
+  }
+
+  .ql-container.ql-snow {
+    border-bottom-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+    border-color: #e5e7eb !important;
+    font-size: 0.875rem;
+    height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .ql-editor {
+    flex: 1;
+    color: #111827;
+    padding: 16px 20px;
+    line-height: 1.7;
+    overflow-y: visible;
+  }
+  .ql-editor.ql-blank::before {
+    color: #9ca3af;
+    font-style: normal;
+    padding-left: 4px;
+  }
+  
+  /* Prevent images from displaying in editor */
+  .ql-editor img {
+    display: none !important;
+  }
+  
+  /* Hide image button if it accidentally appears */
+  .ql-toolbar .ql-image {
+    display: none !important;
+  }
 `;
 
 // --- TypeScript Interfaces and Types ---
@@ -33,7 +351,7 @@ interface EmailLog {
   status: 'Sent' | 'Failed';
   created_at: string;
   error_details: string | null;
-  body: string | null; // Assuming the body is stored in the log for viewing
+  body: string | null;
 }
 
 interface User {
@@ -47,7 +365,7 @@ type TemplateView = 'list' | 'editor';
 
 // --- Helper Components ---
 
-// Confirmation Modal Component
+// Modern Confirmation Modal with backdrop blur
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -59,31 +377,30 @@ interface ConfirmationModalProps {
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
-  isOpen,
-  onClose,
-  onConfirm,
-  title,
-  message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  isOpen, onClose, onConfirm, title, message,
+  confirmText = 'Confirm', cancelText = 'Cancel',
 }) => {
   if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-black">
-        <h3 className="text-lg font-semibold mb-4">{title}</h3>
-        <p className="text-sm text-gray-700 mb-6">{message}</p>
-        <div className="flex justify-end space-x-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-black animate-slide-up">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+        </div>
+        <p className="text-sm text-gray-600 mb-6 ml-[52px]">{message}</p>
+        <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+            className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+            className="px-5 py-2.5 text-sm font-semibold text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors shadow-sm shadow-red-200"
           >
             {confirmText}
           </button>
@@ -93,37 +410,49 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   );
 };
 
-/**
- * Renders a colored status badge with an icon and hover tooltip for errors.
- */
+/** Status badge with modern pill styling and ring accent */
 const StatusBadge = ({ status }: { status: 'Sent' | 'Failed' | string }) => {
-  const baseClasses = "px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 w-fit";
-  
-  const content = {
-    Sent: {
-      icon: <CheckCircle className="w-4 h-4" />,
-      text: "Sent",
-      className: "bg-green-100 text-green-800",
-    },
-    Failed: {
-      icon: <XCircle className="w-4 h-4" />,
-      text: "Failed",
-      className: "bg-red-100 text-red-800",
-    },
-    Default: {
-      icon: null,
-      text: status,
-      className: "bg-gray-100 text-gray-800",
-    },
-  };
-
-  const currentStatus = status === 'Sent' || status === 'Failed' ? content[status] : content.Default;
-
+  if (status === 'Sent') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+        <CheckCircle className="w-3.5 h-3.5" />
+        Sent
+      </span>
+    );
+  }
+  if (status === 'Failed') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 ring-1 ring-red-200">
+        <XCircle className="w-3.5 h-3.5" />
+        Failed
+      </span>
+    );
+  }
   return (
-    <span className={`${baseClasses} ${currentStatus.className}`}>
-      {currentStatus.icon}
-      {currentStatus.text}
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-50 text-gray-600 ring-1 ring-gray-200">
+      {status}
     </span>
+  );
+};
+
+/** Reusable alert banner with dismiss */
+const AlertBanner = ({ message, onDismiss }: { message: MessageState; onDismiss?: () => void }) => {
+  if (!message) return null;
+  const isSuccess = message.type === 'success';
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm animate-slide-up ${
+      isSuccess
+        ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
+        : 'bg-red-50 text-red-800 ring-1 ring-red-200'
+    }`}>
+      {isSuccess ? <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" /> : <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />}
+      <p className="flex-1">{message.text}</p>
+      {onDismiss && (
+        <button onClick={onDismiss} className="text-current opacity-50 hover:opacity-100 transition-opacity">
+          <X className="w-4 h-4" />
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -132,6 +461,7 @@ const StatusBadge = ({ status }: { status: 'Sent' | 'Failed' | string }) => {
 
 const EmailManagement = () => {
   // --- Component State ---
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState<TabName>('send');
   
   // Global State
@@ -163,74 +493,86 @@ const EmailManagement = () => {
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'Sent' | 'Failed'>('all');
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [highlightedLogId, setHighlightedLogId] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState(1); // For pagination
+  const [currentPage, setCurrentPage] = useState(1);
   const emailsPerPage = 10;
+  const [totalLogs, setTotalLogs] = useState(0);
   const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
   const [isLogDetailModalOpen, setIsLogDetailModalOpen] = useState(false);
   const [isFetchingBody, setIsFetchingBody] = useState(false);
 
-  // --- Data Fetching and Effects ---
+  // --- Data Fetching ---
 
-  const fetchEmailLogs = useCallback(async () => {
-    console.log("[EmailManagement] Fetching from '/api/email-history'...");
+  // Load dark mode preference from localStorage
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('emailManagementDarkMode') === 'true';
+    setIsDarkMode(savedDarkMode);
+  }, []);
+
+  // Update localStorage and apply theme to document
+  useEffect(() => {
+    localStorage.setItem('emailManagementDarkMode', isDarkMode.toString());
+    const element = document.documentElement;
+    if (isDarkMode) {
+      element.setAttribute('data-theme', 'dark');
+    } else {
+      element.removeAttribute('data-theme');
+    }
+  }, [isDarkMode]);
+
+  const fetchEmailLogs = useCallback(async (page = 1) => {
     try {
       setIsHistoryLoading(true);
-
-      const response = await fetch('/api/email-history');
-
-      if (!response.ok) { // Check if the response was successful
-        throw new Error('Failed to fetch email logs');
-      }
-      const data = await response.json();
+      const offset = (page - 1) * emailsPerPage;
+      const { data, count } = await fetchEmailLogsApi({
+        limit: emailsPerPage,
+        offset,
+        recipient: historySearch || undefined,
+        status: historyStatusFilter === 'all' ? undefined : historyStatusFilter,
+        sort: 'created_at',
+        direction: 'desc',
+      });
 
       const newLogs = data || [];
+      setTotalLogs(count || 0);
       setEmailLog(prevLogs => {
         if (newLogs.length > 0 && prevLogs.length > 0 && newLogs[0].id !== prevLogs[0].id) {
           setHighlightedLogId(newLogs[0].id);
         }
         return newLogs;
       });
-
     } catch (error) {
       console.error('Error in fetchEmailLogs:', error);
     } finally {
       setIsHistoryLoading(false);
     }
-  }, []);
+  }, [emailsPerPage, historySearch, historyStatusFilter]);
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsHistoryLoading(true); // Set loading true for all initial fetches
+      setIsHistoryLoading(true);
       try {
-        const [templatesResponse, usersResponse, emailLogsResponse] = await Promise.all([
-          fetch('/api/templates'),
+        const [templatesResponse, usersResponse] = await Promise.all([
+          fetchTemplates({ limit: 100 }),
           supabaseBrowserClient.from('users').select('id, email'),
-          fetch('/api/email-history'), // Fetch email logs
         ]);
 
-        const templatesData = await templatesResponse.json();
-        setTemplates(templatesData);
+        setTemplates(templatesResponse.data || []);
 
         const { data: usersData, error: usersError } = usersResponse;
-        if (usersError) {
-          console.error('Error fetching users:', usersError);
-        } else {
-          setUsers(usersData || []);
-        }
-
-        const emailLogsData = await emailLogsResponse.json(); // Parse email logs
-        if (emailLogsResponse.ok) {
-          setEmailLog(emailLogsData || []);
-        } else {
-          console.error('Error fetching email logs:', emailLogsData.error || 'Unknown error');
-        }
+        if (usersError) console.error('Error fetching users:', usersError);
+        else setUsers(usersData || []);
       } catch (error) {
+        console.error('Error fetching initial data:', error);
       } finally {
-        setIsHistoryLoading(false); // All initial fetches are done
+        setIsHistoryLoading(false);
       }
     };
     fetchData();
-  }, []); // Remove dependency to run only once on mount
+  }, []);
+
+  useEffect(() => {
+    fetchEmailLogs(currentPage);
+  }, [fetchEmailLogs, currentPage, historySearch, historyStatusFilter]);
 
   // --- Core Logic Handlers ---
 
@@ -239,44 +581,65 @@ const EmailManagement = () => {
     setValidationError(null);
 
     const errors = [];
-    if (!recipient) errors.push("Recipient is required.");
-    if (!subject.trim()) errors.push("Subject is required.");
-    if (!customMessage.trim() || customMessage === '<p><br></p>') errors.push("Message content cannot be empty.");
+    
+    // Recipient validation
+    if (!recipient) {
+      errors.push("Recipient is required.");
+    } else if (!validateEmailFormat(recipient)) {
+      errors.push("Invalid email format.");
+    } else if (!validateEmailDomain(recipient)) {
+      errors.push("Email domain appears invalid.");
+    }
+    
+    // Subject validation
+    if (!subject.trim()) {
+      errors.push("Subject is required.");
+    } else if (subject.trim().length < EMAIL_VALIDATION.MIN_SUBJECT_LENGTH) {
+      errors.push(`Subject must be at least ${EMAIL_VALIDATION.MIN_SUBJECT_LENGTH} characters.`);
+    } else if (subject.length > EMAIL_VALIDATION.MAX_SUBJECT_LENGTH) {
+      errors.push(`Subject cannot exceed ${EMAIL_VALIDATION.MAX_SUBJECT_LENGTH} characters.`);
+    }
+    
+    // Content validation
+    if (!customMessage.trim() || customMessage === '<p><br></p>') {
+      errors.push("Message content cannot be empty.");
+    } else {
+      const contentLength = getContentLength(customMessage);
+      if (contentLength < EMAIL_VALIDATION.MIN_CONTENT_LENGTH) {
+        errors.push(`Message must be at least ${EMAIL_VALIDATION.MIN_CONTENT_LENGTH} characters.`);
+      }
+      if (customMessage.length > EMAIL_VALIDATION.MAX_CONTENT_SIZE) {
+        errors.push(`Message content is too large (max ${EMAIL_VALIDATION.MAX_CONTENT_SIZE / 1000}KB).`);
+      }
+    }
 
     if (errors.length > 0) {
       setValidationError(errors.join(" "));
       return;
     }
+    
+    // Sanitize content before sending
+    const sanitizedContent = sanitizeHtmlContent(customMessage);
 
     setIsSending(true);
     setSendFormMessage(null);
 
     try {
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient,
-          subject,
-          body: customMessage,
-        }),
+      await sendEmail({
+        recipient: recipient.trim().toLowerCase(),
+        subject: subject.trim(),
+        body: sanitizedContent,
       });
 
-      const result = await response.json();
-
-      if (response.ok) {
-        setSendFormMessage({ type: 'success', text: `Email sent successfully to ${recipient}!` });
-        setRecipient('');
-        setSubject('');
-        setCustomMessage('');
-        setSelectedTemplateId('');
-        await fetchEmailLogs(); // Refresh history and wait for it to complete
-      } else {
-        setSendFormMessage({ type: 'error', text: `Error: ${result.error || 'Failed to send email'}` });
-      }
-    } catch (error) {
+      setSendFormMessage({ type: 'success', text: `Email sent successfully to ${recipient}!` });
+      setRecipient('');
+      setSubject('');
+      setCustomMessage('');
+      setSelectedTemplateId('');
+      await fetchEmailLogs();
+    } catch (error: any) {
       console.error('Failed to send email:', error);
-      setSendFormMessage({ type: 'error', text: 'Error: An unexpected error occurred.' });
+      setSendFormMessage({ type: 'error', text: `Error: ${error?.message || 'Failed to send email'}` });
     } finally {
       setIsSending(false);
     }
@@ -286,37 +649,20 @@ const EmailManagement = () => {
     const isEditing = !!editingTemplate;
     setTemplateMessage(null);
 
-    let updatedTemplatesLocally: Template[];
-
-    if (isEditing) {
-      updatedTemplatesLocally = templates.map(t => 
-        t.id === editingTemplate.id ? { ...t, ...formData } : t
-      );
-    } else {
-      const newTemplate: Template = { id: Date.now(), ...formData };
-      updatedTemplatesLocally = [...templates, newTemplate];
-    }
-
     try {
-      const response = await fetch('/api/templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedTemplatesLocally),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setTemplates(updatedTemplatesLocally);
-        setTemplateMessage({ type: 'success', text: `Template "${formData.name}" ${isEditing ? 'updated' : 'created'} successfully!` });
-        setTemplateView('list');
-        setEditingTemplate(null);
+      if (isEditing && editingTemplate) {
+        const updated = await updateTemplate(editingTemplate.id, formData);
+        setTemplates(prev => prev.map(t => (t.id === editingTemplate.id ? updated : t)));
       } else {
-        setTemplateMessage({ type: 'error', text: `Failed to save template: ${result.error || 'Unknown error'}` });
-        console.error('Failed to save templates:', result.error);
+        const created = await createTemplate(formData);
+        setTemplates(prev => [...prev, created]);
       }
-    } catch (error) {
-      setTemplateMessage({ type: 'error', text: 'An unexpected error occurred while saving the template.' });
+
+      setTemplateMessage({ type: 'success', text: `Template "${formData.name}" ${isEditing ? 'updated' : 'created'} successfully!` });
+      setTemplateView('list');
+      setEditingTemplate(null);
+    } catch (error: any) {
+      setTemplateMessage({ type: 'error', text: `Failed to save template: ${error?.message || 'Unknown error'}` });
       console.error('Failed to save templates:', error);
     }
   };
@@ -326,118 +672,86 @@ const EmailManagement = () => {
     setIsConfirmModalOpen(true);
   };
 
-      const confirmDelete = async () => {
-        if (!templateToDelete) return;
-    
-        const { id: templateId, name: templateName } = templateToDelete;
-        setTemplateMessage(null);
-        setIsConfirmModalOpen(false);
-        setTemplateToDelete(null);
-    
-        // Clear any existing undo timer
-        if (undoTimerRef.current) {
-          clearTimeout(undoTimerRef.current);
-        }
-    
-        try {
-          const response = await fetch(`/api/templates?id=${templateId}`, {
-            method: 'DELETE',
-          });
-    
-          if (response.ok) {
-            // Find the original index before filtering
-            const originalIndex = templates.findIndex(t => t.id === templateId);
-            const deletedTemplateData = templates.find(t => t.id === templateId);
-    
-            setTemplates(prev => prev.filter(t => t.id !== templateId));
-            setTemplateMessage({ type: 'success', text: `Template "${templateName}" deleted successfully!` });
-    
-            if (deletedTemplateData && originalIndex !== -1) {
-              setLastDeletedTemplate({ template: deletedTemplateData, originalIndex });
-              setShowUndoNotification(true);
-              undoTimerRef.current = setTimeout(() => {
-                setShowUndoNotification(false);
-                setLastDeletedTemplate(null);
-              }, 5000); // Hide undo notification after 5 seconds
-            }
-          } else {
-            const result = await response.json();
-            setTemplateMessage({ type: 'error', text: `Failed to delete template: ${result.error || 'Unknown error'}` });
-            console.error('Failed to delete template:', result.error);
-          }
-            } catch (error) {
-              setTemplateMessage({ type: 'error', text: 'An unexpected error occurred while deleting the template.' });
-              console.error('Failed to delete template:', error);
-            }
-          };
-        
-          const handleUndoDelete = async () => {
-            if (!lastDeletedTemplate) return;
-        
-            // Clear the auto-hide timer if undo is clicked
-            if (undoTimerRef.current) {
-              clearTimeout(undoTimerRef.current);
-            }
-        
-            setTemplateMessage(null);
-            setShowUndoNotification(false);
-        
-            const { template: restoredTemplate, originalIndex } = lastDeletedTemplate;
-        
-            // Re-insert the template into the local state at its original position
-            const newTemplates = [...templates];
-            newTemplates.splice(originalIndex, 0, restoredTemplate);
-        
-            try {
-              const response = await fetch('/api/templates', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newTemplates),
-              });
-        
-              if (response.ok) {
-                setTemplates(newTemplates);
-                setLastDeletedTemplate(null);
-                setTemplateMessage({ type: 'success', text: `Template "${restoredTemplate.name}" restored successfully!` });
-              } else {
-                const result = await response.json();
-                setTemplateMessage({ type: 'error', text: `Failed to undo deletion: ${result.error || 'Unknown error'}` });
-                console.error('Failed to undo deletion:', result.error);
-              }
-            } catch (error) {
-              setTemplateMessage({ type: 'error', text: 'An unexpected error occurred while undoing deletion.' });
-              console.error('Failed to undo deletion:', error);
-            }
-          };
-        
-          const handleApplyTemplate = () => {
-            if (!selectedTemplateId) return;
-            const template = templates.find(t => t.id === parseInt(selectedTemplateId));
-                        if (template) {
-                          setSubject(template.subject);
-                          setCustomMessage(template.content);
-                        }
-                      };
+  const confirmDelete = async () => {
+    if (!templateToDelete) return;
+
+    const { id: templateId, name: templateName } = templateToDelete;
+    setTemplateMessage(null);
+    setIsConfirmModalOpen(false);
+    setTemplateToDelete(null);
+
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+
+    try {
+      await deleteTemplate(templateId);
+
+      const originalIndex = templates.findIndex(t => t.id === templateId);
+      const deletedTemplateData = templates.find(t => t.id === templateId);
+
+      setTemplates(prev => prev.filter(t => t.id !== templateId));
+      setTemplateMessage({ type: 'success', text: `Template "${templateName}" deleted successfully!` });
+
+      if (deletedTemplateData && originalIndex !== -1) {
+        setLastDeletedTemplate({ template: deletedTemplateData, originalIndex });
+        setShowUndoNotification(true);
+        undoTimerRef.current = setTimeout(() => {
+          setShowUndoNotification(false);
+          setLastDeletedTemplate(null);
+        }, 5000);
+      }
+    } catch (error: any) {
+      setTemplateMessage({ type: 'error', text: `Failed to delete template: ${error?.message || 'Unknown error'}` });
+      console.error('Failed to delete template:', error);
+    }
+  };
+
+  const handleUndoDelete = async () => {
+    if (!lastDeletedTemplate) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+
+    setTemplateMessage(null);
+    setShowUndoNotification(false);
+
+    const { template: restoredTemplate, originalIndex } = lastDeletedTemplate;
+    try {
+      const recreated = await createTemplate({
+        name: restoredTemplate.name,
+        subject: restoredTemplate.subject,
+        content: restoredTemplate.content,
+      });
+
+      const newTemplates = [...templates];
+      newTemplates.splice(originalIndex, 0, recreated);
+
+      setTemplates(newTemplates);
+      setLastDeletedTemplate(null);
+      setTemplateMessage({ type: 'success', text: `Template "${restoredTemplate.name}" restored successfully!` });
+    } catch (error: any) {
+      setTemplateMessage({ type: 'error', text: `Failed to undo deletion: ${error?.message || 'Unknown error'}` });
+      console.error('Failed to undo deletion:', error);
+    }
+  };
+
+  const handleApplyTemplate = () => {
+    if (!selectedTemplateId) return;
+    const template = templates.find(t => t.id === parseInt(selectedTemplateId));
+    if (template) {
+      setSubject(template.subject);
+      setCustomMessage(template.content);
+    }
+  };
 
   const handleViewLogDetails = async (log: EmailLog) => {
     setSelectedLog(log);
     setIsLogDetailModalOpen(true);
 
-    // If the log body isn't already fetched, fetch it now.
     if (!log.body) {
       setIsFetchingBody(true);
       try {
-        // Assuming you have an endpoint to get a single log's details
-        const response = await fetch(`/api/email-history/${log.id}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch email body.');
-        }
-        const data = await response.json();
-        // Update the selected log with the full body
+        const data = await fetchEmailLog(log.id);
         setSelectedLog(prevLog => prevLog ? { ...prevLog, body: data.body } : null);
       } catch (error) {
         console.error("Error fetching email body:", error);
-        // Optionally, show an error in the modal
         setSelectedLog(prevLog => prevLog ? { ...prevLog, body: '<p>Failed to load email content.</p>' } : null);
       } finally {
         setIsFetchingBody(false);
@@ -449,19 +763,19 @@ const EmailManagement = () => {
 
   const TemplateEditor = () => {
     const [name, setName] = useState(editingTemplate?.name || '');
-    const [subject, setSubject] = useState(editingTemplate?.subject || '');
-    const [content, setContent] = useState(editingTemplate?.content || '<p>Start writing your template here...</p>');
+    const [editorSubject, setEditorSubject] = useState(editingTemplate?.subject || '');
+    const [content, setContent] = useState(editingTemplate?.content || '');
     const [errors, setErrors] = useState({ name: '', subject: '', content: '' });
 
     useEffect(() => {
       if (editingTemplate) {
         setName(editingTemplate.name);
-        setSubject(editingTemplate.subject);
+        setEditorSubject(editingTemplate.subject);
         setContent(editingTemplate.content);
       } else {
         setName('');
-        setSubject('');
-        setContent('<p>Start writing your template here...</p>');
+        setEditorSubject('');
+        setContent('');
       }
     }, [editingTemplate]);
 
@@ -470,90 +784,157 @@ const EmailManagement = () => {
       const newErrors = { name: '', subject: '', content: '' };
       let hasError = false;
 
-      if (!name.trim()) {
-        newErrors.name = "Template name is required.";
+      // Template name validation
+      if (!name.trim()) { 
+        newErrors.name = "Template name is required."; 
+        hasError = true; 
+      } else if (name.trim().length < 2) {
+        newErrors.name = "Template name must be at least 2 characters.";
+        hasError = true;
+      } else if (name.length > 100) {
+        newErrors.name = "Template name cannot exceed 100 characters.";
         hasError = true;
       }
-      if (!subject.trim()) {
-        newErrors.subject = "Subject is required.";
+      
+      // Subject validation
+      if (!editorSubject.trim()) { 
+        newErrors.subject = "Subject is required."; 
+        hasError = true; 
+      } else if (editorSubject.trim().length < EMAIL_VALIDATION.MIN_SUBJECT_LENGTH) {
+        newErrors.subject = `Subject must be at least ${EMAIL_VALIDATION.MIN_SUBJECT_LENGTH} characters.`;
+        hasError = true;
+      } else if (editorSubject.length > EMAIL_VALIDATION.MAX_SUBJECT_LENGTH) {
+        newErrors.subject = `Subject cannot exceed ${EMAIL_VALIDATION.MAX_SUBJECT_LENGTH} characters.`;
         hasError = true;
       }
-      if (!content.trim() || content === '<p>Start writing your template here...</p>' || content === '<p><br></p>') {
-        newErrors.content = "Content cannot be empty.";
-        hasError = true;
+      
+      // Content validation
+      if (!content.trim() || content === '<p><br></p>') { 
+        newErrors.content = "Content cannot be empty."; 
+        hasError = true; 
+      } else {
+        const contentLength = getContentLength(content);
+        if (contentLength < EMAIL_VALIDATION.MIN_CONTENT_LENGTH) {
+          newErrors.content = `Content must be at least ${EMAIL_VALIDATION.MIN_CONTENT_LENGTH} characters.`;
+          hasError = true;
+        }
+        if (content.length > EMAIL_VALIDATION.MAX_CONTENT_SIZE) {
+          newErrors.content = `Content is too large (max ${EMAIL_VALIDATION.MAX_CONTENT_SIZE / 1000}KB).`;
+          hasError = true;
+        }
       }
 
       setErrors(newErrors);
-
       if (!hasError) {
-        handleSaveTemplate({ name, subject, content });
+        // Sanitize content before saving
+        const sanitizedContent = sanitizeHtmlContent(content);
+        handleSaveTemplate({ name: name.trim(), subject: editorSubject.trim(), content: sanitizedContent });
       }
     };
 
     return (
-      <div className="max-w-3xl">
-        <button 
+      <div className="max-w-3xl mx-auto animate-slide-up">
+        <button
           onClick={() => setTemplateView('list')}
-          className="flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 mb-4"
+          className="group flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 mb-6 transition-colors"
         >
-          <ChevronLeft className="w-4 h-4 mr-1" />
+          <ChevronLeft className="w-4 h-4 mr-1 transition-transform group-hover:-translate-x-0.5" />
           Back to Templates
         </button>
-        <h3 className="text-xl font-semibold mb-4">
-          {editingTemplate ? 'Edit Template' : 'Create New Template'}
-        </h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="templateName" className="block text-sm font-medium text-gray-700 mb-1">Template Name</label>
-            <input
-              type="text" id="templateName" value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm text-gray-900"
-              required
-            />
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 md:p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-sm">
+              {editingTemplate ? <Edit2 className="w-5 h-5 text-white" /> : <Plus className="w-5 h-5 text-white" />}
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">
+                {editingTemplate ? 'Edit Template' : 'Create New Template'}
+              </h3>
+              <p className="text-sm text-gray-500">
+                {editingTemplate ? 'Modify the template details below' : 'Fill in the details to create a reusable template'}
+              </p>
+            </div>
           </div>
-          <div>
-            <label htmlFor="templateSubject" className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-            <input
-              type="text" id="templateSubject" value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm text-gray-900"
-              required
-            />
-            {errors.subject && <p className="text-red-500 text-xs mt-1">{errors.subject}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-            <ReactQuill
-              theme="snow"
-              value={content}
-              onChange={setContent}
-              className="mt-1 bg-white"
-              modules={{
-                toolbar: [
-                  [{ 'header': [1, 2, false] }],
-                  ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-                  [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-                  ['link', 'image'],
-                  ['clean']
-                ],
-                imageResize: { // This module might not be available in react-quill-new, but it's a common extension
-                  modules: [ 'Resize', 'DisplaySize', 'Toolbar' ]
-                }
-              }}
-            />
-            {errors.content && <p className="text-red-500 text-xs mt-1">{errors.content}</p>}
-          </div>
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setTemplateView('list')} className="bg-gray-100 text-gray-800 py-2 px-4 rounded-lg font-medium hover:bg-gray-200">Cancel</button>
-            <button type="submit" className="bg-yellow-400 text-black py-2 px-4 rounded-lg font-semibold hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2">Save Template</button>
-          </div>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="templateName" className="block text-sm font-semibold text-gray-700 mb-1.5">Template Name</label>
+              <input
+                type="text" id="templateName" value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Welcome Email, Status Update..."
+                className="block w-full px-4 py-2.5 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400 text-sm text-gray-900 bg-gray-50/50 placeholder:text-gray-400 transition-all"
+              />
+              {errors.name && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{errors.name}</p>}
+            </div>
+            <div>
+              <label htmlFor="templateSubject" className="block text-sm font-semibold text-gray-700 mb-1.5">Subject Line</label>
+              <input
+                type="text" id="templateSubject" value={editorSubject}
+                onChange={(e) => setEditorSubject(e.target.value)}
+                placeholder="Email subject line..."
+                className="block w-full px-4 py-2.5 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400 text-sm text-gray-900 bg-gray-50/50 placeholder:text-gray-400 transition-all"
+              />
+              {!errors.subject && (
+                <p className={`text-xs mt-1 ${
+                  editorSubject.length > EMAIL_VALIDATION.MAX_SUBJECT_LENGTH 
+                    ? 'text-red-500' 
+                    : editorSubject.length > EMAIL_VALIDATION.MAX_SUBJECT_LENGTH * 0.9 
+                    ? 'text-amber-600' 
+                    : 'text-gray-400'
+                }`}>
+                  {editorSubject.length} / {EMAIL_VALIDATION.MAX_SUBJECT_LENGTH} characters
+                </p>
+              )}
+              {errors.subject && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{errors.subject}</p>}
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-semibold text-gray-700">Content</label>
+                <span className="text-xs text-gray-400">Images not allowed</span>
+              </div>
+              <ReactQuill
+                theme="snow"
+                value={content}
+                onChange={setContent}
+                placeholder="Write your template content..."
+                modules={QUILL_MODULES}
+              />
+              {!errors.content && (
+                <p className={`text-xs mt-1.5 ${
+                  content.length > EMAIL_VALIDATION.MAX_CONTENT_SIZE
+                    ? 'text-red-500'
+                    : content.length > EMAIL_VALIDATION.MAX_CONTENT_SIZE * 0.9
+                    ? 'text-amber-600'
+                    : 'text-gray-400'
+                }`}>
+                  {getContentLength(content)} characters ({(content.length / 1000).toFixed(1)}KB / {EMAIL_VALIDATION.MAX_CONTENT_SIZE / 1000}KB)
+                </p>
+              )}
+              {errors.content && <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{errors.content}</p>}
+            </div>
+            <div className="mt-6">
+              <p className="text-sm font-semibold text-gray-700 mb-2">Live Preview</p>
+              <div className="border rounded-xl bg-gray-50 p-4 shadow-inner">
+                <h4 className="text-base font-semibold text-gray-900 mb-3">{editorSubject || 'Email subject'}</h4>
+                <div
+                  className="prose prose-sm max-w-none text-gray-800"
+                  dangerouslySetInnerHTML={{ __html: content || '<p>Your content will appear here.</p>' }}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setTemplateView('list')} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+              <button type="submit" className="px-5 py-2.5 text-sm font-semibold text-black bg-gradient-to-r from-yellow-400 to-amber-400 rounded-xl hover:from-yellow-500 hover:to-amber-500 transition-all shadow-sm shadow-yellow-200">
+                {editingTemplate ? 'Update Template' : 'Create Template'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     );
   };
 
+  // ===== SEND EMAIL TAB =====
   const renderSendEmailView = () => {
     const handleClearForm = () => {
       setRecipient('');
@@ -565,165 +946,223 @@ const EmailManagement = () => {
     };
 
     return (
-      <form onSubmit={handleSendEmail} className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <div>
-              <label htmlFor="recipient" className="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
-              <select
-                id="recipient"
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm text-gray-900"
-                required
-              >
-                <option value="" disabled>Select a user</option>
-                {users.map(user => <option key={user.id} value={user.email}>{user.email}</option>)}
-              </select>
+      <form onSubmit={handleSendEmail} className="animate-slide-up">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+          {/* Header */}
+          <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-sm">
+                <Send className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Compose Email</h3>
+                <p className="text-sm text-gray-500">Send a personalized email to a user</p>
+              </div>
             </div>
           </div>
-          <div className="space-y-6">
+
+          <div className="p-6 space-y-5">
+            {/* Recipient & Subject row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label htmlFor="recipient" className="block text-sm font-semibold text-gray-700 mb-1.5">Recipient</label>
+                <select
+                  id="recipient"
+                  value={recipient}
+                  onChange={(e) => setRecipient(e.target.value)}
+                  className="block w-full px-4 py-2.5 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400 text-sm text-gray-900 bg-gray-50/50 transition-all"
+                  required
+                >
+                  <option value="" disabled>Select a user...</option>
+                  {users.map(user => <option key={user.id} value={user.email}>{user.email}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="subject" className="block text-sm font-semibold text-gray-700 mb-1.5">Subject</label>
+                <input
+                  type="text" id="subject" value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Enter email subject..."
+                  className="block w-full px-4 py-2.5 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400 text-sm text-gray-900 bg-gray-50/50 placeholder:text-gray-400 transition-all"
+                  required
+                />
+                <p className={`text-xs mt-1 ${
+                  subject.length > EMAIL_VALIDATION.MAX_SUBJECT_LENGTH 
+                    ? 'text-red-500' 
+                    : subject.length > EMAIL_VALIDATION.MAX_SUBJECT_LENGTH * 0.9 
+                    ? 'text-amber-600' 
+                    : 'text-gray-400'
+                }`}>
+                  {subject.length} / {EMAIL_VALIDATION.MAX_SUBJECT_LENGTH} characters
+                </p>
+              </div>
+            </div>
+
+            {/* Template selector */}
             <div>
-              <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-              <input
-                type="text" id="subject" value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm text-gray-900"
-                required
+              <label htmlFor="template" className="block text-sm font-semibold text-gray-700 mb-1.5">Quick Template</label>
+              <div className="flex gap-2">
+                <select
+                  id="template"
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  className="block w-full px-4 py-2.5 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400 text-sm text-gray-900 bg-gray-50/50 transition-all"
+                >
+                  <option value="" disabled>Select a template to apply...</option>
+                  {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleApplyTemplate}
+                  disabled={!selectedTemplateId}
+                  className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+
+            {/* Message Content */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-semibold text-gray-700">Message Content</label>
+                <span className="text-xs text-gray-400">Images not allowed</span>
+              </div>
+              <ReactQuill
+                theme="snow"
+                value={customMessage}
+                onChange={setCustomMessage}
+                placeholder="Write your email message here..."
+                modules={QUILL_MODULES}
               />
+              <p className={`text-xs mt-1.5 ${
+                customMessage.length > EMAIL_VALIDATION.MAX_CONTENT_SIZE
+                  ? 'text-red-500'
+                  : customMessage.length > EMAIL_VALIDATION.MAX_CONTENT_SIZE * 0.9
+                  ? 'text-amber-600'
+                  : 'text-gray-400'
+              }`}>
+                {getContentLength(customMessage)} characters ({(customMessage.length / 1000).toFixed(1)}KB / {EMAIL_VALIDATION.MAX_CONTENT_SIZE / 1000}KB)
+              </p>
             </div>
+
+            {/* Alerts */}
+            {validationError && (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm bg-red-50 text-red-700 ring-1 ring-red-200 animate-slide-up">
+                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                <p>{validationError}</p>
+              </div>
+            )}
+            <AlertBanner message={sendFormMessage} onDismiss={() => setSendFormMessage(null)} />
           </div>
-        </div>
-        <div>
-          <label htmlFor="template" className="block text-sm font-medium text-gray-700 mb-1">Use Template</label>
-          <div className="flex gap-2">
-            <select
-              id="template"
-              value={selectedTemplateId}
-              onChange={(e) => setSelectedTemplateId(e.target.value)}
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm text-gray-900"
-            >
-              <option value="" disabled>Select a template</option>
-              {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
-            </select>
+
+          {/* Footer Actions */}
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex justify-end gap-3">
             <button
               type="button"
-              onClick={handleApplyTemplate}
-              className="bg-gray-200 text-gray-800 py-2 px-4 rounded-lg font-medium hover:bg-gray-300"
+              onClick={handleClearForm}
+              className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
             >
-              Apply
+              Clear
+            </button>
+            <button
+              type="submit"
+              disabled={isSending}
+              className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-black bg-gradient-to-r from-yellow-400 to-amber-400 rounded-xl hover:from-yellow-500 hover:to-amber-500 transition-all shadow-sm shadow-yellow-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSending ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+              ) : (
+                <><Send className="w-4 h-4" /> Send Email</>
+              )}
             </button>
           </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Message Content</label>
-          <ReactQuill
-            theme="snow"
-            value={customMessage}
-            onChange={setCustomMessage}
-            className="mt-1 bg-white"
-            modules={{
-              toolbar: [
-                [{ 'header': [1, 2, false] }],
-                ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-                [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-                ['link', 'image'],
-                ['clean']
-              ],
-              imageResize: { // This module might not be available in react-quill-new, but it's a common extension
-                modules: [ 'Resize', 'DisplaySize', 'Toolbar' ]
-              }
-            }}
-          />
-        </div>
-        {validationError && (
-          <div className="flex items-center gap-2 p-3 rounded-md text-sm bg-red-50 text-red-700">
-            <AlertTriangle className="w-5 h-5" />
-            <p>{validationError}</p>
-          </div>
-        )}
-        {sendFormMessage && (
-          <div className={`flex items-center gap-2 p-3 rounded-md text-sm ${sendFormMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-            {sendFormMessage.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-            <p>{sendFormMessage.text}</p>
-          </div>
-        )}
-        <div className="flex justify-end gap-4">
-          <button type="button" onClick={handleClearForm} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-lg font-medium hover:bg-gray-300">Clear</button>
-          <button type="submit" disabled={isSending} className="w-full max-w-xs flex items-center justify-center bg-yellow-400 text-black py-2.5 px-4 rounded-lg font-semibold hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
-            {isSending ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Sending...</> : <><Mail className="mr-2 h-5 w-5" /> Send Email</>}
-          </button>
         </div>
       </form>
     );
   };
 
+  // ===== TEMPLATES TAB =====
   const renderTemplatesView = () => (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-slide-up">
       {templateView === 'list' ? (
         <>
-          <div className="flex justify-end">
-            <button 
+          {/* Header Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Email Templates</h3>
+              <p className="text-sm text-gray-500 mt-0.5">{templates.length} template{templates.length !== 1 ? 's' : ''} available</p>
+            </div>
+            <button
               onClick={() => { setEditingTemplate(null); setTemplateView('editor'); }}
-              className="flex items-center gap-2 bg-yellow-400 text-black py-2 px-4 rounded-lg font-semibold hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-black bg-gradient-to-r from-yellow-400 to-amber-400 rounded-xl hover:from-yellow-500 hover:to-amber-500 transition-all shadow-sm shadow-yellow-200"
             >
-              <Plus className="w-5 h-5" />
-              Create New Template
+              <Plus className="w-4 h-4" />
+              New Template
             </button>
           </div>
-          {templateMessage && (
-            <div className={`flex items-center gap-2 p-3 rounded-md text-sm ${templateMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-              {templateMessage.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-              <p>{templateMessage.text}</p>
-            </div>
-          )}
+
+          <AlertBanner message={templateMessage} onDismiss={() => setTemplateMessage(null)} />
+
+          {/* Undo Toast */}
           {showUndoNotification && lastDeletedTemplate && (
-            <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-4 rounded-lg shadow-lg flex items-center gap-4 z-50">
-              <span>Template "{lastDeletedTemplate.template.name}" deleted.</span>
+            <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-4 z-50 animate-slide-up">
+              <Trash2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <span className="text-sm">Template &ldquo;{lastDeletedTemplate.template.name}&rdquo; deleted.</span>
               <button
                 onClick={handleUndoDelete}
-                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-md text-sm font-medium"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-colors"
               >
+                <Undo2 className="w-3.5 h-3.5" />
                 Undo
               </button>
             </div>
           )}
-          {showUndoNotification && lastDeletedTemplate && (
-            <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-4 rounded-lg shadow-lg flex items-center gap-4 z-50">
-              <span>Template "{lastDeletedTemplate.template.name}" deleted.</span>
-              <button
-                onClick={handleUndoDelete}
-                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded-md text-sm font-medium"
-              >
-                Undo
-              </button>
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {templates.map(template => (
-              <div key={template.id} className="p-5 border rounded-xl shadow-sm bg-white flex flex-col transition-all duration-300 hover:shadow-lg">
-                <div className="flex-grow">
-                  <h3 className="font-bold text-lg text-gray-900">{template.name}</h3>
-                  <p className="text-sm text-gray-600 mt-1"><strong>Subject:</strong> {template.subject}</p>
-                  <p className="text-sm text-gray-500 mt-2 line-clamp-3">{template.content.replace(/<[^>]+>/g, '')}</p>
-                </div>
-                <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
-                  <button 
-                    onClick={() => { setEditingTemplate(template); setTemplateView('editor'); }}
-                    className="flex items-center gap-1.5 text-sm font-medium text-yellow-600 hover:text-yellow-800"
-                  >
-                    <Edit2 className="w-4 h-4" /> Edit
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteTemplate(template.id, template.name)}
-                    className="flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 className="w-4 h-4" /> Delete
-                  </button>
-                </div>
+
+          {/* Template Cards Grid */}
+          {templates.length === 0 ? (
+            <div className="text-center py-16 px-4">
+              <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-gray-400" />
               </div>
-            ))}
-          </div>
+              <h4 className="text-base font-semibold text-gray-900 mb-1">No templates yet</h4>
+              <p className="text-sm text-gray-500 max-w-sm mx-auto">Create your first email template to speed up your workflow.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {templates.map(template => (
+                <div key={template.id} className="group bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col transition-all duration-200 hover:shadow-md hover:border-gray-300">
+                  <div className="flex-grow">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="font-bold text-gray-900 leading-tight">{template.name}</h3>
+                      <div className="w-8 h-8 rounded-lg bg-yellow-50 flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-4 h-4 text-yellow-600" />
+                      </div>
+                    </div>
+                    <p className="text-xs font-medium text-gray-500 mb-2">Subject: <span className="text-gray-700">{template.subject}</span></p>
+                    <div
+                      className="text-xs text-gray-700 line-clamp-3 leading-relaxed prose prose-xs max-w-none"
+                      dangerouslySetInnerHTML={{ __html: template.content }}
+                    />
+                  </div>
+                  <div className="flex gap-1 mt-4 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => { setEditingTemplate(template); setTemplateView('editor'); }}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-gray-600 hover:text-yellow-700 hover:bg-yellow-50 rounded-lg transition-colors"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTemplate(template.id, template.name)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       ) : (
         <TemplateEditor />
@@ -732,168 +1171,238 @@ const EmailManagement = () => {
         isOpen={isConfirmModalOpen}
         onClose={() => setIsConfirmModalOpen(false)}
         onConfirm={confirmDelete}
-        title="Confirm Deletion"
-        message={`Are you sure you want to permanently delete the template "${templateToDelete?.name}"? This action cannot be undone.`}
+        title="Delete Template"
+        message={`Are you sure you want to delete "${templateToDelete?.name}"? You can undo this within 5 seconds.`}
         confirmText="Delete"
       />
     </div>
   );
 
-  const filteredEmailLog = emailLog.filter(log => {
-    const matchesSearch = log.recipient.toLowerCase().includes(historySearch.toLowerCase());
-    const matchesStatus = historyStatusFilter === 'all' || log.status === historyStatusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
+  // ===== HISTORY TAB =====
   const renderHistoryView = () => {
     const indexOfLastEmail = currentPage * emailsPerPage;
     const indexOfFirstEmail = indexOfLastEmail - emailsPerPage;
-    const currentEmails = filteredEmailLog.slice(indexOfFirstEmail, indexOfLastEmail);
-
-    const totalPages = Math.ceil(filteredEmailLog.length / emailsPerPage);
-
-    const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+    const currentEmails = emailLog;
+    const totalPages = Math.max(1, Math.ceil(totalLogs / emailsPerPage));
+    const paginate = (pageNumber: number) => {
+      setCurrentPage(pageNumber);
+      fetchEmailLogs(pageNumber);
+    };
 
     return (
-      <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-grow">
-            <input
-              type="text"
-              placeholder="Search by recipient..."
-              value={historySearch}
-              onChange={(e) => setHistorySearch(e.target.value)}
-              className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm text-gray-900"
-            />
-            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="space-y-5 animate-slide-up">
+        {/* Filters Bar */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-grow">
+              <input
+                type="text"
+                placeholder="Search by recipient..."
+                value={historySearch}
+                onChange={(e) => {
+                  setHistorySearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full px-4 py-2.5 pl-10 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400 text-sm text-gray-900 bg-gray-50/50 placeholder:text-gray-400 transition-all"
+              />
+              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            </div>
+            <div className="flex gap-2">
+              {(['all', 'Sent', 'Failed'] as const).map(status => (
+                <button
+                  key={status}
+                  onClick={() => {
+                    setHistoryStatusFilter(status);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    historyStatusFilter === status
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {status === 'all' ? 'All' : status}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => fetchEmailLogs(currentPage)}
+              disabled={isHistoryLoading}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-wait flex-shrink-0"
+            >
+              <RefreshCw className={`w-4 h-4 ${isHistoryLoading ? 'animate-spin' : ''}`} />
+              {isHistoryLoading ? 'Loading...' : 'Refresh'}
+            </button>
           </div>
-          <select
-            value={historyStatusFilter}
-            onChange={(e) => setHistoryStatusFilter(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm bg-white text-black"
-          >
-            <option value="all">All Statuses</option>
-            <option value="Sent">Sent</option>
-            <option value="Failed">Failed</option>
-          </select>
-          <button
-            onClick={() => fetchEmailLogs()}
-            disabled={isHistoryLoading}
-            className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-wait"
-          >
-            <RefreshCw className={`w-4 h-4 ${isHistoryLoading ? 'animate-spin' : ''}`} />
-            {isHistoryLoading ? 'Refreshing...' : 'Refresh'}
-          </button>
         </div>
-        <div className="overflow-x-auto">
-          {/* Inject the animation styles */}
-          <style>{highlightAnimation}</style>
-          <div className="align-middle inline-block min-w-full shadow overflow-hidden sm:rounded-lg border-b border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+
+        {/* Email Log Table */}
+        <style>{customStyles}</style>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <table className="min-w-full">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50/80">Recipient</th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50/80">Subject</th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50/80">Status</th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50/80">Date</th>
+                <th className="px-6 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50/80">View</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {currentEmails.length === 0 ? (
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <td colSpan={5} className="text-center py-14">
+                    <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                      <Mail className="w-6 h-6 text-gray-400" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-500">No email logs found</p>
+                    <p className="text-xs text-gray-400 mt-1">Try adjusting your search or filters</p>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {currentEmails.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="text-center py-10 text-gray-500">No logs found.</td>
+              ) : (
+                currentEmails.map((log) => (
+                  <tr
+                    key={log.id}
+                    className={`${highlightedLogId === log.id ? 'animate-flash' : ''} hover:bg-gray-50/50 transition-colors`}
+                  >
+                    <td className="px-6 py-4 text-sm text-gray-900 font-medium">{log.recipient}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-[250px] truncate">{log.subject}</td>
+                    <td className="px-6 py-4"><StatusBadge status={log.status} /></td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        {new Date(log.created_at).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => handleViewLogDetails(log)}
+                        className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="View details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
-                ) : (
-                  currentEmails.map((log) => (
-                    <tr 
-                      key={log.id} 
-                      className={`${
-                        highlightedLogId === log.id ? 'animate-flash' : ''
-                      } transition-colors`}
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">{log.recipient}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.subject}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <StatusBadge status={log.status} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(log.created_at).toLocaleString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <button
-                          onClick={() => handleViewLogDetails(log)}
-                          className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-        {/* Pagination Controls */}
-        {filteredEmailLog.length > emailsPerPage && (
-          <div className="flex justify-center items-center space-x-2 mt-4">
-            <button
-              onClick={() => paginate(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => paginate(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
+
+        {/* Pagination */}
+        {totalLogs > emailsPerPage && (
+          <div className="flex items-center justify-between px-1">
+            <p className="text-sm text-gray-500">
+              Showing <span className="font-medium text-gray-700">{indexOfFirstEmail + 1}</span> to <span className="font-medium text-gray-700">{Math.min(indexOfLastEmail, totalLogs)}</span> of <span className="font-medium text-gray-700">{totalLogs}</span> results
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).slice(
+                  Math.max(0, currentPage - 3),
+                  Math.min(totalPages, currentPage + 2)
+                ).map(pageNum => (
+                  <button
+                    key={pageNum}
+                    onClick={() => paginate(pageNum)}
+                    className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${
+                      currentPage === pageNum
+                        ? 'bg-gray-900 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => paginate(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Next
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
       </div>
     );
   };
 
+  // ===== LOG DETAIL MODAL =====
   const LogDetailModal = () => {
     if (!isLogDetailModalOpen || !selectedLog) return null;
-
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl text-black relative">
-          <button 
-            onClick={() => setIsLogDetailModalOpen(false)}
-            className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
-          <h3 className="text-lg font-semibold mb-4">Email Log Details</h3>
-          <div className="space-y-3 text-sm">
-            <p><strong>Recipient:</strong> {selectedLog.recipient}</p>
-            <p><strong>Subject:</strong> {selectedLog.subject}</p>
-            <p><strong>Status:</strong> <StatusBadge status={selectedLog.status} /></p>
-            <p><strong>Date:</strong> {new Date(selectedLog.created_at).toLocaleString()}</p>
-            {selectedLog.status === 'Failed' && selectedLog.error_details && (
-              <p><strong>Error:</strong> <span className="text-red-600">{selectedLog.error_details}</span></p>
-            )}
-          </div>
-          <div className="mt-4 pt-4 border-t">
-            <h4 className="font-semibold mb-2">Email Content:</h4>
-            {isFetchingBody ? (
-              <div className="flex items-center justify-center p-4">
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <span className="ml-2">Loading content...</span>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl text-black animate-slide-up overflow-hidden">
+          {/* Modal Header */}
+          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center">
+                <Mail className="w-4 h-4 text-white" />
               </div>
-            ) : (
-              <div 
-                className="prose prose-sm max-w-none border p-3 rounded-md bg-gray-50 h-64 overflow-y-auto"
-                dangerouslySetInnerHTML={{ __html: selectedLog.body || '<p>No content available.</p>' }} 
-              />
+              <h3 className="text-base font-bold text-gray-900">Email Details</h3>
+            </div>
+            <button
+              onClick={() => setIsLogDetailModalOpen(false)}
+              className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-50 rounded-xl px-4 py-3">
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Recipient</p>
+                <p className="text-sm font-semibold text-gray-900 break-all">{selectedLog.recipient}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl px-4 py-3">
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Status</p>
+                <div className="mt-0.5"><StatusBadge status={selectedLog.status} /></div>
+              </div>
+              <div className="bg-gray-50 rounded-xl px-4 py-3">
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Subject</p>
+                <p className="text-sm font-semibold text-gray-900">{selectedLog.subject}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl px-4 py-3">
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Date Sent</p>
+                <p className="text-sm font-semibold text-gray-900">{new Date(selectedLog.created_at).toLocaleString()}</p>
+              </div>
+            </div>
+
+            {selectedLog.status === 'Failed' && selectedLog.error_details && (
+              <div className="bg-red-50 rounded-xl px-4 py-3 ring-1 ring-red-200">
+                <p className="text-xs font-medium text-red-600 mb-0.5">Error Details</p>
+                <p className="text-sm text-red-800">{selectedLog.error_details}</p>
+              </div>
             )}
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Email Content</p>
+              {isFetchingBody ? (
+                <div className="flex items-center justify-center py-10 text-gray-400">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  <span className="text-sm">Loading content...</span>
+                </div>
+              ) : (
+                <div
+                  className="prose prose-sm max-w-none border border-gray-200 p-4 rounded-xl bg-gray-50/50 max-h-72 overflow-y-auto"
+                  dangerouslySetInnerHTML={{ __html: selectedLog.body || '<p class="text-gray-400">No content available.</p>' }}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -901,42 +1410,55 @@ const EmailManagement = () => {
   };
 
   // --- Main Render ---
-
   const tabs = [
-    { name: 'Send Email', id: 'send', icon: Mail },
-    { name: 'Templates', id: 'templates', icon: FileText },
-    { name: 'History', id: 'history', icon: History },
+    { name: 'Send Email', id: 'send' as TabName, icon: Send },
+    { name: 'Templates', id: 'templates' as TabName, icon: FileText },
+    { name: 'History', id: 'history' as TabName, icon: History },
   ];
 
   return (
-    <div className="container mx-auto">
-      <div className="mb-6 border-b border-gray-200">
-        <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-          {tabs.map((tab) => (
-            <button
-              key={tab.name}
-              onClick={() => setActiveTab(tab.id as TabName)}
-              className={`flex items-center gap-2 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                ${activeTab === tab.id
-                    ? 'border-yellow-500 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }
-                focus:outline-none
-              `}
-            >
-              <tab.icon className="w-5 h-5" />
-              {tab.name}
-            </button>
-          ))}
-        </nav>
+    <div className="w-full transition-colors duration-500 ease-out">
+      <style>{customStyles}</style>
+
+      {/* Modern Pill Tabs */}
+      <div className="mb-8">
+        <div className="inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-2xl p-1.5 gap-1 transition-colors duration-300">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                }`}
+              >
+                <tab.icon className={`w-4 h-4 ${isActive ? 'text-yellow-500' : ''}`} />
+                {tab.name}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
+      {/* Tab Content */}
       <div>
         {activeTab === 'send' && renderSendEmailView()}
         {activeTab === 'templates' && renderTemplatesView()}
         {activeTab === 'history' && renderHistoryView()}
       </div>
       <LogDetailModal />
+
+      {/* Dark Mode Toggle Button - Bottom Right */}
+      <button
+        onClick={() => setIsDarkMode(!isDarkMode)}
+        className="fixed bottom-6 right-6 z-40 p-3 rounded-full bg-gradient-to-br from-gray-900 to-gray-700 dark:from-yellow-400 dark:to-amber-400 text-white dark:text-gray-900 shadow-lg hover:shadow-xl transition-all duration-500 ease-out transform hover:scale-110 active:scale-95"
+        title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      >
+        {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
     </div>
   );
 };

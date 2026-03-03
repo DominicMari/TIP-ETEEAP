@@ -1,96 +1,136 @@
-// Example of how your /api/templates route should handle POST requests
-import fs from 'fs';
-import path from 'path';
+import { NextRequest, NextResponse } from 'next/server';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
-const templatesFilePath = path.join(process.cwd(), 'data', 'templates.json');
+const TABLE = 'email_templates';
 
-export async function POST(req: Request) {
+function parsePagination(searchParams: URLSearchParams) {
+  const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
+  const offset = parseInt(searchParams.get('offset') || '0', 10);
+  return { limit: Number.isNaN(limit) ? 50 : limit, offset: Number.isNaN(offset) ? 0 : offset };
+}
+
+export async function GET(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { searchParams } = new URL(req.url);
+
+  const search = searchParams.get('search') || '';
+  const sort = searchParams.get('sort') || 'created_at';
+  const direction = (searchParams.get('direction') || 'desc').toLowerCase() === 'asc';
+  const { limit, offset } = parsePagination(searchParams);
+
   try {
-    const updatedTemplates = await req.json(); // Get the new list of templates from the request body
+    let query = supabase
+      .from(TABLE)
+      .select('*', { count: 'exact' })
+      .order(sort, { ascending: direction })
+      .range(offset, offset + limit - 1);
 
-    // Write the updated templates array back to the JSON file
-    fs.writeFileSync(templatesFilePath, JSON.stringify(updatedTemplates, null, 2), 'utf-8');
+    if (search) {
+      query = query.ilike('name', `%${search}%`);
+    }
 
-    return new Response(JSON.stringify(updatedTemplates), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (error) {
-    console.error('Error updating templates.json:', error);
-    return new Response(JSON.stringify({ error: 'Failed to update templates' }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return NextResponse.json({ data: data || [], limit, offset });
+  } catch (error: any) {
+    console.error('GET /api/templates error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to fetch templates' }, { status: 500 });
   }
 }
 
-// You should also have a GET handler to read the templates
-export async function GET() {
+export async function POST(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies });
+
   try {
-    const templates = JSON.parse(fs.readFileSync(templatesFilePath, 'utf-8'));
-    return new Response(JSON.stringify(templates), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (error) {
-    console.error('Error reading templates.json:', error);
-    return new Response(JSON.stringify({ error: 'Failed to read templates' }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const { name, subject, content } = await req.json();
+
+    if (!name?.trim() || !subject?.trim() || !content?.trim()) {
+      return NextResponse.json({ error: 'Name, subject, and content are required.' }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from(TABLE)
+      .insert({ name: name.trim(), subject: subject.trim(), content })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        return NextResponse.json({ error: 'Template name must be unique.' }, { status: 409 });
+      }
+      throw error;
+    }
+
+    return NextResponse.json(data, { status: 201 });
+  } catch (error: any) {
+    console.error('POST /api/templates error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to create template' }, { status: 500 });
   }
 }
 
-export async function DELETE(req: Request) {
+export async function PATCH(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('id');
+
+  if (!id) {
+    return NextResponse.json({ error: 'Template id is required.' }, { status: 400 });
+  }
+
   try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
+    const { name, subject, content } = await req.json();
 
-    if (!id) {
-      return new Response(JSON.stringify({ error: 'Template ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    if (![name, subject, content].some((v) => typeof v === 'string')) {
+      return NextResponse.json({ error: 'At least one of name, subject, or content is required.' }, { status: 400 });
     }
 
-    let templates: any[] = [];
-    if (fs.existsSync(templatesFilePath)) {
-      templates = JSON.parse(fs.readFileSync(templatesFilePath, 'utf-8'));
+    const updates: Record<string, string> = {};
+    if (typeof name === 'string') updates.name = name.trim();
+    if (typeof subject === 'string') updates.subject = subject.trim();
+    if (typeof content === 'string') updates.content = content;
+
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update(updates)
+      .eq('id', Number(id))
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        return NextResponse.json({ error: 'Template name must be unique.' }, { status: 409 });
+      }
+      throw error;
     }
 
-    const initialLength = templates.length;
-    const updatedTemplates = templates.filter(t => t.id !== parseInt(id));
-
-    if (updatedTemplates.length === initialLength) {
-      return new Response(JSON.stringify({ error: 'Template not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    if (!data) {
+      return NextResponse.json({ error: 'Template not found.' }, { status: 404 });
     }
 
-    fs.writeFileSync(templatesFilePath, JSON.stringify(updatedTemplates, null, 2), 'utf-8');
+    return NextResponse.json(data);
+  } catch (error: any) {
+    console.error('PATCH /api/templates error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to update template' }, { status: 500 });
+  }
+}
 
-    return new Response(JSON.stringify({ message: 'Template deleted successfully' }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (error) {
-    console.error('Error deleting template from templates.json:', error);
-    return new Response(JSON.stringify({ error: 'Failed to delete template' }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+export async function DELETE(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('id');
+
+  if (!id) {
+    return NextResponse.json({ error: 'Template id is required.' }, { status: 400 });
+  }
+
+  try {
+    const { error } = await supabase.from(TABLE).delete().eq('id', Number(id));
+    if (error) throw error;
+    return NextResponse.json({ message: 'Template deleted successfully' });
+  } catch (error: any) {
+    console.error('DELETE /api/templates error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to delete template' }, { status: 500 });
   }
 }
