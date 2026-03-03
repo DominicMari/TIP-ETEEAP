@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
 const TABLE = 'email_logs';
 
-export async function GET(_req: NextRequest, context: { params: { id: string } }) {
-  const { params } = context;
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const supabase = createRouteHandlerClient({ cookies });
   const id = Number(params.id);
 
