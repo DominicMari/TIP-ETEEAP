@@ -2335,7 +2335,7 @@ export default function BackgroundAchievementsForm({
         </AccordionItem>
 
         {/* --- D. Certifications --- */}
-        <AccordionItem title="D. Certifications (Optional)">
+        <AccordionItem title="D. Certifications">
           <NoneCheckbox
             id="none-certifications"
             label="I have no Certifications to declare."
@@ -2353,7 +2353,7 @@ export default function BackgroundAchievementsForm({
         </AccordionItem>
 
         {/* --- E & F. Inventions and Publications --- */}
-        <AccordionItem title="E. Inventions and Publications (Optional)">
+        <AccordionItem title="E. Inventions and Publications">
           <NoneCheckbox
             id="none-inventions-publications"
             label="I have no Inventions and Publications to declare."
@@ -2385,7 +2385,7 @@ export default function BackgroundAchievementsForm({
         </AccordionItem>
 
         {/* --- F. Work Experience --- */}
-        <AccordionItem title="F. Work Experience (Optional)">
+        <AccordionItem title="F. Work Experience">
           <NoneCheckbox
             id="none-work"
             label="I have no Work Experience to declare."
@@ -2405,7 +2405,7 @@ export default function BackgroundAchievementsForm({
         </AccordionItem>
 
         {/* --- G. Recognitions --- */}
-        <AccordionItem title="G. Recognitions (Optional)">
+        <AccordionItem title="G. Recognitions">
           <NoneCheckbox
             id="none-recognitions"
             label="I have no Recognitions to declare."
@@ -2423,7 +2423,7 @@ export default function BackgroundAchievementsForm({
         </AccordionItem>
 
         {/* --- H. Professional Development --- */}
-        <AccordionItem title="H. Professional Development Activities (Optional)">
+        <AccordionItem title="H. Professional Development Activities">
           <NoneCheckbox
             id="none-profdev"
             label="I have no Professional Development Activities to declare."

@@ -314,135 +314,118 @@ export default function ApplicationFormPage() {
     };
 
     // The handleSubmit function
-    const handleSubmit = async () => {
-        setIsSubmitting(true);
+   const handleSubmit = async () => {
+    setIsSubmitting(true);
 
-        if (!session?.user?.email || !session?.user?.id) {
-            alert("You must be logged in to submit.");
-            setIsSubmitting(false);
-            return;
-        }
+    if (!session?.user?.email) {
+        alert("You must be logged in to submit.");
+        setIsSubmitting(false);
+        return;
+    }
 
-        console.log("Current session user ID (from NextAuth):", session.user.id);
-        const signatureDataUrl = signaturePadRef.current?.toDataURL('image/png');
-        if (signaturePadRef.current?.isEmpty() || !signatureDataUrl) {
-            alert("Signature is empty.");
-            setIsSubmitting(false);
-            return;
-        }
+    try {
+        // 1. User Lookup
+        const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', session.user.email)
+            .single();
+
+        if (userError || !userData?.id) throw new Error("User not found in database.");
+        const supabaseUserId = userData.id;
+
+        // 2. Upload 1x1 Photo
         const photoFile = formData.initial.photo;
-        if (!photoFile) {
-            alert("1x1 Photo is missing from Step 1.");
-            setIsSubmitting(false);
-            setCurrentStep(1); // Send user back to step 1
-            return;
+        if (!photoFile) throw new Error("1x1 Photo is missing from Step 1.");
+        
+        const photoPath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
+        await supabase.storage.from('application_files').upload(photoPath, photoFile);
+        const { data: photoUrl } = supabase.storage.from('application_files').getPublicUrl(photoPath);
+
+        // 3. Upload Signature
+        const signatureDataUrl = signaturePadRef.current?.toDataURL('image/png');
+        const sigBlob = await (await fetch(signatureDataUrl!)).blob();
+        const sigPath = `${supabaseUserId}/signature_${Date.now()}.png`;
+        await supabase.storage.from('application_files').upload(sigPath, sigBlob);
+        const { data: sigUrl } = supabase.storage.from('application_files').getPublicUrl(sigPath);
+
+        // 4. NEW: Upload Portfolio Documents
+        const uploadedPortfolioMetadata = [];
+        // portfolioFiles was set in your PortfolioForm component
+        if (formData.portfolioFiles && formData.portfolioFiles.length > 0) {
+            for (let i = 0; i < formData.portfolioFiles.length; i++) {
+                const file = formData.portfolioFiles[i];
+                const meta = formData.portfolio_metadata[i];
+
+                if (file) {
+                    const filePath = `${supabaseUserId}/portfolio/${Date.now()}_${file.name}`;
+                    const { error: uploadErr } = await supabase.storage
+                        .from('portfolio_files') // Ensure this bucket exists in Supabase!
+                        .upload(filePath, file);
+
+                    if (uploadErr) console.error(`Error uploading ${meta.title}:`, uploadErr);
+
+                    const { data: publicUrl } = supabase.storage
+                        .from('portfolio_files')
+                        .getPublicUrl(filePath);
+
+                    uploadedPortfolioMetadata.push({
+                        ...meta,
+                        url: publicUrl.publicUrl,
+                        storagePath: filePath
+                    });
+                }
+            }
         }
 
-        try {
-            console.log(`Looking up user with email: ${session.user.email}`);
-            
-            const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('id')
-                .eq('email', session.user.email)
-                .single();
+        // 5. Insert Final Payload
+        const insertPayload = {
+            user_id: supabaseUserId,
+            applicant_name: formData.initial.name,
+            degree_applied_for: formData.initial.degree,
+            campus: formData.initial.campus,
+            application_date: formData.initial.date,
+            folder_link: formData.initial.folderLink,
+            full_address: formData.personalInfo.fullAddress,
+            mobile_number: formData.personalInfo.mobile,
+            email_address: formData.personalInfo.email,
+            age: formData.personalInfo.age,
+            birth_date: formData.personalInfo.birthDate,
+            goal_statement: formData.goals.statement,
+            degree_priorities: formData.goals.degrees,
+            creative_works: formData.creativeWorks,
+            lifelong_learning: formData.lifelongLearning,
+            // Save the version with URLs into the DB
+            portfolio: uploadedPortfolioMetadata, 
+            photo_url: photoUrl.publicUrl,
+            signature_url: sigUrl.publicUrl,
+            education_background: formData.education,
+            non_formal_education: formData.nonFormal,
+            certifications: formData.certifications,
+            publications: formData.publications,
+            inventions: formData.inventions,
+            work_experiences: formData.work,
+            recognitions: formData.recognitions,
+            professional_development: formData.professional_development,
+        };
 
-            if (userError) {
-                console.error("Session User:", session.user);
-                console.error("User lookup error details:", userError);
-                throw new Error(`Database error: ${userError.message}`);
-            }
+        const { error: insertError } = await supabase
+            .from('applications')
+            .insert(insertPayload);
 
-            if (!userData?.id) {
-                throw new Error(`Could not find a matching user in the database for email ${session.user.email}. Please ensure your account is properly set up.`);
-            }
-            const supabaseUserId = userData.id;
-            console.log("Found Supabase User UUID:", supabaseUserId);
+        if (insertError) throw insertError;
 
-            // Upload Photo
-            const photoFilePath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
-            console.log("Uploading photo to:", photoFilePath);
-            const { data: photoUploadData, error: photoUploadError } = await supabase.storage
-                .from('application_files')
-                .upload(photoFilePath, photoFile, { upsert: true });
-            if (photoUploadError) {
-                console.error("Photo upload error details:", photoUploadError);
-                throw photoUploadError;
-            }
-            const { data: photoUrlData } = supabase.storage.from('application_files').getPublicUrl(photoUploadData.path);
-            console.log("Photo uploaded to URL:", photoUrlData.publicUrl);
+        // Clear local storage and move to success
+        localStorage.removeItem('applicationFormData');
+        localStorage.removeItem('applicationFormStep');
+        nextStep();
 
-            // Upload Signature
-            const response = await fetch(signatureDataUrl);
-            const blob = await response.blob();
-            const signatureFile = new File([blob], `signature_${Date.now()}.png`, { type: "image/png" });
-            const signatureFilePath = `${supabaseUserId}/signature_${signatureFile.name}`;
-            console.log("Uploading signature to:", signatureFilePath);
-
-            const { data: sigUploadData, error: sigUploadError } = await supabase.storage
-                .from('application_files')
-                .upload(signatureFilePath, signatureFile, { upsert: true });
-            if (sigUploadError) {
-                console.error("Signature upload error details:", sigUploadError);
-                throw sigUploadError;
-            }
-            const { data: sigUrlData } = supabase.storage.from('application_files').getPublicUrl(sigUploadData.path);
-            console.log("Signature uploaded to URL:", sigUrlData.publicUrl);
-
-            // Prepare and Insert Data
-            console.log("Preparing data for insertion with user_id:", supabaseUserId);
-            const insertPayload = {
-                user_id: supabaseUserId,
-                applicant_name: formData.initial.name,
-                degree_applied_for: formData.initial.degree,
-                campus: formData.initial.campus,
-                application_date: formData.initial.date,
-                folder_link: formData.initial.folderLink,
-                full_address: formData.personalInfo.fullAddress,
-                mobile_number: formData.personalInfo.mobile,
-                email_address: formData.personalInfo.email,
-                age: formData.personalInfo.age,
-                birth_date: formData.personalInfo.birthDate,
-                goal_statement: formData.goals.statement,
-                degree_priorities: formData.goals.degrees,
-                creative_works: formData.creativeWorks,
-                lifelong_learning: formData.lifelongLearning,
-                portfolio: formData.portfolio,
-                photo_url: photoUrlData.publicUrl,
-                signature_url: sigUrlData.publicUrl,
-                education_background: formData.education,
-                non_formal_education: formData.nonFormal,
-                certifications: formData.certifications,
-                publications: formData.publications,
-                inventions: formData.inventions,
-                work_experiences: formData.work,
-                recognitions: formData.recognitions,
-                professional_development: formData.professional_development,
-            };
-            console.log("Insert Payload:", insertPayload);
-
-            const { error: insertError } = await supabase
-                .from('applications')
-                .insert(insertPayload);
-
-            if (insertError) {
-                console.error("Database insert error details:", insertError);
-                throw insertError; // Throw the error to be caught below
-            }
-            console.log("Data inserted successfully!");
-
-            // Success
-            localStorage.removeItem('applicationFormData');
-            localStorage.removeItem('applicationFormStep');
-            nextStep(); // Move to success screen (step 9)
-
-        } catch (error) {
-            console.error("Error during submission process:", (error as Error).message);
-            alert(`Submission failed: ${(error as Error).message}`);
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+    } catch (error: any) {
+        alert(`Submission failed: ${error.message}`);
+    } finally {
+        setIsSubmitting(false);
+    }
+};
 
     // --- Render Logic ---
     const renderStep = () => {
@@ -470,7 +453,14 @@ export default function ApplicationFormPage() {
             case 6:
                 return ( <LifelongLearningForm formData={formData.lifelongLearning} setFormData={handleLearningChange} nextStep={nextStep} prevStep={prevStep} /> );
             case 7:
-                return ( <PortfolioForm formData={formData} setFormData={(data: any) => setFormData({ ...formData, ...data })} nextStep={nextStep} prevStep={prevStep} /> );
+                return ( 
+                    <PortfolioForm 
+                        formData={formData} 
+                        setFormData={(newData: any) => setFormData(prev => ({ ...prev, ...newData }))} 
+                        nextStep={nextStep} 
+                        prevStep={prevStep} 
+                    /> 
+                );
             case 8:
                 return ( <FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} /> );
             // ✅ 9. Pass the new reset handler to the SuccessScreen

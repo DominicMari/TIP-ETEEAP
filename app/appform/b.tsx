@@ -1,82 +1,99 @@
 "use client";
 
 import { useState } from "react";
-import MonthYearPicker from "./MonthYearPicker";
 
 export default function PersonalInformationForm({
-  formData, // This is formData.personalInfo, e.g., { fullAddress: ..., mobile: ..., email: ... }
-  setFormData, // This is handlePersonalChange
+  formData,
+  setFormData,
   nextStep,
   prevStep,
 }: {
   formData: any;
-  setFormData: Function;
+  setFormData: (data: any) => void;
   nextStep: () => void;
   prevStep: () => void;
 }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // --- This function is for most text inputs ---
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
-  };
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => {
+    const { name, value, type, checked } = e.target as HTMLInputElement;
+    const newValue = type === "checkbox" ? checked : value;
 
-  // --- This function calculates age from a date string ---
-  const calculateAge = (dateString: string): number => {
-    if (!dateString) return 0;
-    const today = new Date();
-    const birthDate = new Date(dateString);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDifference = today.getMonth() - birthDate.getMonth();
-    
-    // Check if the birthday has occurred this year
-    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+    let updated = {
+      ...formData,
+      [name]: newValue,
+    };
+
+    // Clear overseas details if unchecked
+    if (name === "isOverseas" && !checked) {
+      updated.overseasDetails = "";
     }
-    return age;
-  };
 
-  // --- Special handler for the date picker ---
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target; // name will be "birthDate"
-    const calculatedAge = calculateAge(value);
+    // Auto-calculate age if birthday changes
+    if (name === "birthday" && value) {
+      const birthDate = new Date(value);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      updated.age = age;
+    }
 
-    setFormData({
-      ...formData,
-      [name]: value, // Update birthDate
-      age: calculatedAge, // Update age
-    });
+    setFormData(updated);
 
-    if (errors.birthDate) setErrors((prev) => ({ ...prev, [name]: "" }));
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
   };
 
   const validateAndProceed = () => {
     const newErrors: Record<string, string> = {};
-    
-    const { fullAddress, mobile, email, birthDate } = formData;
 
-    if (!fullAddress?.trim()) newErrors.fullAddress = "Full address is required.";
+    const requiredFields = [
+      "name",
+      "cityAddress",
+      "permanentAddress",
+      "birthday",
+      "birthplace",
+      "age",
+      "gender",
+      "nationality",
+      "religion",
+      "civilStatus",
+      "email",
+      "mobile",
+      "language",
+      "emergencyContactName",
+      "emergencyRelationship",
+      "emergencyAddress",
+      "emergencyContactNumber",
+    ];
 
-    // ✅ 2. VALIDATION UPDATED
-    if (!mobile?.trim()) {
-      newErrors.mobile = "Mobile number is required.";
-    } else if (!/^09\d{9}$/.test(mobile)) { // Regex updated to only 11 digits
-        newErrors.mobile = "Please enter a valid 11-digit PH mobile number (e.g., 09xxxxxxxxx).";
-    }
+    requiredFields.forEach((field) => {
+      if (!String(formData[field] ?? "").trim()) {
+        newErrors[field] = "This field is required.";
+      }
+    });
 
-    if (!email?.trim()) {
-      newErrors.email = "Email is required.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address.";
     }
 
-    if (!birthDate?.trim()) {
-      newErrors.birthDate = "Date of birth is required.";
+    if (formData.mobile && !/^\d{11}$/.test(formData.mobile)) {
+      newErrors.mobile = "Mobile number must be 11 digits.";
+    }
+
+    if (
+      formData.emergencyContactNumber &&
+      !/^\d{7,11}$/.test(formData.emergencyContactNumber)
+    ) {
+      newErrors.emergencyContactNumber = "Contact number must be 7–11 digits.";
     }
 
     setErrors(newErrors);
@@ -86,166 +103,287 @@ export default function PersonalInformationForm({
     }
   };
 
-  // This default object ensures formData.age exists on first render
-  const data = formData || { 
-    fullAddress: "", 
-    mobile: "", 
-    email: "", 
-    birthDate: "", 
-    age: "" 
-  };
-
   return (
-    <form
-      className="bg-white shadow-lg rounded-2xl w-full max-w-3xl flex flex-col"
-      onSubmit={(e) => e.preventDefault()}
-    >
-      <div className="flex-1 overflow-y-auto max-h-[70vh] p-6">
-        <h3 className="font-semibold text-lg mb-4 text-black">
-          A. Personal Information
-        </h3>
+    <div className="min-h-screen flex justify-center items-center bg-gray-100 p-6">
+      <form
+        className="bg-white shadow-lg rounded-2xl w-full max-w-3xl flex flex-col"
+        onSubmit={(e) => e.preventDefault()}
+      >
+        <h2 className="text-center font-bold text-xl mt-4 mb-2 text-black">
+          PERSONAL INFORMATION
+        </h2>
 
-        <div className="grid grid-cols-2 gap-4">
-          {/* Full Address */}
-          <div className="col-span-2">
-            <label className="block text-sm font-semibold text-black">
-              Full Address: <span className="text-red-500">*</span>
-            </label>
+        <div className="flex-1 overflow-y-auto max-h-[70vh] px-6 pt-4 pb-6">
+          {/* Overseas */}
+          <div className="mb-6 flex items-center gap-2">
             <input
-              name="fullAddress"
-              value={data.fullAddress || ""}
+              type="checkbox"
+              name="isOverseas"
+              checked={formData.isOverseas || false}
               onChange={handleChange}
-              className={`w-full border rounded-lg p-2 text-black ${
-                errors.fullAddress ? "border-red-500" : "border-gray-400"
-              }`}
+              className="w-5 h-5 accent-yellow-500"
             />
-            {errors.fullAddress && (
-              <p className="text-red-500 text-sm mt-1">{errors.fullAddress}</p>
-            )}
-          </div>
-
-          {/* Mobile */}
-          <div>
-            <label className="block text-sm font-semibold text-black">
-              Mobile Number: <span className="text-red-500">*</span>
+            <label className="text-sm font-semibold text-black">
+              I am an Overseas Applicant
             </label>
-            <input
-              name="mobile"
-              type="tel"
-              value={data.mobile || ""}
-              // ✅ 1. INPUT LOGIC UPDATED
-              onChange={(e) => {
-                const value = e.target.value;
-                // Regex to allow only numbers
-                const numericRegex = /^[0-9]*$/;
-                
-                // Only update state if value is numeric AND 11 digits or less
-                if (numericRegex.test(value) && value.length <= 11) {
-                  handleChange(e);
-                }
-              }}
-              maxLength={11} // Updated to 11
-              inputMode="numeric"
-              placeholder="09XXXXXXXXX"
-              className={`w-full border rounded-lg p-2 text-black ${
-                errors.mobile ? "border-red-500" : "border-gray-400"
-              }`}
-            />
-            {errors.mobile && (
-               <p className="text-red-500 text-sm mt-1">{errors.mobile}</p>
-            )}
           </div>
 
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-semibold text-black">
-              Email: <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="email"
-              type="email"
-              value={data.email || ""}
-              onChange={handleChange}
-              className={`w-full border rounded-lg p-2 text-black ${
-                errors.email ? "border-red-500" : "border-gray-400"
-              }`}
-            />
-            {errors.email && (
-              <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-            )}
+          {formData.isOverseas && (
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-black">
+                (Optional) Country or Remarks:
+              </label>
+              <textarea
+                name="overseasDetails"
+                rows={2}
+                value={formData.overseasDetails || ""}
+                onChange={handleChange}
+                className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black"
+              />
+            </div>
+          )}
+
+          {/* Personal Details */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-semibold text-black">Full Name:</label>
+              <input
+                name="name"
+                value={formData.name || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.name ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+              {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Birthplace:</label>
+              <input
+                name="birthplace"
+                value={formData.birthplace || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.birthplace ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+              {errors.birthplace && <p className="text-red-500 text-sm mt-1">{errors.birthplace}</p>}
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Birthday:</label>
+              <input
+                type="date"
+                name="birthday"
+                value={formData.birthday || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.birthday ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Age:</label>
+              <input
+                type="number"
+                name="age"
+                value={formData.age || ""}
+                readOnly
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.age ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Gender:</label>
+              <select
+                name="gender"
+                value={formData.gender || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.gender ? "border-red-500" : "border-gray-400"
+                }`}
+              >
+                <option value="">Select gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Prefer not to say">Prefer not to say</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Civil Status:</label>
+              <input
+                name="civilStatus"
+                value={formData.civilStatus || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.civilStatus ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Nationality:</label>
+              <input
+                name="nationality"
+                value={formData.nationality || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.nationality ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Religion:</label>
+              <input
+                name="religion"
+                value={formData.religion || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.religion ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">City Address:</label>
+              <input
+                name="cityAddress"
+                value={formData.cityAddress || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.cityAddress ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Permanent Address:</label>
+              <input
+                name="permanentAddress"
+                value={formData.permanentAddress || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.permanentAddress ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Email:</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.email ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Mobile:</label>
+              <input
+                type="tel"
+                name="mobile"
+                value={formData.mobile || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.mobile ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-black">Language Spoken:</label>
+              <input
+                name="language"
+                value={formData.language || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.language ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
           </div>
 
-          {/* Date of Birth & Age Row */}
-<div className="col-span-2 flex gap-4">
-  
-  {/* Date of Birth */}
-  <div className="flex-1">
-    <label className="block text-sm font-medium text-black mb-1">
-      Date of Birth: <span className="text-red-500">*</span>
-    </label>
-    <input
-      type="date"
-      /* Added text-black and bg-white here */
-      className={`w-full p-2 border rounded-md text-black bg-white focus:outline-none focus:ring-2 ${
-        errors.birthDate ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-blue-200"
-      }`}
-      value={data.birthDate || ""}
-      max={new Date().toISOString().split("T")[0]}
-      onChange={(e) => {
-        const value = e.target.value;
-        const calculatedAge = calculateAge(value);
-        
-        setFormData({
-          ...data,
-          birthDate: value,
-          age: calculatedAge,
-        });
+          {/* Emergency Contact */}
+          <h3 className="font-semibold text-lg mt-6 mb-2 text-black border-b pb-1">
+            Emergency Contact
+          </h3>
 
-        if (errors.birthDate) setErrors((prev) => ({ ...prev, birthDate: "" }));
-      }}
-      required
-    />
-    {errors.birthDate && (
-      <p className="mt-1 text-xs text-red-500">{errors.birthDate}</p>
-    )}
-  </div>
-
-  {/* Age */}
-  <div className="w-24">
-    <label className="block text-sm font-semibold text-black mb-1">
-      Age:
-    </label>
-    <input
-      name="age"
-      type="text"
-      value={data.age || ""}
-      readOnly
-      placeholder="0"
-      className="w-full p-2 border rounded-md text-black bg-gray-100 cursor-not-allowed text-center"
-    />
-  </div>
-  
-</div>
-
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-semibold text-black">Contact Person Name:</label>
+              <input
+                name="emergencyContactName"
+                value={formData.emergencyContactName || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.emergencyContactName ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-black">Relationship:</label>
+              <input
+                name="emergencyRelationship"
+                value={formData.emergencyRelationship || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.emergencyRelationship ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-black">Address:</label>
+              <input
+                name="emergencyAddress"
+                value={formData.emergencyAddress || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.emergencyAddress ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-black">Contact Number:</label>
+              <input
+                name="emergencyContactNumber"
+                value={formData.emergencyContactNumber || ""}
+                onChange={handleChange}
+                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                  errors.emergencyContactNumber ? "border-red-500" : "border-gray-400"
+                }`}
+              />
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="flex justify-between p-6">
-        <button
-          type="button"
-          onClick={prevStep}
-          className="bg-gray-300 text-black font-semibold py-2 px-6 rounded-lg"
-        >
-          ← Back
-        </button>
-        <button
-          type="button"
-          onClick={validateAndProceed}
-          className="bg-yellow-500 text-white font-semibold py-2 px-6 rounded-lg hover:bg-yellow-600"
-        >
-          Next →
-        </button>
-      </div>
-    </form>
+        {/* Navigation Buttons */}
+        <div className="flex justify-between px-6 pb-4">
+          <button
+            type="button"
+            onClick={prevStep}
+            className="bg-gray-300 text-black font-semibold py-2 px-6 rounded-lg"
+          >
+            ← Back
+          </button>
+          <button
+            type="button"
+            onClick={validateAndProceed}
+            className="bg-yellow-500 text-white font-semibold py-2 px-6 rounded-lg"
+          >
+            Next →
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
