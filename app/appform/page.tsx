@@ -175,7 +175,8 @@ export default function ApplicationFormPage() {
         creativeWorks: [{ title: "", institution: "", dates: "" }],
         lifelongLearning: { hobbies: "", skills: "", workActivities: "", volunteer: "", travels: "" },
         portfolio: [] as any[],
-        portfolioFiles: [] as any[]
+        portfolioFiles: [] as any[],
+        portfolio_metadata: [] as any[]
     };
     
     const [formData, setFormData] = useState(defaultFormData);
@@ -351,28 +352,35 @@ export default function ApplicationFormPage() {
 
         // 4. NEW: Upload Portfolio Documents
         const uploadedPortfolioMetadata = [];
-        // portfolioFiles was set in your PortfolioForm component
+
         if (formData.portfolioFiles && formData.portfolioFiles.length > 0) {
             for (let i = 0; i < formData.portfolioFiles.length; i++) {
                 const file = formData.portfolioFiles[i];
-                const meta = formData.portfolio_metadata[i];
+                
+                // This was likely the line causing the "does not exist" error
+                const meta = formData.portfolio_metadata?.[i] || { title: `File ${i + 1}` }; 
 
                 if (file) {
                     const filePath = `${supabaseUserId}/portfolio/${Date.now()}_${file.name}`;
                     const { error: uploadErr } = await supabase.storage
-                        .from('portfolio_files') // Ensure this bucket exists in Supabase!
+                        .from('portfolio_files') 
                         .upload(filePath, file);
 
-                    if (uploadErr) console.error(`Error uploading ${meta.title}:`, uploadErr);
+                    if (uploadErr) {
+                        console.error(`Error uploading:`, uploadErr);
+                        continue; // Skip this file if it fails
+                    }
 
                     const { data: publicUrl } = supabase.storage
                         .from('portfolio_files')
                         .getPublicUrl(filePath);
 
                     uploadedPortfolioMetadata.push({
-                        ...meta,
+                        title: meta.title, // Use the title from metadata
                         url: publicUrl.publicUrl,
-                        storagePath: filePath
+                        storagePath: filePath,
+                        fileSize: file.size,
+                        fileType: file.type
                     });
                 }
             }

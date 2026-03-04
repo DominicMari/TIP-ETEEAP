@@ -155,7 +155,7 @@ export default function PortfolioForm({
                     </p>
                   </div>
                   <div className="bg-green-600 text-white rounded-full p-1">
-                    <svg size="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
