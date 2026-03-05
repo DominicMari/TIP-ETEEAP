@@ -115,7 +115,7 @@ interface Applicant {
   mobile_number: string | null;
   email_address: string | null;
   goal_statement: string | null;
-  degree_priorities: any | null; 
+  degree_priorities: any | null;
   creative_works: any | null;
   signature_url: string | null;
   lifelong_learning: any | null;
@@ -129,6 +129,23 @@ interface Applicant {
   work_experiences: any | null;
   recognitions: any | null;
   professional_development: any | null;
+  age: number | null;
+  birth_date: string | null;
+  birth_place: string | null;
+  gender: string | null;
+  nationality: string | null;
+  religion: string | null;
+  civil_status: string | null;
+  language_spoken: string | null;
+  is_overseas: boolean | null;
+  overseas_details: string | null;
+  city_address: string | null;
+  permanent_address: string | null;
+  emergency_contact_name: string | null;
+  emergency_relationship: string | null;
+  emergency_address: string | null;
+  emergency_contact_number: string | null;
+  portfolio: any | null;
 }
 
 // --- Constants ---
@@ -620,6 +637,24 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
               </div>
             </div>
 
+            <InfoCard title='Applicant Information'>
+              <InfoItem label='Birthday' value={formatDate(applicant.birth_date)} />
+              <InfoItem label='Birthplace' value={applicant.birth_place} />
+              <InfoItem label='Age' value={applicant.age != null ? String(applicant.age) : 'N/A'} />
+              <InfoItem label='Gender' value={applicant.gender} />
+              <InfoItem label='Civil Status' value={applicant.civil_status} />
+              <InfoItem label='Nationality' value={applicant.nationality} />
+              <InfoItem label='Religion' value={applicant.religion} />
+              <InfoItem label='Language Spoken' value={applicant.language_spoken} />
+            </InfoCard>
+
+            <InfoCard title='Emergency Contact'>
+              <InfoItem label='Contact Name' value={applicant.emergency_contact_name} />
+              <InfoItem label='Address' value={applicant.emergency_address} />
+              <InfoItem label='Relationship' value={applicant.emergency_relationship} />
+              <InfoItem label='Contact Number' value={applicant.emergency_contact_number} />
+            </InfoCard>
+
             <InfoCard title='Contact Information'>
               <InfoItem label='Email'>
                 <a href={`mailto:${applicant.email_address}`} className='text-blue-600 hover:underline break-all'>
@@ -627,7 +662,8 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
                 </a>
               </InfoItem>
               <InfoItem label='Mobile Number' value={applicant.mobile_number} />
-              <InfoItem label='Full Address' value={applicant.full_address} />
+              <InfoItem label='City Address' value={applicant.city_address} />
+              <InfoItem label='Permanent Address' value={applicant.permanent_address} />
             </InfoCard>
 
             <InfoCard title='Application Info'>
@@ -680,13 +716,10 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
             <GenericList data={applicant.publications} title="Publications" />
             <GenericList data={applicant.inventions} title="Inventions" />
             <GenericList data={applicant.recognitions} title="Recognitions" />
-            <CollapsibleSection title="Self Assessment">
-              <AssessmentList data={applicant.self_assessment} />
-            </CollapsibleSection>
             <CollapsibleSection title="Lifelong Learning">
               <AssessmentList data={applicant.lifelong_learning} />
             </CollapsibleSection>
-            <CollapsibleSection title="Creative Works / Portfolio">
+            <CollapsibleSection title="Creative Works">
               <CreativeWorks data={applicant.creative_works} />
             </CollapsibleSection>
             <CollapsibleSection title="Applicant Signature">

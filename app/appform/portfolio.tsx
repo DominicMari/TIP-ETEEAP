@@ -42,6 +42,7 @@ export default function PortfolioForm({
       }));
       setDocuments(restoredDocs);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileChange = (index: number, file: File | null) => {

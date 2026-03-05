@@ -18,9 +18,6 @@ import PortfolioForm from "./portfolio";
 import { useRouter } from 'next/navigation';
 import DataPrivacyConsent from './undertaking';
 
-// ❌ 3. REMOVED the local, broken client
-// const supabaseUrl = ...
-// const supabase = createClient(...)
 
 const getTodayDateISO = () => {
     const today = new Date();
@@ -153,7 +150,7 @@ function FinalReviewStep({ nextStep, prevStep, signaturePadRef, isSubmitting }: 
 
 // --- Main Page Component ---
 export default function ApplicationFormPage() {
-    const { data: session } = useSession(); // Get the user's session
+    const { data: session } = useSession();
     const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const signaturePadRef = useRef<SignatureCanvas>(null);
@@ -162,7 +159,7 @@ export default function ApplicationFormPage() {
 
     const defaultFormData = {
         initial: { name: "", degree: "", campus: "", date: getTodayDateISO(), folderLink: "", photo: null as File | null },
-        personalInfo: {
+       personalInfo: {
         name: "",
         fullAddress: "",
         mobile: "",
@@ -186,11 +183,11 @@ export default function ApplicationFormPage() {
         },
         goals: { degrees: [""], statement: "" },
         education: { tertiary: [], secondary: [], elementary: [], technical: [] },
-        nonFormal: [] as any[],
+        non_formal_education: [] as any[],
         certifications: [] as any[],
         publications: [] as any[],
         inventions: [] as any[],
-        work: { employment: [], consultancy: [], selfEmployment: [] },
+        work_experience: { employment: [], consultancy: [], selfEmployment: [] },
         recognitions: [] as any[],
         professional_development: { memberships: [], projects: [], research: [] },
         creativeWorks: [{ title: "", institution: "", dates: "" }],
@@ -250,10 +247,10 @@ export default function ApplicationFormPage() {
                     if (!Array.isArray(newState.goals.degrees)) newState.goals.degrees = [""];
                     newState.personalInfo = { ...prev.personalInfo, ...(newState.personalInfo || {}) };
                     newState.education = { ...prev.education, ...(newState.education || {}) };
-                    newState.work = { ...prev.work, ...(newState.work || {}) };
+                    newState.work_experience = { ...prev.work_experience, ...(newState.work_experience || {}) };
                     newState.lifelongLearning = { ...prev.lifelongLearning, ...(newState.lifelongLearning || {}) };
                     if (!Array.isArray(newState.portfolio)) newState.portfolio = [];
-                    if (!Array.isArray(newState.nonFormal)) newState.nonFormal = [];
+                    if (!Array.isArray(newState.non_formal_education)) newState.non_formal_education = [];
                     if (!Array.isArray(newState.certifications)) newState.certifications = [];
                     if (!Array.isArray(newState.publications)) newState.publications = [];
                     if (!Array.isArray(newState.inventions)) newState.inventions = [];
@@ -314,15 +311,8 @@ export default function ApplicationFormPage() {
     const handleInitialChange = createFormUpdater('initial');
     const handlePersonalChange = createFormUpdater('personalInfo');
     const handleGoalsChange = createFormUpdater('goals');
-    const handleBackgroundChange = (updatedData: any) => {
-        setFormData(prev => ({
-            ...prev,
-            ...updatedData
-        }));
-    };
     const handleCreativeWorksChange = createFormUpdater('creativeWorks');
     const handleLearningChange = createFormUpdater('lifelongLearning');
-    const handlePortfolioChange = createFormUpdater('portfolio');
 
     // Consent handlers
     const handleConsentAgree = () => {
@@ -337,6 +327,12 @@ export default function ApplicationFormPage() {
 
     // The handleSubmit function
    const handleSubmit = async () => {
+    // Capture signature BEFORE setIsSubmitting unmounts the canvas
+    const signatureDataUrl = signaturePadRef.current?.toDataURL('image/png');
+    if (!signatureDataUrl) {
+        alert('Signature is missing. Please draw your signature.');
+        return;
+    }
     setIsSubmitting(true);
 
     if (!session?.user?.email) {
@@ -361,14 +357,15 @@ export default function ApplicationFormPage() {
         if (!photoFile) throw new Error("1x1 Photo is missing from Step 1.");
         
         const photoPath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
-        await supabase.storage.from('application_files').upload(photoPath, photoFile);
+        const { error: photoUploadError } = await supabase.storage.from('application_files').upload(photoPath, photoFile);
+        if (photoUploadError) throw new Error(`Photo upload failed: ${photoUploadError.message}`);
         const { data: photoUrl } = supabase.storage.from('application_files').getPublicUrl(photoPath);
 
         // 3. Upload Signature
-        const signatureDataUrl = signaturePadRef.current?.toDataURL('image/png');
-        const sigBlob = await (await fetch(signatureDataUrl!)).blob();
+        const sigBlob = await (await fetch(signatureDataUrl)).blob();
         const sigPath = `${supabaseUserId}/signature_${Date.now()}.png`;
-        await supabase.storage.from('application_files').upload(sigPath, sigBlob);
+        const { error: sigUploadError } = await supabase.storage.from('application_files').upload(sigPath, sigBlob);
+        if (sigUploadError) throw new Error(`Signature upload failed: ${sigUploadError.message}`);
         const { data: sigUrl } = supabase.storage.from('application_files').getPublicUrl(sigPath);
 
         // 4. NEW: Upload Portfolio Documents
@@ -410,50 +407,40 @@ export default function ApplicationFormPage() {
         // 5. Insert Final Payload
         const insertPayload = {
             user_id: supabaseUserId,
+            education_background: formData.education,
             applicant_name: formData.initial.name,
             degree_applied_for: formData.initial.degree,
             campus: formData.initial.campus,
             application_date: formData.initial.date,
             folder_link: formData.initial.folderLink,
-
-            // Personal Info — now maps ALL b.tsx fields
             full_address: formData.personalInfo.fullAddress,
             mobile_number: formData.personalInfo.mobile,
             email_address: formData.personalInfo.email,
             age: formData.personalInfo.age,
-            birth_date: formData.personalInfo.birthday,        // was birthDate
-            birth_place: formData.personalInfo.birthplace,      // NEW
-            gender: formData.personalInfo.gender,               // NEW
-            nationality: formData.personalInfo.nationality,     // NEW
-            religion: formData.personalInfo.religion,           // NEW
-            civil_status: formData.personalInfo.civilStatus,    // NEW
-            language_spoken: formData.personalInfo.language,     // NEW
-            is_overseas: formData.personalInfo.isOverseas || false, // NEW
-            overseas_details: formData.personalInfo.overseasDetails, // NEW
-            city_address: formData.personalInfo.cityAddress,    // NEW
-            permanent_address: formData.personalInfo.permanentAddress, // NEW
-            emergency_contact_name: formData.personalInfo.emergencyContactName, // NEW
-            emergency_relationship: formData.personalInfo.emergencyRelationship, // NEW
-            emergency_address: formData.personalInfo.emergencyAddress, // NEW
-            emergency_contact_number: formData.personalInfo.emergencyContactNumber, // NEW
-
-            // Everything else stays the same
+            birth_date: formData.personalInfo.birthday,
+            birth_place: formData.personalInfo.birthplace,
+            gender: formData.personalInfo.gender,
+            nationality: formData.personalInfo.nationality,
+            religion: formData.personalInfo.religion,
+            civil_status: formData.personalInfo.civilStatus,
+            language_spoken: formData.personalInfo.language,
+            is_overseas: formData.personalInfo.isOverseas || false,
+            overseas_details: formData.personalInfo.overseasDetails,
+            city_address: formData.personalInfo.cityAddress,
+            permanent_address: formData.personalInfo.permanentAddress,
+            emergency_contact_name: formData.personalInfo.emergencyContactName,
+            emergency_relationship: formData.personalInfo.emergencyRelationship,
+            emergency_address: formData.personalInfo.emergencyAddress,
+            emergency_contact_number: formData.personalInfo.emergencyContactNumber,
             goal_statement: formData.goals.statement,
-            degree_priorities: formData.goals.degrees,
-            creative_works: formData.creativeWorks,
+            non_formal_education: formData.non_formal_education,
+            work_experiences: formData.work_experience,
             lifelong_learning: formData.lifelongLearning,
-            portfolio: uploadedPortfolioMetadata,
+            creative_works: formData.creativeWorks,
+            professional_development: formData.professional_development,
             photo_url: photoUrl.publicUrl,
             signature_url: sigUrl.publicUrl,
-            education_background: formData.education,
-            non_formal_education: formData.nonFormal,
-            certifications: formData.certifications,
-            publications: formData.publications,
-            inventions: formData.inventions,
-            work_experiences: formData.work,
-            recognitions: formData.recognitions,
-            professional_development: formData.professional_development,
-            };
+        }
 
         const { error: insertError } = await supabase
             .from('applications')

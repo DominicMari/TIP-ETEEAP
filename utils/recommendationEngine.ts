@@ -17,7 +17,7 @@ const DEGREE_RULES: DegreeRule[] = [
   {
     id: 'BSIS',
     name: 'Bachelor of Science in Information Systems',
-    keywords: ['business process', 'enterprise', 'database', 'analyst', 'crm', 'erp', 'management system', 'corporate data', 'audit', 'strategy', 'information', 'data'],
+    keywords: ['business', 'business process', 'enterprise', 'database', 'analyst', 'crm', 'erp', 'management system', 'corporate data', 'audit', 'strategy', 'information', 'data'],
   },
   {
     id: 'BSIT',
@@ -41,7 +41,7 @@ const DEGREE_RULES: DegreeRule[] = [
   {
     id: 'BSBA-LSCM',
     name: 'BSBA - Logistics and Supply Chain Management',
-    keywords: ['logistics', 'supply chain', 'warehouse', 'inventory', 'shipping', 'transport', 'distribution', 'procurement', 'freight', 'delivery', 'cargo'],
+    keywords: ['business', 'logistics', 'supply chain', 'warehouse', 'inventory', 'shipping', 'transport', 'distribution', 'procurement', 'freight', 'delivery', 'cargo'],
   },
   {
     id: 'BSBA-FM',

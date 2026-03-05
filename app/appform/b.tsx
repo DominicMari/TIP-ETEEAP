@@ -216,14 +216,20 @@ export default function PersonalInformationForm({
 
             <div>
               <label className="text-sm font-semibold text-black">Civil Status:</label>
-              <input
+              <select
                 name="civilStatus"
                 value={formData.civilStatus || ""}
                 onChange={handleChange}
                 className={`w-full border rounded-lg px-3 py-2 text-black ${
                   errors.civilStatus ? "border-red-500" : "border-gray-400"
                 }`}
-              />
+              >
+                <option value="">Select civil status</option>
+                <option value="Single">Single</option>
+                <option value="Married">Married</option>
+                <option value="Widowed">Widowed</option>
+                <option value="Separated">Separated</option>
+              </select>
             </div>
 
             <div>

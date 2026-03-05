@@ -39,7 +39,7 @@ export default function InitialForm({
       if (file.size > 2 * 1024 * 1024) { // 2MB limit
         setErrors((prev) => ({
           ...prev,
-          photo: "Image size must be less than 2MB.", // Use 'photo'
+          photo: "Image size must be less than 2MB.",
         }));
         return;
       }
@@ -48,7 +48,7 @@ export default function InitialForm({
       // Update the 'initial' slice with the new file
       setFormData({
         ...formData,
-        photo: file, // Use 'photo'
+        photo: file,
       });
       if (errors.photo) setErrors((prev) => ({ ...prev, photo: "" }));
     }
@@ -64,7 +64,7 @@ export default function InitialForm({
     if (!name?.trim()) newErrors.name = "Name is required.";
     if (!degree) newErrors.degree = "Degree is required.";
     if (!campus) newErrors.campus = "Campus is required.";
-    if (!photo) newErrors.photo = "Photo is required."; // Use 'photo'
+    if (!photo) newErrors.photo = "Photo is required.";
 
     if (!folderLink?.trim()) {
       newErrors.folderLink = "Folder link is required.";
@@ -102,15 +102,15 @@ export default function InitialForm({
             </label>
             <input
               type="text"
-              name="name" // Use 'name'
-              value={formData.name || ""} // Use 'name'
+              name="name"
+              value={formData.name || ""}
               onChange={handleChange}
               className={`w-full border rounded-lg px-3 py-2 text-black ${
-                errors.name ? "border-red-500" : "border-gray-400" // Use 'name'
+                errors.name ? "border-red-500" : "border-gray-400"
               }`}
             />
             {errors.name && (
-              <p className="text-red-500 text-sm mt-1">{errors.name}</p> // Use 'name'
+              <p className="text-red-500 text-sm mt-1">{errors.name}</p>
             )}
           </div>
 
@@ -121,11 +121,11 @@ export default function InitialForm({
                 Degree Applied For: <span className="text-red-500">*</span>
               </label>
               <select
-                name="degree" // Use 'degree'
-                value={formData.degree || ""} // Use 'degree'
+                name="degree"
+                value={formData.degree || ""}
                 onChange={handleChange}
                 className={`w-full border rounded-lg px-3 py-2 text-black ${
-                  errors.degree ? "border-red-500" : "border-gray-400" // Use 'degree'
+                  errors.degree ? "border-red-500" : "border-gray-400"
                 }`}
               >
                 <option value="">Select degree</option>
@@ -148,7 +148,7 @@ export default function InitialForm({
 
               </select>
               {errors.degree && (
-                <p className="text-red-500 text-sm mt-1">{errors.degree}</p> // Use 'degree'
+                <p className="text-red-500 text-sm mt-1">{errors.degree}</p>
               )}
             </div>
           </div>
@@ -159,7 +159,7 @@ export default function InitialForm({
           <label
             htmlFor="photo-upload"
             className={`w-20 h-20 rounded-full bg-yellow-400 flex items-center justify-center cursor-pointer overflow-hidden ${
-              errors.photo ? "ring-2 ring-red-500" : "" // Use 'photo'
+              errors.photo ? "ring-2 ring-red-500" : ""
             }`}
           >
             {photoPreview ? (
@@ -181,7 +181,7 @@ export default function InitialForm({
           />
           <p className="text-sm mt-2 text-black">Add Photo</p>
           {errors.photo && (
-            <p className="text-red-500 text-sm mt-1">{errors.photo}</p> // Use 'photo'
+            <p className="text-red-500 text-sm mt-1">{errors.photo}</p>
           )}
         </div>
       </div>
@@ -192,11 +192,11 @@ export default function InitialForm({
           Campus: <span className="text-red-500">*</span>
         </label>
         <select
-          name="campus" // Use 'campus'
-          value={formData.campus || ""} // Use 'campus'
+          name="campus"
+          value={formData.campus || ""}
           onChange={handleChange}
           className={`w-full border rounded-lg px-3 py-2 text-black ${
-            errors.campus ? "border-red-500" : "border-gray-400" // Use 'campus'
+            errors.campus ? "border-red-500" : "border-gray-400"
           }`}
         >
           <option value="">Select campus</option>
@@ -204,7 +204,7 @@ export default function InitialForm({
           <option value="Manila">Manila</option>
         </select>
         {errors.campus && (
-          <p className="text-red-500 text-sm mt-1">{errors.campus}</p> // Use 'campus'
+          <p className="text-red-500 text-sm mt-1">{errors.campus}</p>
         )}
       </div>
 
@@ -215,15 +215,15 @@ export default function InitialForm({
         </label>
         <input
           type="url"
-          name="folderLink" // Use 'folderLink'
-          value={formData.folderLink || ""} // Use 'folderLink'
+          name="folderLink"
+          value={formData.folderLink || ""}
           onChange={handleChange}
           className={`w-full border rounded-lg px-3 py-2 text-black ${
-            errors.folderLink ? "border-red-500" : "border-gray-400" // Use 'folderLink'
+            errors.folderLink ? "border-red-500" : "border-gray-400"
           }`}
         />
         {errors.folderLink && (
-          <p className="text-red-500 text-sm mt-1">{errors.folderLink}</p> // Use 'folderLink'
+          <p className="text-red-500 text-sm mt-1">{errors.folderLink}</p>
         )}
       </div>
 
