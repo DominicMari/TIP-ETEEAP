@@ -124,3 +124,59 @@
 .ql-editor {
   color: black;
 }
+
+/* globals.css */
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-area,
+  #printable-area * {
+    visibility: visible;
+  }
+
+  #printable-area {
+    position: fixed;        /* Changed from absolute */
+    top: 0;                 /* Replace margin-top: -500% */
+    left: 50%;              /* Start at center */
+    transform: translateX(-50%);  /* Shift back by half its width */
+    width: 190mm;           /* A4 width minus margins (210mm - 10mm*2) */
+    max-width: 190mm;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #printable-area table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  #printable-area th, 
+  #printable-area td {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+  }
+
+  html, 
+  body, 
+  #__next, 
+  #root {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 10mm; 
+  }
+}

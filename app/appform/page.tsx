@@ -162,7 +162,28 @@ export default function ApplicationFormPage() {
 
     const defaultFormData = {
         initial: { name: "", degree: "", campus: "", date: getTodayDateISO(), folderLink: "", photo: null as File | null },
-        personalInfo: { fullAddress: "", mobile: "", email: "", birthDate: "", age: null as number | null },
+        personalInfo: {
+        name: "",
+        fullAddress: "",
+        mobile: "",
+        email: "",
+        birthday: "",
+        birthplace: "",
+        age: null as number | null,
+        gender: "",
+        nationality: "",
+        religion: "",
+        civilStatus: "",
+        language: "",
+        isOverseas: false,
+        overseasDetails: "",
+        cityAddress: "",
+        permanentAddress: "",
+        emergencyContactName: "",
+        emergencyRelationship: "",
+        emergencyAddress: "",
+        emergencyContactNumber: "",
+        },
         goals: { degrees: [""], statement: "" },
         education: { tertiary: [], secondary: [], elementary: [], technical: [] },
         nonFormal: [] as any[],
@@ -394,17 +415,34 @@ export default function ApplicationFormPage() {
             campus: formData.initial.campus,
             application_date: formData.initial.date,
             folder_link: formData.initial.folderLink,
+
+            // Personal Info — now maps ALL b.tsx fields
             full_address: formData.personalInfo.fullAddress,
             mobile_number: formData.personalInfo.mobile,
             email_address: formData.personalInfo.email,
             age: formData.personalInfo.age,
-            birth_date: formData.personalInfo.birthDate,
+            birth_date: formData.personalInfo.birthday,        // was birthDate
+            birth_place: formData.personalInfo.birthplace,      // NEW
+            gender: formData.personalInfo.gender,               // NEW
+            nationality: formData.personalInfo.nationality,     // NEW
+            religion: formData.personalInfo.religion,           // NEW
+            civil_status: formData.personalInfo.civilStatus,    // NEW
+            language_spoken: formData.personalInfo.language,     // NEW
+            is_overseas: formData.personalInfo.isOverseas || false, // NEW
+            overseas_details: formData.personalInfo.overseasDetails, // NEW
+            city_address: formData.personalInfo.cityAddress,    // NEW
+            permanent_address: formData.personalInfo.permanentAddress, // NEW
+            emergency_contact_name: formData.personalInfo.emergencyContactName, // NEW
+            emergency_relationship: formData.personalInfo.emergencyRelationship, // NEW
+            emergency_address: formData.personalInfo.emergencyAddress, // NEW
+            emergency_contact_number: formData.personalInfo.emergencyContactNumber, // NEW
+
+            // Everything else stays the same
             goal_statement: formData.goals.statement,
             degree_priorities: formData.goals.degrees,
             creative_works: formData.creativeWorks,
             lifelong_learning: formData.lifelongLearning,
-            // Save the version with URLs into the DB
-            portfolio: uploadedPortfolioMetadata, 
+            portfolio: uploadedPortfolioMetadata,
             photo_url: photoUrl.publicUrl,
             signature_url: sigUrl.publicUrl,
             education_background: formData.education,
@@ -415,7 +453,7 @@ export default function ApplicationFormPage() {
             work_experiences: formData.work,
             recognitions: formData.recognitions,
             professional_development: formData.professional_development,
-        };
+            };
 
         const { error: insertError } = await supabase
             .from('applications')

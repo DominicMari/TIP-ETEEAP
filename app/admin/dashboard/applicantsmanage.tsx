@@ -1,5 +1,6 @@
 'use client';
-
+import { createPortal } from 'react-dom';
+import { openPrintPreview } from "@/components/admin/printTemplate";
 import { useEffect, useState, FC, ReactNode, useMemo, useRef } from 'react';
 import supabase from '../../../lib/supabase/client'; // Adjust path if needed
 import { 
@@ -344,19 +345,21 @@ export default function ApplicantsManage() {
   ) : null;
 
   return (
-    <div className='space-y-6'>
-      <ErrorAlert />
+    <div className='relative min-h-screen'>
       
-      {/* 🔽 --- NEW: Page Header --- */}
-      <PageHeader
-        title='Applicant Management'
-        applicantCount={filteredApplicants.length}
-        totalApplicants={applicants.length}
-        searchTerm={searchTerm}
-        onSearchChange={(e) => setSearchTerm(e.target.value)}
-        statusFilter={statusFilter}
-        onStatusChange={(e) => setStatusFilter(e.target.value)}
-      />
+      {/* 1. ADD print:hidden TO YOUR MAIN UI WRAPPER */}
+      <div className='space-y-6 print:hidden'>
+        <ErrorAlert />
+        
+        <PageHeader
+          title='Applicant Management'
+          applicantCount={filteredApplicants.length}
+          totalApplicants={applicants.length}
+          searchTerm={searchTerm}
+          onSearchChange={(e) => setSearchTerm(e.target.value)}
+          statusFilter={statusFilter}
+          onStatusChange={(e) => setStatusFilter(e.target.value)}
+        />
 
       {/* --- Main Table --- */}
       <div className='overflow-x-auto border border-gray-200 rounded-lg shadow-sm'>
@@ -462,10 +465,11 @@ export default function ApplicantsManage() {
       </div>
 
       <PaginationControls
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-      />
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      </div>
 
       {/* View Details Modal */}
       {isModalOpen && selectedApplicant && (
@@ -474,6 +478,7 @@ export default function ApplicantsManage() {
           onClose={handleCloseModal}
         />
       )}
+
     </div>
   );
 }
@@ -564,8 +569,12 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
   applicant,
   onClose,
 }) => {
-  return (
-    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in backdrop-blur-sm'>
+  const handlePrint = () => {
+    openPrintPreview(applicant);
+  };
+
+  return createPortal(
+    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm'>
       <div className='bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col text-black'>
         {/* Modal Header */}
         <div className='flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10'>
@@ -581,7 +590,7 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
           </button>
         </div>
 
-        {/* 🔽 --- NEW: Two-Column Modal Body --- */}
+        {/* Two-Column Modal Body */}
         <div className='flex-1 flex overflow-hidden'>
           
           {/* Left Column (Info) */}
@@ -632,14 +641,13 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
               />
                   <InfoItem label='Portfolio/Folder Link'>
                     <a
-                      href={applicant.folder_link || '#'} // Use link if present, or '#' as a fallback
+                      href={applicant.folder_link || '#'}
                       target='_blank'
                       rel='noopener noreferrer'
-                      // --- This is the improved logic ---
                       className={`break-all ${
                         applicant.folder_link
-                          ? 'text-blue-600 hover:underline' // Has link: blue and underlined on hover
-                          : 'text-black pointer-events-none' // No link: black text and not clickable
+                          ? 'text-blue-600 hover:underline'
+                          : 'text-black pointer-events-none'
                       }`}
                     >
                       {applicant.folder_link || 'N/A'}
@@ -688,17 +696,25 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className='p-4 border-t border-gray-200 bg-gray-100 text-right sticky bottom-0 rounded-b-2xl z-10'>
+        <div className="p-4 border-t flex justify-end gap-3">
           <button
             onClick={onClose}
-            className='px-6 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400'
+            className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-lg font-medium text-gray-700 transition-colors"
           >
-            Close
+            Cancel
+          </button>
+          <button
+            onClick={handlePrint}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print
           </button>
         </div>
+
       </div>
     </div>
-  );
+  , document.body);
 };
 
 // --- 🔽 NEW: Helper Components for Modal ---
@@ -1043,12 +1059,9 @@ const ProfessionalDevelopment: FC<{ data: any }> = ({ data }) => {
   );
 };
 
-
-
-
 const ActionsMenu: FC<{
   applicant: Applicant;
-  onView: (applicant: Applicant) => void; // Added onView
+  onView: (applicant: Applicant) => void;
   onDelete: (applicationId: string, applicantName: string | null) => void;
   isDeleting: boolean;
   isUpdating: boolean;
@@ -1079,29 +1092,33 @@ const ActionsMenu: FC<{
         <MoreHorizontal size={18} />
       </button>
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border">
-          <button
-            onClick={() => {
-              onView(applicant);
-              setIsOpen(false);
-            }}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-          >
-            <Eye size={16} />
-            View Details
-          </button>
-          <button
-            onClick={() => {
-              onDelete(applicant.application_id, applicant.applicant_name);
-              setIsOpen(false);
-            }}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-          >
-            <Trash2 size={16} />
-            Delete Application
-          </button>
-        </div>
-      )}
+  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border">
+
+    <button
+      onClick={() => {
+        onView(applicant);
+        setIsOpen(false);
+      }}
+      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+    >
+      <Eye size={16} />
+      View Details
+    </button>
+
+    <button
+      onClick={() => {
+        onDelete(applicant.application_id, applicant.applicant_name);
+        setIsOpen(false);
+      }}
+      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+    >
+      <Trash2 size={16} />
+      Delete Application
+    </button>
+
+  </div>
+)}
+
     </div>
   );
 };
