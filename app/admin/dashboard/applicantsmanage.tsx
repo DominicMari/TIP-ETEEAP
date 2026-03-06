@@ -13,7 +13,9 @@ import {
   ChevronDown,
   MoreHorizontal,
   Eye,
-  Trash2
+  Trash2,
+  Zap,
+  TrendingUp
 } from 'lucide-react';
 
 interface DegreePriority {
@@ -146,6 +148,7 @@ interface Applicant {
   emergency_address: string | null;
   emergency_contact_number: string | null;
   portfolio: any | null;
+  admin_remarks: string | null;
 }
 
 // --- Constants ---
@@ -197,6 +200,94 @@ const getCompletionPercentage = (app: Applicant): number => {
   return (completedSteps / 8) * 100;
 };
 
+// Get suggested status based on completion percentage
+const getSuggestedStatus = (percentage: number, currentStatus: string | null): string | null => {
+  if (percentage < 40) {
+    // Incomplete - should remain Submitted
+    return currentStatus === 'Submitted' ? null : 'Submitted';
+  } else if (percentage >= 40 && percentage < 75) {
+    // Partial completion - suggest Pending for review
+    return currentStatus === 'Pending' ? null : 'Pending';
+  } else if (percentage >= 75) {
+    // Nearly complete or complete - ready for decision
+    if (currentStatus === 'Approved' || currentStatus === 'Declined') {
+      return null; // Already decided
+    }
+    return 'Pending'; // Suggest moving to review if not already
+  }
+  return null;
+};
+
+// Get suggested remarks templates
+const getRemarksTemplate = (status: string): string => {
+  const templates: Record<string, string> = {
+    Submitted: 'Thank you for starting your application. Please complete all required sections to proceed with the review process.',
+    Pending: 'Your application is currently under review. Our team will carefully assess your qualifications and experience. You will be notified once a decision has been made.',
+    Approved: 'Congratulations! Your application has been approved. Please check your email for next steps and enrollment instructions.',
+    Declined: 'Thank you for your interest in our program. Unfortunately, we are unable to approve your application at this time. [Add specific reason or feedback here]'
+  };
+  return templates[status] || '';
+};
+
+// Send status notification email
+const sendStatusEmail = async (
+  applicantEmail: string | null,
+  applicantName: string | null,
+  status: string,
+  remarks: string | null
+): Promise<void> => {
+  if (!applicantEmail) {
+    console.warn('No email address available for applicant');
+    return;
+  }
+
+  const emailTemplates: Record<string, { subject: string; body: string }> = {
+    Submitted: {
+      subject: 'Application Received - TIP ETEEAP',
+      body: `Dear ${applicantName || 'Applicant'},\n\nThank you for submitting your application to the TIP ETEEAP program. We have received your application and it is now in our system.\n\nPlease continue to complete any remaining sections of your application. Our team will begin reviewing your submission shortly.\n\nBest regards,\nTIP ETEEAP Team`
+    },
+    Pending: {
+      subject: 'Application Under Review - TIP ETEEAP',
+      body: `Dear ${applicantName || 'Applicant'},\n\nYour application is now under review. Our assessment team is carefully evaluating your qualifications, experience, and fit for the program.\n\nYou will be notified of the decision as soon as the review process is complete.\n\nThank you for your patience.\n\nBest regards,\nTIP ETEEAP Team`
+    },
+    Approved: {
+      subject: 'Application Approved - TIP ETEEAP',
+      body: `Dear ${applicantName || 'Applicant'},\n\nCongratulations! We are pleased to inform you that your application has been approved.\n\nPlease check your email for details regarding next steps, enrollment procedures, and program information.\n\nWe look forward to welcoming you to the TIP ETEEAP program!\n\nBest regards,\nTIP ETEEAP Team`
+    },
+    Declined: {
+      subject: 'Application Decision - TIP ETEEAP',
+      body: `Dear ${applicantName || 'Applicant'},\n\nThank you for your interest in the TIP ETEEAP program. We have completed our review of your application.\n\nUnfortunately, we are unable to approve your application at this time. We encourage you to apply again in future cycles.\n\nBest regards,\nTIP ETEEAP Team`
+    }
+  };
+
+  const emailTemplate = emailTemplates[status];
+  if (!emailTemplate) {
+    console.warn(`No email template found for status: ${status}`);
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        recipient: applicantEmail,
+        subject: emailTemplate.subject,
+        body: remarks ? `${emailTemplate.body}\n\n---\nAdmin Comments:\n${remarks}` : emailTemplate.body
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Failed to send email:', error.error);
+    }
+  } catch (error) {
+    console.error('Error sending email:', error);
+  }
+};
+
 const STATUS_OPTIONS = ['All', 'Submitted', 'Pending', 'Approved', 'Declined'];
 const STATUS_COLORS: Record<string, string> = {
   Submitted: 'bg-gray-100 text-gray-800 ring-gray-300',
@@ -222,6 +313,8 @@ export default function ApplicantsManage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [remarksModal, setRemarksModal] = useState<{ applicationId: string; newStatus: string; currentRemarks: string } | null>(null);
+  const [remarksText, setRemarksText] = useState('');
   
   // 🔽 --- NEW: State for search and filtering ---
   const [searchTerm, setSearchTerm] = useState('');
@@ -289,18 +382,29 @@ export default function ApplicantsManage() {
     setSelectedApplicant(null);
   };
 
-  const handleStatusChange = async (applicationId: string, newStatus: string) => {
+  const handleStatusChange = (applicationId: string, newStatus: string) => {
+    const currentApp = applicants.find(a => a.application_id === applicationId);
+    const template = getRemarksTemplate(newStatus);
+    setRemarksText(currentApp?.admin_remarks || template);
+    setRemarksModal({ applicationId, newStatus, currentRemarks: currentApp?.admin_remarks || '' });
+  };
+
+  const handleStatusChangeConfirm = async () => {
+    if (!remarksModal) return;
+    const { applicationId, newStatus } = remarksModal;
     setUpdatingStatusId(applicationId);
     setError(null);
 
     const { data: updatedData, error: updateError } = await supabase
       .from('applications')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .update({ status: newStatus, admin_remarks: remarksText.trim() || null, updated_at: new Date().toISOString() })
       .eq('application_id', applicationId)
       .select()
       .single();
 
     setUpdatingStatusId(null);
+    setRemarksModal(null);
+    setRemarksText('');
 
     if (updateError) {
       console.error('Error updating status:', updateError.message);
@@ -310,6 +414,14 @@ export default function ApplicantsManage() {
         prevApplicants.map(app =>
           app.application_id === applicationId ? (updatedData as Applicant) : app
         )
+      );
+      
+      // Send status notification email
+      await sendStatusEmail(
+        (updatedData as Applicant).email_address,
+        (updatedData as Applicant).applicant_name,
+        newStatus,
+        remarksText.trim() || null
       );
     }
   };
@@ -462,6 +574,15 @@ export default function ApplicantsManage() {
                             <option key={status} value={status}>{status}</option>
                           ))}
                         </select>
+                        {getSuggestedStatus(getCompletionPercentage(app), app.status) && (
+                          <div className='relative group'>
+                            <Zap size={14} className='text-yellow-500 animate-pulse cursor-help' />
+                            <div className='absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 whitespace-nowrap z-20 shadow-lg'>
+                              Suggested: {getSuggestedStatus(getCompletionPercentage(app), app.status)}
+                              <div className='absolute left-2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900'></div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -470,6 +591,7 @@ export default function ApplicantsManage() {
                       applicant={app}
                       onView={handleViewDetails}
                       onDelete={handleDelete}
+                      onStatusChange={handleStatusChange}
                       isDeleting={deletingId === app.application_id}
                       isUpdating={updatingStatusId === app.application_id}
                     />
@@ -494,6 +616,50 @@ export default function ApplicantsManage() {
           applicant={selectedApplicant}
           onClose={handleCloseModal}
         />
+      )}
+
+      {/* Remarks Modal */}
+      {remarksModal && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm'>
+          <div className='bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-black'>
+            <h3 className='text-lg font-bold text-gray-900 mb-1'>
+              Update Status to <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-sm font-semibold ${STATUS_COLORS[remarksModal.newStatus]}`}>{remarksModal.newStatus}</span>
+            </h3>
+            <p className='text-sm text-gray-500 mb-4'>Add optional remarks for the applicant. These will be visible on their application tracker.</p>
+            <textarea
+              value={remarksText}
+              onChange={(e) => setRemarksText(e.target.value)}
+              placeholder='e.g., Your application has been reviewed and approved. Please check your email for next steps...'
+              rows={5}
+              className='w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none'
+            />
+            {!remarksModal.currentRemarks && (
+              <button
+                onClick={() => setRemarksText(getRemarksTemplate(remarksModal.newStatus))}
+                className='text-xs text-blue-600 hover:text-blue-800 font-medium mb-3 flex items-center gap-1'
+              >
+                <Zap size={12} />
+                Use suggested template
+              </button>
+            )}
+            <div className='flex justify-end gap-3 mt-4'>
+              <button
+                onClick={() => { setRemarksModal(null); setRemarksText(''); }}
+                className='px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors'
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStatusChangeConfirm}
+                disabled={updatingStatusId === remarksModal.applicationId}
+                className='px-4 py-2 text-sm font-semibold text-white bg-yellow-500 rounded-lg hover:bg-yellow-600 transition-colors disabled:opacity-50 flex items-center gap-2'
+              >
+                {updatingStatusId === remarksModal.applicationId && <Loader2 className='w-4 h-4 animate-spin' />}
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
@@ -695,6 +861,12 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
               <InfoItem label='Application ID' value={applicant.application_id} />
               <InfoItem label='User ID' value={applicant.user_id} />
             </InfoCard>
+
+            {applicant.admin_remarks && (
+              <InfoCard title='Admin Remarks'>
+                <p className='text-sm text-gray-700 whitespace-pre-wrap'>{applicant.admin_remarks}</p>
+              </InfoCard>
+            )}
           </div>
           
           {/* Right Column (Content) */}
@@ -1096,11 +1268,15 @@ const ActionsMenu: FC<{
   applicant: Applicant;
   onView: (applicant: Applicant) => void;
   onDelete: (applicationId: string, applicantName: string | null) => void;
+  onStatusChange: (applicationId: string, newStatus: string) => void;
   isDeleting: boolean;
   isUpdating: boolean;
-}> = ({ applicant, onView, onDelete, isDeleting, isUpdating }) => {
+}> = ({ applicant, onView, onDelete, onStatusChange, isDeleting, isUpdating }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  
+  const completionPercentage = getCompletionPercentage(applicant);
+  const suggestedStatus = getSuggestedStatus(completionPercentage, applicant.status);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1125,7 +1301,7 @@ const ActionsMenu: FC<{
         <MoreHorizontal size={18} />
       </button>
       {isOpen && (
-  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border">
+  <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10 border">
 
     <button
       onClick={() => {
@@ -1137,6 +1313,31 @@ const ActionsMenu: FC<{
       <Eye size={16} />
       View Details
     </button>
+
+    {suggestedStatus && (
+      <>
+        <div className="border-t border-gray-100 my-1"></div>
+        <div className="px-3 py-1.5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
+            <Zap size={12} className="text-yellow-500" />
+            Quick Actions
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            onStatusChange(applicant.application_id, suggestedStatus);
+            setIsOpen(false);
+          }}
+          className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
+        >
+          <TrendingUp size={16} />
+          Move to {suggestedStatus}
+          <span className="text-xs text-gray-500">({Math.round(completionPercentage)}% complete)</span>
+        </button>
+      </>
+    )}
+
+    <div className="border-t border-gray-100 my-1"></div>
 
     <button
       onClick={() => {

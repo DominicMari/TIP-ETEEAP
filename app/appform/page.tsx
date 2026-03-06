@@ -62,7 +62,7 @@ function SuccessScreen({ onEdit }: { onEdit: () => void }) {
             <h1 className="text-3xl font-bold text-black mb-4">Application Submitted!</h1>
             <p className="text-gray-600 mb-8">Thank you for completing the form. We have received your application and will review it shortly.</p>
             
-            <div className="flex items-center gap-4 mt-4">
+            <div className="flex items-center gap-4 mt-4 flex-wrap justify-center">
                 <button
                     type="button"
                     onClick={onEdit}
@@ -70,6 +70,12 @@ function SuccessScreen({ onEdit }: { onEdit: () => void }) {
                 >
                     Make a New Application
                 </button>
+                <Link
+                    href="/tracker"
+                    className="bg-slate-700 text-white font-semibold py-2 px-6 rounded-lg hover:bg-slate-800 transition-colors"
+                >
+                    Track Application
+                </Link>
                 <Link
                     href="/" // Link to homepage
                     className="bg-yellow-500 text-white font-semibold py-2 px-6 rounded-lg hover:bg-yellow-600 transition-colors"

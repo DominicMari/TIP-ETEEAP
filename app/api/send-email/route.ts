@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { Resend } from 'resend';
 import { EmailTemplate } from '@/app/emails/template';
@@ -8,7 +8,8 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = 'admin@tipeteeap.online';
 
 export async function POST(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const cookieStore = await cookies();
+  const supabase = createSupabaseServerClient(cookieStore);
   const { recipient, subject, body } = await req.json();
 
   if (!recipient || !subject?.trim() || !body?.trim()) {

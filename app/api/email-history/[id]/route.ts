@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
 const TABLE = 'email_logs';
@@ -8,7 +8,8 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const cookieStore = await cookies();
+  const supabase = createSupabaseServerClient(cookieStore);
   const { id: idParam } = await params;
   const id = Number(idParam);
 

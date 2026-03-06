@@ -70,7 +70,8 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           recipient: email,
-          templateId: 1
+          subject: 'Application Received - TIP ETEEAP',
+          body: `Dear ${name || 'Applicant'},\n\nThank you for submitting your application to the TIP ETEEAP program. We have received your application and it is now in our system.\n\nPlease continue to complete any remaining sections of your application. Our team will begin reviewing your submission shortly.\n\nBest regards,\nTIP ETEEAP Team`
         }),
       });
     } catch (emailError) {

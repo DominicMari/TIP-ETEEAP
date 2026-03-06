@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
 const TABLE = 'email_logs';
@@ -11,7 +11,8 @@ function parsePagination(searchParams: URLSearchParams) {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const cookieStore = await cookies();
+  const supabase = createSupabaseServerClient(cookieStore);
   const { searchParams } = new URL(req.url);
 
   const status = searchParams.get('status');

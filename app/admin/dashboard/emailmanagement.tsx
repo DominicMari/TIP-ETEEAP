@@ -12,7 +12,7 @@ import {
 } from '@/lib/emailService';
 
 import dynamic from 'next/dynamic';
-import { CheckCircle, XCircle, ChevronLeft, AlertTriangle, Loader2, Mail, Plus, Edit2, Search, RefreshCw, FileText, History, Trash2, Eye, Send, X, Undo2, Clock, ArrowLeft, ArrowRight, Moon, Sun } from 'lucide-react';
+import { CheckCircle, XCircle, ChevronLeft, ChevronDown, AlertTriangle, Loader2, Mail, Plus, Edit2, Search, RefreshCw, FileText, History, Trash2, Eye, Send, X, Undo2, Clock, ArrowLeft, ArrowRight, Moon, Sun, Check, User } from 'lucide-react';
 import { FC, ReactNode } from "react";
 
 // Dynamically import ReactQuill to avoid SSR issues
@@ -334,6 +334,105 @@ const customStyles = `
   .ql-toolbar .ql-image {
     display: none !important;
   }
+
+  /* Custom Searchable Select Dropdown */
+  .custom-select-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px -8px rgba(0,0,0,0.12), 0 8px 16px -4px rgba(0,0,0,0.06);
+    overflow: hidden;
+    animation: dropdownSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes dropdownSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  .custom-select-search {
+    position: sticky;
+    top: 0;
+    background: white;
+    padding: 12px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .custom-select-search input {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 0.8125rem;
+    color: #111827;
+    background: #f9fafb;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .custom-select-search input:focus {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+    background: white;
+  }
+  .custom-select-search input::placeholder {
+    color: #9ca3af;
+  }
+  .custom-select-options {
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 6px;
+    scroll-behavior: smooth;
+  }
+  .custom-select-options::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-select-options::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-select-options::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 100px;
+  }
+  .custom-select-options::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+  .custom-select-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    font-size: 0.8125rem;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    position: relative;
+  }
+  .custom-select-option:hover {
+    background: #f9fafb;
+  }
+  .custom-select-option.selected {
+    background: #fffbeb;
+    color: #92400e;
+    font-weight: 600;
+  }
+  .custom-select-option.selected:hover {
+    background: #fef3c7;
+  }
+  .custom-select-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.8125rem;
+  }
 `;
 
 // --- TypeScript Interfaces and Types ---
@@ -451,6 +550,172 @@ const AlertBanner = ({ message, onDismiss }: { message: MessageState; onDismiss?
         <button onClick={onDismiss} className="text-current opacity-50 hover:opacity-100 transition-opacity">
           <X className="w-4 h-4" />
         </button>
+      )}
+    </div>
+  );
+};
+
+
+// --- Searchable Select Component ---
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+interface SearchableSelectProps {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  icon?: React.ReactNode;
+  showSearch?: boolean;
+  required?: boolean;
+}
+
+const SearchableSelect: React.FC<SearchableSelectProps> = ({
+  id,
+  value,
+  onChange,
+  options,
+  placeholder = 'Select an option...',
+  searchPlaceholder = 'Search...',
+  icon,
+  showSearch = true,
+  required = false,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedLabel = options.find(o => o.value === value)?.label;
+
+  const filteredOptions = searchQuery
+    ? options.filter(o => o.label.toLowerCase().includes(searchQuery.toLowerCase()))
+    : options;
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setSearchQuery('');
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  // Focus search on open
+  useEffect(() => {
+    if (isOpen && showSearch && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [isOpen, showSearch]);
+
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsOpen(false);
+      setSearchQuery('');
+    } else if (e.key === 'Enter' && !isOpen) {
+      e.preventDefault();
+      setIsOpen(true);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative" onKeyDown={handleKeyDown}>
+      {/* Hidden native select for form validation */}
+      {required && (
+        <select
+          tabIndex={-1}
+          value={value}
+          required
+          onChange={() => {}}
+          className="absolute opacity-0 w-0 h-0 pointer-events-none"
+          aria-hidden="true"
+        >
+          <option value=""></option>
+          {value && <option value={value}>{value}</option>}
+        </select>
+      )}
+
+      {/* Trigger Button */}
+      <button
+        id={id}
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center w-full px-4 py-2.5 border rounded-xl shadow-sm text-sm transition-all text-left gap-2 ${
+          isOpen
+            ? 'border-yellow-400 ring-2 ring-yellow-400/50 bg-white'
+            : 'border-gray-200 bg-gray-50/50 hover:border-gray-300 hover:bg-white'
+        }`}
+      >
+        {icon && <span className="flex-shrink-0 text-gray-400">{icon}</span>}
+        <span className={`flex-1 truncate ${value ? 'text-gray-900' : 'text-gray-400'}`}>
+          {selectedLabel || placeholder}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* Dropdown */}
+      {isOpen && (
+        <div className="custom-select-dropdown">
+          {showSearch && (
+            <div className="custom-select-search">
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+          )}
+          <div className="custom-select-options">
+            {filteredOptions.length === 0 ? (
+              <div className="custom-select-empty">
+                <Search className="w-5 h-5 mx-auto mb-2 text-gray-300" />
+                <p>No results found</p>
+              </div>
+            ) : (
+              filteredOptions.map((option) => (
+                <div
+                  key={option.value}
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                    setSearchQuery('');
+                  }}
+                  className={`custom-select-option ${option.value === value ? 'selected' : ''}`}
+                >
+                  {icon && (
+                    <span className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
+                      option.value === value
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {option.label.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="flex-1 truncate">{option.label}</span>
+                  {option.value === value && (
+                    <Check className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -966,16 +1231,17 @@ const EmailManagement = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label htmlFor="recipient" className="block text-sm font-semibold text-gray-700 mb-1.5">Recipient</label>
-                <select
+                <SearchableSelect
                   id="recipient"
                   value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  className="block w-full px-4 py-2.5 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400 text-sm text-gray-900 bg-gray-50/50 transition-all"
+                  onChange={setRecipient}
+                  options={users.map(user => ({ value: user.email, label: user.email }))}
+                  placeholder="Select a user..."
+                  searchPlaceholder="Search by email..."
+                  icon={<Mail className="w-4 h-4" />}
+                  showSearch={true}
                   required
-                >
-                  <option value="" disabled>Select a user...</option>
-                  {users.map(user => <option key={user.id} value={user.email}>{user.email}</option>)}
-                </select>
+                />
               </div>
               <div>
                 <label htmlFor="subject" className="block text-sm font-semibold text-gray-700 mb-1.5">Subject</label>
@@ -1002,15 +1268,16 @@ const EmailManagement = () => {
             <div>
               <label htmlFor="template" className="block text-sm font-semibold text-gray-700 mb-1.5">Quick Template</label>
               <div className="flex gap-2">
-                <select
+                <SearchableSelect
                   id="template"
                   value={selectedTemplateId}
-                  onChange={(e) => setSelectedTemplateId(e.target.value)}
-                  className="block w-full px-4 py-2.5 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 focus:border-yellow-400 text-sm text-gray-900 bg-gray-50/50 transition-all"
-                >
-                  <option value="" disabled>Select a template to apply...</option>
-                  {templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
-                </select>
+                  onChange={setSelectedTemplateId}
+                  options={templates.map(t => ({ value: String(t.id), label: t.name }))}
+                  placeholder="Select a template to apply..."
+                  searchPlaceholder="Search templates..."
+                  icon={<FileText className="w-4 h-4" />}
+                  showSearch={templates.length > 5}
+                />
                 <button
                   type="button"
                   onClick={handleApplyTemplate}

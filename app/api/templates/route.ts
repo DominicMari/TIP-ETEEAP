@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
 const TABLE = 'email_templates';
@@ -11,7 +11,8 @@ function parsePagination(searchParams: URLSearchParams) {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const cookieStore = await cookies();
+  const supabase = createSupabaseServerClient(cookieStore);
   const { searchParams } = new URL(req.url);
 
   const search = searchParams.get('search') || '';
@@ -41,7 +42,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const cookieStore = await cookies();
+  const supabase = createSupabaseServerClient(cookieStore);
 
   try {
     const { name, subject, content } = await req.json();
@@ -71,7 +73,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const cookieStore = await cookies();
+  const supabase = createSupabaseServerClient(cookieStore);
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
 
@@ -117,7 +120,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const cookieStore = await cookies();
+  const supabase = createSupabaseServerClient(cookieStore);
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
 
