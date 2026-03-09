@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Minus, Lightbulb, Sparkles } from "lucide-react";
-import { getRecommendedDegree } from "@/utils/recommendationEngine"; // Ensure this matches your file path
+import { getRecommendedDegree, getInputGuidance } from "@/utils/recommendationEngine";
 
 export default function PrioritiesGoalsForm({
   formData, // This prop IS the 'goals' object: { degrees: [...], statement: "..." }
@@ -16,24 +16,25 @@ export default function PrioritiesGoalsForm({
   prevStep: () => void;
 }) {
   
-  // 🔽🔽🔽 --- NEW: RECOMMENDATION LOGIC --- 🔽🔽🔽
+  // 🔽🔽🔽 --- RECOMMENDATION LOGIC --- 🔽🔽🔽
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [showRecommendations, setShowRecommendations] = useState(false);
+  const [guidance, setGuidance] = useState<{ message: string; suggestions: string[] } | null>(null);
 
   const handleGetRecommendation = () => {
-    // 1. Get the text from the statement field
     const textToAnalyze = formData.statement || "";
 
-    // 2. Simple validation to ensure they typed something
-    if (textToAnalyze.length < 10) {
-      alert("Please write a short statement of your goals in the box below first, then click this button again!");
+    // Check if input is ready for analysis
+    const check = getInputGuidance(textToAnalyze);
+    if (!check.isReady) {
+      setGuidance({ message: check.message, suggestions: check.suggestions });
+      setRecommendations([]);
+      setShowRecommendations(true);
       return;
     }
 
-    // 3. Run the algorithm (Using the statement as the 'skills' input)
-    // We pass "Student" as job title, and the statement text as both skills and duties to maximize keyword hits
+    setGuidance(null);
     const results = getRecommendedDegree("Student", textToAnalyze, textToAnalyze);
-    
     setRecommendations(results);
     setShowRecommendations(true);
   };
@@ -111,35 +112,63 @@ export default function PrioritiesGoalsForm({
             {/* Results Area */}
             {showRecommendations && (
                 <div className="mt-5 pt-4 border-t border-blue-200 animate-in fade-in slide-in-from-top-2">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-                        Based on your goals, we recommend:
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        {recommendations.map((rec, index) => (
-                            <div 
-                                key={rec.id} 
-                                className={`p-3 rounded-lg border flex justify-between items-center transition-all ${
-                                    index === 0 
-                                    ? 'bg-white border-blue-400 ring-2 ring-blue-100 shadow-sm' 
-                                    : 'bg-white/60 border-gray-200'
-                                }`}
-                            >
-                                <div>
-                                    {index === 0 && <span className="text-[10px] font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full mb-1 inline-block">BEST MATCH</span>}
-                                    <div className="text-sm font-bold text-gray-800 leading-tight">{rec.name}</div>
-                                </div>
-                                <div className="text-right pl-2">
-                                    <span className="block text-lg font-bold text-blue-600">{rec.score}</span>
-                                    <span className="text-[10px] text-gray-500">matches</span>
-                                </div>
-                            </div>
-                        ))}
-                        {recommendations.length === 0 && (
-                            <p className="text-sm text-gray-500 italic col-span-2">
-                                No specific keywords found. Try adding words like "computer", "business", or "teaching" to your statement below!
+                    {/* Guidance mode: help the applicant write better input */}
+                    {guidance ? (
+                        <div className="space-y-3">
+                            <p className="text-sm font-semibold text-amber-800">
+                                {guidance.message}
                             </p>
-                        )}
-                    </div>
+                            <ul className="space-y-2">
+                                {guidance.suggestions.map((tip, i) => (
+                                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                                        <span className="text-amber-500 mt-0.5">💡</span>
+                                        <span>{tip}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : (
+                        <>
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                                Based on your goals, we recommend:
+                            </p>
+                            <div className="grid gap-3 sm:grid-cols-1">
+                                {recommendations.map((rec, index) => (
+                                    <div 
+                                        key={rec.id} 
+                                        className={`p-4 rounded-lg border transition-all ${
+                                            index === 0 
+                                            ? 'bg-white border-blue-400 ring-2 ring-blue-100 shadow-sm' 
+                                            : 'bg-white/60 border-gray-200'
+                                        }`}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                {index === 0 && <span className="text-[10px] font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full mb-1 inline-block">BEST MATCH</span>}
+                                                <div className="text-sm font-bold text-gray-800 leading-tight">{rec.name}</div>
+                                            </div>
+                                            <span className="text-sm font-bold text-blue-600 whitespace-nowrap ml-2">{rec.confidence}%</span>
+                                        </div>
+                                        {rec.reasons && rec.reasons.length > 0 && (
+                                            <ul className="mt-2 space-y-1">
+                                                {rec.reasons.map((reason: string, ri: number) => (
+                                                    <li key={ri} className="text-xs text-gray-600 flex items-start gap-1.5">
+                                                        <span className="text-blue-400 mt-0.5">•</span>
+                                                        <span>{reason}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                ))}
+                                {recommendations.length === 0 && (
+                                    <p className="text-sm text-gray-500 italic">
+                                        We couldn&apos;t find a strong match. Try being more specific about your work experience, skills, or career goals.
+                                    </p>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
         </div>
