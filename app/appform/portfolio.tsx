@@ -99,7 +99,7 @@ export default function PortfolioForm({
 
   return (
     <form
-      className="bg-white shadow-lg rounded-2xl w-full max-w-3xl flex flex-col"
+      className="bg-white shadow-lg rounded-2xl w-7xl max-w flex flex-col"
       onSubmit={(e) => e.preventDefault()}
     >
       <div className="p-6 border-b text-center">

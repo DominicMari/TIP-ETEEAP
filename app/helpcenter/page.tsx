@@ -18,16 +18,58 @@ export default function Page() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert("Ticket submitted successfully!");
-    setFormData({
-      name: "",
-      email: "",
-      category: "",
-      message: "",
+  // const handleSubmit = (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   alert("Ticket submitted successfully!");
+  //   setFormData({
+  //     name: "",
+  //     email: "",
+  //     category: "",
+  //     message: "",
+  //   });
+  // };
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipient: "qjcnjimenez@tip.edu.ph",
+        subject: `New Support Ticket from ${formData.name}`,
+        body: `
+          Name: ${formData.name}
+          Email: ${formData.email}
+          Category: ${formData.category}
+          Message: ${formData.message}
+        `,
+      }),
     });
-  };
+
+    // Read response as text first
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text); // try parsing JSON
+    } catch {
+      console.error("Response is not JSON:", text);
+      alert("Server error: response is not JSON");
+      return;
+    }
+
+    if (res.ok) {
+      alert("Ticket submitted successfully!");
+      setFormData({ name: "", email: "", category: "", message: "" });
+    } else {
+      alert(`Failed to send ticket: ${data?.error || "Unknown error"}`);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("An error occurred while submitting your ticket.");
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
@@ -75,7 +117,7 @@ export default function Page() {
             Submit a Support Ticket
           </h2>
 
-          <div className="bg-white p-8 rounded-2xl shadow-lg max-w-3xl mx-auto">
+          <div className="bg-white p-8 rounded-2xl shadow-lg max-w mx-auto">
             <form onSubmit={handleSubmit} className="space-y-6">
 
               <div>

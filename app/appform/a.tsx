@@ -1,42 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Camera } from "lucide-react";
 
 export default function InitialForm({
-  formData, // This is NOW formData.initial, e.g., { name: "...", degree: "..." }
-  setFormData, // This is NOW handleInitialChange
+  formData,
+  setFormData,
   nextStep,
 }: {
   formData: any;
   setFormData: Function;
   nextStep: () => void;
 }) {
-  // 🔽🔽🔽 --- FIX #1: Read from formData.photo --- 🔽🔽🔽
+  const formRef = useRef<HTMLFormElement>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     formData.photo ? URL.createObjectURL(formData.photo) : null
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // 🔽🔽🔽 --- FIX #2: Update handleChange --- 🔽🔽🔽
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    // Call setFormData (which is handleInitialChange) with the new object for the 'initial' slice
     setFormData({
       ...formData,
       [name]: value,
     });
-    // Clear error on change
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  // 🔽🔽🔽 --- FIX #3: Update handlePhotoUpload --- 🔽🔽🔽
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+      if (file.size > 2 * 1024 * 1024) {
         setErrors((prev) => ({
           ...prev,
           photo: "Image size must be less than 2MB.",
@@ -45,7 +41,6 @@ export default function InitialForm({
       }
 
       setPhotoPreview(URL.createObjectURL(file));
-      // Update the 'initial' slice with the new file
       setFormData({
         ...formData,
         photo: file,
@@ -54,11 +49,9 @@ export default function InitialForm({
     }
   };
 
-  // 🔽🔽🔽 --- FIX #4: Update validateAndProceed --- 🔽🔽🔽
   const validateAndProceed = () => {
     const newErrors: Record<string, string> = {};
-    
-    // Destructure keys from formData (which is formData.initial)
+
     const { name, degree, campus, folderLink, photo } = formData;
 
     if (!name?.trim()) newErrors.name = "Name is required.";
@@ -70,7 +63,7 @@ export default function InitialForm({
       newErrors.folderLink = "Folder link is required.";
     } else {
       try {
-        new URL(folderLink); // Simple check for valid URL format
+        new URL(folderLink);
       } catch {
         newErrors.folderLink = "Invalid URL format.";
       }
@@ -80,19 +73,22 @@ export default function InitialForm({
 
     if (Object.keys(newErrors).length === 0) {
       nextStep();
+    } else {
+      setTimeout(() => formRef.current?.reportValidity(), 0);
     }
   };
 
   return (
     <form
-      className="bg-white shadow-lg rounded-2xl w-full max-w-3xl p-6"
-      onSubmit={(e) => e.preventDefault()}
+      ref={formRef}
+      noValidate
+      className="bg-white shadow-lg rounded-2xl w-7xl max-w p-6 ml-70 mr-70"
+      onSubmit={(e) => { e.preventDefault(); validateAndProceed(); }}
     >
       <h2 className="text-center font-bold text-xl mb-4 text-black">
         APPLICATION FORM AND PRELIMINARY ASSESSMENT FORM
       </h2>
 
-      {/* 🔽🔽🔽 --- FIX #5: Update JSX props (name, value, errors) --- 🔽🔽🔽 */}
       <div className="grid grid-cols-3 gap-4 items-start mb-4">
         <div className="col-span-2">
           {/* Name */}
@@ -101,6 +97,7 @@ export default function InitialForm({
               Name of the Applicant: <span className="text-red-500">*</span>
             </label>
             <input
+              required
               type="text"
               name="name"
               value={formData.name || ""}
@@ -109,9 +106,7 @@ export default function InitialForm({
                 errors.name ? "border-red-500" : "border-gray-400"
               }`}
             />
-            {errors.name && (
-              <p className="text-red-500 text-sm mt-1">{errors.name}</p>
-            )}
+
           </div>
 
           {/* Degree */}
@@ -121,6 +116,7 @@ export default function InitialForm({
                 Degree Applied For: <span className="text-red-500">*</span>
               </label>
               <select
+                required
                 name="degree"
                 value={formData.degree || ""}
                 onChange={handleChange}
@@ -130,29 +126,21 @@ export default function InitialForm({
               >
                 <option value="">Select degree</option>
                 <option value="BSCS">BSCS (Computer Science)</option>
-                
-                {/* --- Here are the new options --- */}
                 <option value="BSIS">BSIS (Information Systems)</option>
                 <option value="BSIT">BSIT (Information Technology)</option>
                 <option value="BSCpE">BSCpE (Computer Engineering)</option>
                 <option value="BSIE">BSIE (Industrial Engineering)</option>
-
-                {/* Using optgroup to match the grouping in your image */}
                 <optgroup label="Bachelor of Science in Business Administration">
                   <option value="BSBA-LSCM">BSBA (Logistics and Supply Chain Management)</option>
                   <option value="BSBA-FM">BSBA (Financial Management)</option>
                   <option value="BSBA-HRM">BSBA (Human Resources Management)</option>
                   <option value="BSBA-MM">BSBA (Marketing Management)</option>
                 </optgroup>
-                {/* --- End of new options --- */}
-
               </select>
-              {errors.degree && (
-                <p className="text-red-500 text-sm mt-1">{errors.degree}</p>
-              )}
+
             </div>
           </div>
-        </div> 
+        </div>
 
         {/* Photo */}
         <div className="flex flex-col items-center justify-center">
@@ -179,10 +167,8 @@ export default function InitialForm({
             onChange={handlePhotoUpload}
             className="hidden"
           />
-          <p className="text-sm mt-2 text-black">Add Photo</p>
-          {errors.photo && (
-            <p className="text-red-500 text-sm mt-1">{errors.photo}</p>
-          )}
+          <p className="text-sm mt-2 text-black">Add Photo <span className="text-red-500">*</span></p>
+
         </div>
       </div>
 
@@ -192,6 +178,7 @@ export default function InitialForm({
           Campus: <span className="text-red-500">*</span>
         </label>
         <select
+          required
           name="campus"
           value={formData.campus || ""}
           onChange={handleChange}
@@ -203,9 +190,7 @@ export default function InitialForm({
           <option value="QC">Quezon City</option>
           <option value="Manila">Manila</option>
         </select>
-        {errors.campus && (
-          <p className="text-red-500 text-sm mt-1">{errors.campus}</p>
-        )}
+
       </div>
 
       {/* Folder Link */}
@@ -214,6 +199,7 @@ export default function InitialForm({
           Folder Link (e.g., Google Drive): <span className="text-red-500">*</span>
         </label>
         <input
+          required
           type="url"
           name="folderLink"
           value={formData.folderLink || ""}
@@ -222,14 +208,11 @@ export default function InitialForm({
             errors.folderLink ? "border-red-500" : "border-gray-400"
           }`}
         />
-        {errors.folderLink && (
-          <p className="text-red-500 text-sm mt-1">{errors.folderLink}</p>
-        )}
+
       </div>
 
       <button
-        type="button"
-        onClick={validateAndProceed}
+        type="submit"
         className="w-full bg-yellow-500 text-white font-semibold py-2 rounded-lg hover:bg-yellow-600"
       >
         Proceed →

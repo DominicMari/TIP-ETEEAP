@@ -99,8 +99,8 @@ export default function CreativeWorksForm({
       : [{ title: "", institution: "", startDate: "", endDate: "" }];
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-gray-100 p-6">
-      <form className="bg-white shadow-lg rounded-2xl w-full max-w-3xl flex flex-col">
+    <div className=" flex justify-center items-center bg-gray-100 p-6">
+      <form className="bg-white shadow-lg rounded-2xl w-7xl max-w flex flex-col">
         <h2 className="text-center font-bold text-xl mt-4 mb-2 text-black">
           APPLICATION FORM AND PRELIMINARY ASSESSMENT FORM
         </h2>

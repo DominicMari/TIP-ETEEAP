@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export default function PersonalInformationForm({
   formData,
@@ -14,6 +14,7 @@ export default function PersonalInformationForm({
   prevStep: () => void;
 }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const formRef = useRef<HTMLFormElement>(null);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -100,14 +101,18 @@ export default function PersonalInformationForm({
 
     if (Object.keys(newErrors).length === 0) {
       nextStep();
+    } else {
+      setTimeout(() => formRef.current?.reportValidity(), 0);
     }
   };
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-gray-100 p-6">
+    <div className="flex justify-center items-center bg-gray-100 p-6">
       <form
-        className="bg-white shadow-lg rounded-2xl w-full max-w-3xl flex flex-col"
-        onSubmit={(e) => e.preventDefault()}
+        ref={formRef}
+        noValidate
+        className="bg-white shadow-lg rounded-2xl  w-7xl max-w flex flex-col"
+        onSubmit={(e) => { e.preventDefault(); validateAndProceed(); }}
       >
         <h2 className="text-center font-bold text-xl mt-4 mb-2 text-black">
           PERSONAL INFORMATION
@@ -146,8 +151,9 @@ export default function PersonalInformationForm({
           {/* Personal Details */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-semibold text-black">Full Name:</label>
+              <label className="text-sm font-semibold text-black">Full Name: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="name"
                 value={formData.name || ""}
                 onChange={handleChange}
@@ -155,12 +161,13 @@ export default function PersonalInformationForm({
                   errors.name ? "border-red-500" : "border-gray-400"
                 }`}
               />
-              {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Birthplace:</label>
+              <label className="text-sm font-semibold text-black">Birthplace: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="birthplace"
                 value={formData.birthplace || ""}
                 onChange={handleChange}
@@ -168,12 +175,13 @@ export default function PersonalInformationForm({
                   errors.birthplace ? "border-red-500" : "border-gray-400"
                 }`}
               />
-              {errors.birthplace && <p className="text-red-500 text-sm mt-1">{errors.birthplace}</p>}
+
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Birthday:</label>
+              <label className="text-sm font-semibold text-black">Birthday: <span className="text-red-500">*</span></label>
               <input
+                required
                 type="date"
                 name="birthday"
                 value={formData.birthday || ""}
@@ -185,8 +193,9 @@ export default function PersonalInformationForm({
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Age:</label>
+              <label className="text-sm font-semibold text-black">Age: <span className="text-red-500">*</span></label>
               <input
+                required
                 type="number"
                 name="age"
                 value={formData.age || ""}
@@ -198,8 +207,9 @@ export default function PersonalInformationForm({
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Gender:</label>
+              <label className="text-sm font-semibold text-black">Gender: <span className="text-red-500">*</span></label>
               <select
+                required
                 name="gender"
                 value={formData.gender || ""}
                 onChange={handleChange}
@@ -215,26 +225,22 @@ export default function PersonalInformationForm({
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Civil Status:</label>
-              <select
+              <label className="text-sm font-semibold text-black">Civil Status: <span className="text-red-500">*</span></label>
+              <input
+                required
                 name="civilStatus"
                 value={formData.civilStatus || ""}
                 onChange={handleChange}
                 className={`w-full border rounded-lg px-3 py-2 text-black ${
                   errors.civilStatus ? "border-red-500" : "border-gray-400"
                 }`}
-              >
-                <option value="">Select civil status</option>
-                <option value="Single">Single</option>
-                <option value="Married">Married</option>
-                <option value="Widowed">Widowed</option>
-                <option value="Separated">Separated</option>
-              </select>
+              />
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Nationality:</label>
+              <label className="text-sm font-semibold text-black">Nationality: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="nationality"
                 value={formData.nationality || ""}
                 onChange={handleChange}
@@ -245,8 +251,9 @@ export default function PersonalInformationForm({
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Religion:</label>
+              <label className="text-sm font-semibold text-black">Religion: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="religion"
                 value={formData.religion || ""}
                 onChange={handleChange}
@@ -257,8 +264,9 @@ export default function PersonalInformationForm({
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">City Address:</label>
+              <label className="text-sm font-semibold text-black">City Address: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="cityAddress"
                 value={formData.cityAddress || ""}
                 onChange={handleChange}
@@ -269,8 +277,9 @@ export default function PersonalInformationForm({
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Permanent Address:</label>
+              <label className="text-sm font-semibold text-black">Permanent Address: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="permanentAddress"
                 value={formData.permanentAddress || ""}
                 onChange={handleChange}
@@ -281,8 +290,9 @@ export default function PersonalInformationForm({
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Email:</label>
+              <label className="text-sm font-semibold text-black">Email: <span className="text-red-500">*</span></label>
               <input
+                required
                 type="email"
                 name="email"
                 value={formData.email || ""}
@@ -291,11 +301,13 @@ export default function PersonalInformationForm({
                   errors.email ? "border-red-500" : "border-gray-400"
                 }`}
               />
+
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Mobile:</label>
+              <label className="text-sm font-semibold text-black">Mobile: <span className="text-red-500">*</span></label>
               <input
+                required
                 type="tel"
                 name="mobile"
                 value={formData.mobile || ""}
@@ -304,11 +316,13 @@ export default function PersonalInformationForm({
                   errors.mobile ? "border-red-500" : "border-gray-400"
                 }`}
               />
+
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-black">Language Spoken:</label>
+              <label className="text-sm font-semibold text-black">Language Spoken: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="language"
                 value={formData.language || ""}
                 onChange={handleChange}
@@ -326,8 +340,9 @@ export default function PersonalInformationForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-semibold text-black">Contact Person Name:</label>
+              <label className="text-sm font-semibold text-black">Contact Person Name: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="emergencyContactName"
                 value={formData.emergencyContactName || ""}
                 onChange={handleChange}
@@ -337,8 +352,9 @@ export default function PersonalInformationForm({
               />
             </div>
             <div>
-              <label className="text-sm font-semibold text-black">Relationship:</label>
+              <label className="text-sm font-semibold text-black">Relationship: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="emergencyRelationship"
                 value={formData.emergencyRelationship || ""}
                 onChange={handleChange}
@@ -348,8 +364,9 @@ export default function PersonalInformationForm({
               />
             </div>
             <div>
-              <label className="text-sm font-semibold text-black">Address:</label>
+              <label className="text-sm font-semibold text-black">Address: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="emergencyAddress"
                 value={formData.emergencyAddress || ""}
                 onChange={handleChange}
@@ -359,8 +376,9 @@ export default function PersonalInformationForm({
               />
             </div>
             <div>
-              <label className="text-sm font-semibold text-black">Contact Number:</label>
+              <label className="text-sm font-semibold text-black">Contact Number: <span className="text-red-500">*</span></label>
               <input
+                required
                 name="emergencyContactNumber"
                 value={formData.emergencyContactNumber || ""}
                 onChange={handleChange}
@@ -368,6 +386,7 @@ export default function PersonalInformationForm({
                   errors.emergencyContactNumber ? "border-red-500" : "border-gray-400"
                 }`}
               />
+
             </div>
           </div>
         </div>
@@ -382,8 +401,7 @@ export default function PersonalInformationForm({
             ← Back
           </button>
           <button
-            type="button"
-            onClick={validateAndProceed}
+            type="submit"
             className="bg-yellow-500 text-white font-semibold py-2 px-6 rounded-lg"
           >
             Next →

@@ -2294,7 +2294,7 @@ export default function BackgroundAchievementsForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto bg-white rounded-xl shadow-md flex flex-col h-full">
+    <form onSubmit={handleSubmit} className="w-7xl max-w mx-auto bg-white rounded-xl shadow-md flex flex-col h-full">
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto mb-2 max-h-[60vh] px-6 pt-2 pb-4 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
         {submitError && (

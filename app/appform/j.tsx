@@ -41,7 +41,7 @@ export default function LifelongLearningForm({
   return (
     <form
       onSubmit={handleNext}
-      className="bg-white shadow-lg rounded-2xl w-full max-w-3xl flex flex-col"
+      className="bg-white shadow-lg rounded-2xl w-7xl max-w flex flex-col"
     >
       <h2 className="text-center font-bold text-xl mt-4 mb-2 text-black">
         APPLICATION FORM AND PRELIMINARY ASSESSMENT FORM
