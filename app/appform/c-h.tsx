@@ -239,7 +239,13 @@ export default function PrioritiesGoalsForm({
                                                 {index === 0 && <span className="text-[10px] font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full mb-1 inline-block">BEST MATCH</span>}
                                                 <div className="text-sm font-bold text-gray-800 leading-tight">{rec.name}</div>
                                             </div>
-                                            <span className="text-sm font-bold text-yellow-600 whitespace-nowrap ml-2">{rec.confidence}%</span>
+                                            <span className={`text-xs font-bold whitespace-nowrap ml-2 px-2 py-0.5 rounded-full ${
+                                              rec.matchLabel === 'Strong Match' ? 'bg-green-100 text-green-700' :
+                                              rec.matchLabel === 'Good Match'   ? 'bg-yellow-100 text-yellow-700' :
+                                                                                  'bg-gray-100 text-gray-500'
+                                            }`}>
+                                              {rec.matchLabel ?? 'Possible Match'}
+                                            </span>
                                         </div>
                                         {rec.reasons && rec.reasons.length > 0 && (
                                             <ul className="mt-2 space-y-1">

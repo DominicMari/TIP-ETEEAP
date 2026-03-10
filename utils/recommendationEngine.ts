@@ -24,6 +24,7 @@ interface PredictionResult {
   name: string;
   score: number;
   confidence: number;
+  matchLabel: 'Strong Match' | 'Good Match' | 'Possible Match'; // ← add this
   reasons: string[];
 }
 
@@ -329,9 +330,19 @@ function generateReasons(input: ApplicantInput, degreeId: DegreeId): string[] {
   }
 
   // Build human-readable reasons from matches
+  const fieldSentences: Record<string, (kws: string[]) => string> = {
+    'skills':                 (kws) => `You have hands-on skills in ${kws.join(', ')}, which are core to this program.`,
+    'duties':                 (kws) => `Your work responsibilities — like ${kws.join(' and ')} — closely align with this field.`,
+    'job title':              (kws) => `Your job title reflects relevant experience in ${kws.join(', ')}.`,
+    'industry':               (kws) => `Your industry background in ${kws.join(', ')} is a strong match.`,
+    'educational background': (kws) => `Your educational background includes relevant exposure to ${kws.join(', ')}.`,
+    'certifications':         (kws) => `Your certifications demonstrate expertise in ${kws.join(', ')}.`,
+    'recognition':            (kws) => `Your recognition highlights performance in areas related to ${kws.join(', ')}.`,
+  };
+
   for (const [fieldName, matched] of Object.entries(fieldMatches)) {
-    const kwList = matched.map(k => `"${k}"`).join(', ');
-    reasons.push(`Your ${fieldName} mentions ${kwList}`);
+    const formatter = fieldSentences[fieldName];
+    if (formatter) reasons.push(formatter(matched));
   }
 
   // Add a focus summary if we have reasons
@@ -759,14 +770,26 @@ function predictWithReasons(input: ApplicantInput): PredictionResult[] {
   const votes = model.predict(extractFeatures(input));
   const totalVotes = Object.values(votes).reduce((s, v) => s + v, 0) || 1;
 
-  const results: PredictionResult[] = Object.entries(votes).map(([id, count]) => ({
+const CONFIDENCE_THRESHOLD = 10; // Minimum % to be shown at all
+
+function getMatchLabel(confidence: number): PredictionResult['matchLabel'] {
+  if (confidence >= 40) return 'Strong Match';
+  if (confidence >= 20) return 'Good Match';
+  return 'Possible Match';
+}
+
+const results: PredictionResult[] = Object.entries(votes).map(([id, count]) => {
+  const confidence = Math.round((count / totalVotes) * 100);
+  return {
     id,
     name: DEGREE_NAMES[id as DegreeId] || id,
     score: count,
-    confidence: Math.round((count / totalVotes) * 100),
+    confidence,
+    matchLabel: getMatchLabel(confidence),
     reasons: generateReasons(input, id as DegreeId),
-  }));
+  };
+});
 
-  results.sort((a, b) => b.score - a.score);
-  return results.filter(r => r.score > 0).slice(0, 3);
+results.sort((a, b) => b.score - a.score);
+return results.filter(r => r.confidence >= CONFIDENCE_THRESHOLD).slice(0, 3);
 }
