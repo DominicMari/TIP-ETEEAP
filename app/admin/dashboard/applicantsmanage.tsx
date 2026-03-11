@@ -922,7 +922,7 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
   , document.body);
 };
 
-// --- 🔽 NEW: Helper Components for Modal ---
+// ---  NEW: Helper Components for Modal ---
 
 // Simple Card for left sidebar
 const InfoCard: FC<{ title: string; children: ReactNode }> = ({ title, children }) => (
@@ -947,7 +947,7 @@ const InfoItem: FC<{ label: string; value?: ReactNode; children?: ReactNode }> =
   </div>
 );
 
-// --- 🔽 NEW: Specific Renderers for Readability ---
+// ---  NEW: Specific Renderers for Readability ---
 
 // Renders Goal Statement
 const GoalStatement: FC<{ data: any }> = ({ data }) => {
