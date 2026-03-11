@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import {
   Loader2, Users, CheckCircle, Clock, XCircle, LogIn, ShieldUser,
-  GraduationCap, Calendar, BarChart3, AlertCircle,
+  GraduationCap, Calendar, BarChart3, AlertCircle, Search, X,
 } from "lucide-react";
 
 // --- Type Definitions ---
@@ -17,6 +17,8 @@ interface PortfolioSubmission {
   created_at: string;
   status: string;
   degree_program: string;
+  full_name?: string | null;
+  campus?: string | null;
 }
 
 interface Applicant {
@@ -25,10 +27,25 @@ interface Applicant {
   degree_applied_for: string | null;
   campus: string | null;
   status: string | null;
+  applicant_name?: string | null;
   user_id?: string;
 }
 
 type CampusMetric = "total" | "approved" | "pending" | "declined";
+
+type SearchResultItem = {
+  id: string;
+  formType: "Application" | "Portfolio";
+  name: string;
+  status: string;
+  program: string;
+  campus: string;
+  createdAt: string;
+  score: number;
+};
+
+type SearchViewMode = "selected" | "all";
+type SearchStatusFilter = "All" | "Submitted" | "Pending" | "Approved" | "Declined";
 
 // --- Constants ---
 const STATUS_COLORS: Record<string, string> = {
@@ -85,6 +102,28 @@ const normalizeCampus = (campus: string | null | undefined): "Manila" | "Quezon 
   return null;
 };
 
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const createWildcardRegex = (input: string): RegExp | null => {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const wildcardPattern = trimmed
+    .split("")
+    .map((char) => {
+      if (char === "*") return ".*";
+      if (char === "?") return ".";
+      return escapeRegex(char);
+    })
+    .join("");
+
+  try {
+    return new RegExp(wildcardPattern, "i");
+  } catch {
+    return null;
+  }
+};
+
 // --- Reusable Components ---
 const StatCard: FC<{ title: string; value: string | number; icon: ReactNode }> = ({
   title, value, icon,
@@ -101,7 +140,11 @@ const StatCard: FC<{ title: string; value: string | number; icon: ReactNode }> =
 );
 
 // --- Main Dashboard Component ---
-export default function DashboardHome() {
+export default function DashboardHome({
+  onNavigateToRecord,
+}: {
+  onNavigateToRecord?: (target: { formType: "Application" | "Portfolio"; id: string }) => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allApplicants, setAllApplicants] = useState<Applicant[]>([]);
@@ -112,6 +155,19 @@ export default function DashboardHome() {
   const [dataType, setDataType] = useState<"applicants" | "portfolios">("applicants");
   const [selectedChart, setSelectedChart] = useState<"volume" | "status" | "programs" | "campus">("volume");
   const [campusMetric, setCampusMetric] = useState<CampusMetric>("total");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchViewMode, setSearchViewMode] = useState<SearchViewMode>("selected");
+  const [searchStatusFilter, setSearchStatusFilter] = useState<SearchStatusFilter>("All");
+  const [visibleSearchCount, setVisibleSearchCount] = useState(3);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [selectedResult, setSelectedResult] = useState<SearchResultItem | null>(null);
+  const [selectedResultDetails, setSelectedResultDetails] = useState<Record<string, any> | null>(null);
+
+  useEffect(() => {
+    setVisibleSearchCount(3);
+  }, [searchTerm, dataType, searchViewMode, searchStatusFilter]);
 
   // Fetch all necessary data on mount
   useEffect(() => {
@@ -129,10 +185,10 @@ export default function DashboardHome() {
         ] = await Promise.all([
           supabase
             .from("applications")
-            .select("application_id, created_at, status, degree_applied_for, campus"),
+            .select("application_id, applicant_name, created_at, status, degree_applied_for, campus"),
           supabase
             .from("portfolio_submissions")
-            .select("id, created_at, status, degree_program"),
+            .select("id, created_at, status, degree_program, full_name, campus"),
           supabase
             .from("user_login_history")
             .select("email, user_id"),
@@ -300,6 +356,180 @@ export default function DashboardHome() {
     if (!campusComparisonData.length) return null as { name: string; count: number } | null;
     return campusComparisonData[0];
   }, [campusComparisonData]);
+
+  const allSearchResults = useMemo(() => {
+    const effectiveSearchTerm = searchTerm.trim() ? searchTerm : "*";
+    const wildcard = createWildcardRegex(effectiveSearchTerm);
+    const normalizedTerm = effectiveSearchTerm.trim().toLowerCase();
+    if (!wildcard && !normalizedTerm) return [] as SearchResultItem[];
+
+    const portfolioItems = allPortfolioSubmissions.map((portfolio): SearchResultItem => {
+        const name = portfolio.full_name?.trim() || "Unnamed Applicant";
+        const status = portfolio.status || "Submitted";
+        const program = portfolio.degree_program || "N/A";
+        const campus = portfolio.campus || "N/A";
+        const id = String(portfolio.id);
+      const formType = "Portfolio";
+      const formTypeSearchText = `${formType} type`;
+
+        const nameMatch = wildcard ? wildcard.test(name) : name.toLowerCase().includes(normalizedTerm);
+        const statusMatch = wildcard ? wildcard.test(status) : status.toLowerCase().includes(normalizedTerm);
+        const idMatch = wildcard ? wildcard.test(id) : id.toLowerCase().includes(normalizedTerm);
+        const programMatch = wildcard ? wildcard.test(program) : program.toLowerCase().includes(normalizedTerm);
+        const campusMatch = wildcard ? wildcard.test(campus) : campus.toLowerCase().includes(normalizedTerm);
+        const formTypeMatch = wildcard
+          ? wildcard.test(formTypeSearchText)
+          : formTypeSearchText.toLowerCase().includes(normalizedTerm);
+
+        const score =
+          (nameMatch ? 5 : 0) +
+          (statusMatch ? 4 : 0) +
+          (idMatch ? 2 : 0) +
+          (programMatch ? 1 : 0) +
+          (campusMatch ? 1 : 0) +
+          (formTypeMatch ? 1 : 0);
+
+      return {
+          id,
+          formType,
+          name,
+          status,
+          program,
+          campus,
+          createdAt: portfolio.created_at,
+          score,
+        };
+      })
+      .filter((item) => item.score > 0);
+
+    const applicationItems = allApplicants
+      .map((app): SearchResultItem => {
+        const name = app.applicant_name?.trim() || "Unnamed Applicant";
+        const status = app.status || "Submitted";
+        const program = app.degree_applied_for || "N/A";
+        const campus = app.campus || "N/A";
+        const id = app.application_id;
+        const formType = "Application";
+        const formTypeSearchText = `${formType} type`;
+
+        const nameMatch = wildcard ? wildcard.test(name) : name.toLowerCase().includes(normalizedTerm);
+        const statusMatch = wildcard ? wildcard.test(status) : status.toLowerCase().includes(normalizedTerm);
+        const idMatch = wildcard ? wildcard.test(id) : id.toLowerCase().includes(normalizedTerm);
+        const programMatch = wildcard ? wildcard.test(program) : program.toLowerCase().includes(normalizedTerm);
+        const campusMatch = wildcard ? wildcard.test(campus) : campus.toLowerCase().includes(normalizedTerm);
+        const formTypeMatch = wildcard
+          ? wildcard.test(formTypeSearchText)
+          : formTypeSearchText.toLowerCase().includes(normalizedTerm);
+
+        const score =
+          (nameMatch ? 5 : 0) +
+          (statusMatch ? 4 : 0) +
+          (idMatch ? 2 : 0) +
+          (programMatch ? 1 : 0) +
+          (campusMatch ? 1 : 0) +
+          (formTypeMatch ? 1 : 0);
+
+        return {
+          id,
+          formType,
+          name,
+          status,
+          program,
+          campus,
+          createdAt: app.created_at,
+          score,
+        };
+      })
+      .filter((item) => item.score > 0);
+
+    return [...applicationItems, ...portfolioItems].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [allApplicants, allPortfolioSubmissions, dataType, searchTerm]);
+
+  const scopedSearchResults = useMemo(() => {
+    const byDataset =
+      searchViewMode === "all"
+        ? allSearchResults
+        : allSearchResults.filter((item) =>
+            dataType === "applicants" ? item.formType === "Application" : item.formType === "Portfolio"
+          );
+
+    if (searchStatusFilter === "All") return byDataset;
+    return byDataset.filter((item) => item.status === searchStatusFilter);
+  }, [allSearchResults, dataType, searchStatusFilter, searchViewMode]);
+
+  const searchStatusCounts = useMemo(() => {
+    const counts: Record<SearchStatusFilter, number> = {
+      All: scopedSearchResults.length,
+      Submitted: 0,
+      Pending: 0,
+      Approved: 0,
+      Declined: 0,
+    };
+
+    scopedSearchResults.forEach((item) => {
+      const status = item.status as SearchStatusFilter;
+      if (counts[status] !== undefined) {
+        counts[status] += 1;
+      }
+    });
+
+    return counts;
+  }, [scopedSearchResults]);
+
+  const displayedSearchResults = useMemo(
+    () => scopedSearchResults.slice(0, visibleSearchCount),
+    [scopedSearchResults, visibleSearchCount]
+  );
+
+  const openDetailsFromDashboard = async (item: SearchResultItem) => {
+    setSelectedResult(item);
+    setSelectedResultDetails(null);
+    setDetailsError(null);
+    setIsDetailsModalOpen(true);
+    setDetailsLoading(true);
+
+    try {
+      if (item.formType === "Application") {
+        const { data, error: fetchError } = await supabase
+          .from("applications")
+          .select("*")
+          .eq("application_id", item.id)
+          .single();
+
+        if (fetchError) throw fetchError;
+        setSelectedResultDetails((data as Record<string, any>) || null);
+      } else {
+        const numericId = Number(item.id);
+        if (Number.isNaN(numericId)) {
+          throw new Error("Invalid portfolio submission ID.");
+        }
+
+        const { data, error: fetchError } = await supabase
+          .from("portfolio_submissions")
+          .select("*")
+          .eq("id", numericId)
+          .single();
+
+        if (fetchError) throw fetchError;
+        setSelectedResultDetails((data as Record<string, any>) || null);
+      }
+    } catch (err) {
+      setDetailsError(err instanceof Error ? err.message : "Failed to load details.");
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const closeDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    setDetailsLoading(false);
+    setDetailsError(null);
+    setSelectedResult(null);
+    setSelectedResultDetails(null);
+  };
 
   const chartTabs = [
     { id: "volume" as const, label: "Volume Trend", description: "Daily submissions over time", available: timeSeriesData.length > 0, icon: <Calendar size={16} /> },
@@ -522,6 +752,108 @@ export default function DashboardHome() {
           </div>
         </div>
         <p className="text-xs text-gray-500">Select a dataset and switch between available visualizations. Tabs disable automatically when there is no data.</p>
+
+        <div className="mt-1 border-t border-gray-100 pt-3">
+          <label htmlFor="dashboard-form-search" className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Search Applicant Forms 
+          </label>
+          <div className="mt-2 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              id="dashboard-form-search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Try name or status, e.g. Juan*, *pending, *manila*"
+              className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            />
+          </div>
+          <p className="mt-1 text-[11px] text-gray-500">Use `*` for any characters.</p>
+
+          <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div className="inline-flex items-center bg-white border border-gray-200 rounded-full p-1">
+                  <button
+                    onClick={() => setSearchViewMode("selected")}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+                      searchViewMode === "selected" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    Selected Dataset
+                  </button>
+                  <button
+                    onClick={() => setSearchViewMode("all")}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+                      searchViewMode === "all" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    All Submissions
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Showing {displayedSearchResults.length} of {scopedSearchResults.length} match(es)
+                </p>
+              </div>
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(["All", "Submitted", "Pending", "Approved", "Declined"] as SearchStatusFilter[]).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setSearchStatusFilter(status)}
+                    className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                      searchStatusFilter === status
+                        ? "bg-white text-gray-900 border-yellow-400"
+                        : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-white"
+                    }`}
+                  >
+                    {status} ({searchStatusCounts[status]})
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-2.5">
+                {displayedSearchResults.length > 0 ? (
+                  displayedSearchResults.map((item) => (
+                    <div key={`${item.formType}-${item.id}`} className="rounded-lg border border-gray-200 bg-white p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{item.name}</p>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200 text-gray-600 whitespace-nowrap">
+                          {item.formType}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">Form ID: {item.id}</p>
+                      <p className="text-xs text-gray-600">Status: {item.status}</p>
+                      <p className="text-xs text-gray-600">Program: {item.program}</p>
+                      <p className="text-xs text-gray-600">Campus: {item.campus}</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <p className="text-[11px] text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</p>
+                        <button
+                          onClick={() => openDetailsFromDashboard(item)}
+                          className="text-xs font-semibold text-yellow-700 hover:text-yellow-800"
+                        >
+                          Open Details
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="lg:col-span-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3 text-sm text-gray-500">
+                    No matching forms found for this filter.
+                  </div>
+                )}
+              </div>
+
+              {scopedSearchResults.length > displayedSearchResults.length && (
+                <div className="mt-3 flex justify-center">
+                  <button
+                    onClick={() => setVisibleSearchCount((prev) => prev + 3)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  >
+                    Show 3 more
+                  </button>
+                </div>
+              )}
+            </div>
+        </div>
       </div>
 
       {/* Charts + Insights */}
@@ -608,6 +940,81 @@ export default function DashboardHome() {
           </div>
         </div>
       </div>
+
+      {isDetailsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <div>
+                <p className="text-lg font-bold text-gray-900">Applicant Details</p>
+                <p className="text-xs text-gray-500">
+                  {selectedResult?.formType} • {selectedResult?.id}
+                </p>
+              </div>
+              <button
+                onClick={closeDetailsModal}
+                className="text-gray-400 hover:text-gray-700"
+                aria-label="Close details modal"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <div className="p-5 max-h-[70vh] overflow-y-auto">
+              {detailsLoading && (
+                <div className="flex items-center text-gray-600">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  Loading applicant details...
+                </div>
+              )}
+
+              {!detailsLoading && detailsError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {detailsError}
+                </div>
+              )}
+
+              {!detailsLoading && !detailsError && selectedResultDetails && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">Name</p>
+                    <p className="font-semibold text-gray-900">{selectedResultDetails.applicant_name || selectedResultDetails.full_name || selectedResult?.name || "N/A"}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">Status</p>
+                    <p className="font-semibold text-gray-900">{selectedResultDetails.status || selectedResult?.status || "N/A"}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">Program</p>
+                    <p className="font-semibold text-gray-900">{selectedResultDetails.degree_applied_for || selectedResultDetails.degree_program || selectedResult?.program || "N/A"}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-xs text-gray-500">Campus</p>
+                    <p className="font-semibold text-gray-900">{selectedResultDetails.campus || selectedResult?.campus || "N/A"}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3 sm:col-span-2">
+                    <p className="text-xs text-gray-500">Email / User</p>
+                    <p className="font-semibold text-gray-900">{selectedResultDetails.email_address || selectedResultDetails.user_id || "N/A"}</p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-3 sm:col-span-2">
+                    <p className="text-xs text-gray-500">Submitted</p>
+                    <p className="font-semibold text-gray-900">{selectedResultDetails.created_at ? new Date(selectedResultDetails.created_at).toLocaleString() : "N/A"}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={closeDetailsModal}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

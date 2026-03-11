@@ -305,7 +305,15 @@ const STATUS_ICONS: Record<string, ReactNode> = {
 
 
 // --- Main ApplicantsManage Component ---
-export default function ApplicantsManage() {
+export default function ApplicantsManage({
+  focusApplicationId,
+  focusRequestKey,
+  onFocusRequestHandled,
+}: {
+  focusApplicationId?: string | null;
+  focusRequestKey?: number;
+  onFocusRequestHandled?: (key: number) => void;
+}) {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -344,6 +352,28 @@ export default function ApplicantsManage() {
 
     fetchApplicants();
   }, []);
+
+  useEffect(() => {
+    if (!focusApplicationId || applicants.length === 0) return;
+    const requestKey = focusRequestKey ?? 0;
+
+    const targetApplicant = applicants.find(
+      (app) => app.application_id === focusApplicationId
+    );
+
+    if (!targetApplicant) {
+      onFocusRequestHandled?.(requestKey);
+      return;
+    }
+
+    // Reset filters so the destination record context remains consistent.
+    setSearchTerm("");
+    setStatusFilter("All");
+    setCurrentPage(1);
+    setSelectedApplicant(targetApplicant);
+    setIsModalOpen(true);
+    onFocusRequestHandled?.(requestKey);
+  }, [focusApplicationId, focusRequestKey, applicants, onFocusRequestHandled]);
 
   // Memoized filtering logic
   const filteredApplicants = useMemo(() => {

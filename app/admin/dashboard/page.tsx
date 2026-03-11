@@ -20,6 +20,17 @@ export interface GoogleUser {
   email?: string;
 }
 
+type HomeRecordNavigationTarget = {
+  formType: "Application" | "Portfolio";
+  id: string;
+};
+
+type RecordFocusRequest = {
+  tab: "Applicants" | "PortfolioSubmissions";
+  id: string;
+  key: number;
+};
+
 // ✅ 2. Add the new tab name to the type
 type TabName =
   | "Home"
@@ -55,6 +66,7 @@ export default function DashboardPage() {
   const [currentUser, setCurrentUser] = useState<AdminProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabName>("Home");
+  const [recordFocusRequest, setRecordFocusRequest] = useState<RecordFocusRequest | null>(null);
   
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -133,6 +145,30 @@ export default function DashboardPage() {
       router.push("/admin");
     }
   }
+
+  const handleNavigateToRecord = (target: HomeRecordNavigationTarget) => {
+    const nextTab: "Applicants" | "PortfolioSubmissions" =
+      target.formType === "Application" ? "Applicants" : "PortfolioSubmissions";
+
+    setRecordFocusRequest({
+      tab: nextTab,
+      id: target.id,
+      key: Date.now(),
+    });
+    setActiveTab(nextTab);
+  };
+
+  const handleFocusRequestHandled = (
+    tab: "Applicants" | "PortfolioSubmissions",
+    key: number
+  ) => {
+    setRecordFocusRequest((prev) => {
+      if (!prev) return null;
+      if (prev.tab !== tab) return prev;
+      if (prev.key !== key) return prev;
+      return null;
+    });
+  };
   
   // Inactivity Logout Effect
   useEffect(() => {
@@ -198,11 +234,26 @@ export default function DashboardPage() {
   // ✅ 4. Add an entry for your new component's props (if any)
   const componentProps: { [key: string]: any } = useMemo(
     () => ({
+      Home: {
+        onNavigateToRecord: handleNavigateToRecord,
+      },
+      Applicants: {
+        focusApplicationId: recordFocusRequest?.tab === "Applicants" ? recordFocusRequest.id : null,
+        focusRequestKey: recordFocusRequest?.tab === "Applicants" ? recordFocusRequest.key : 0,
+        onFocusRequestHandled: (key: number) => handleFocusRequestHandled("Applicants", key),
+      },
+      PortfolioSubmissions: {
+        focusSubmissionId:
+          recordFocusRequest?.tab === "PortfolioSubmissions" ? recordFocusRequest.id : null,
+        focusRequestKey:
+          recordFocusRequest?.tab === "PortfolioSubmissions" ? recordFocusRequest.key : 0,
+        onFocusRequestHandled: (key: number) =>
+          handleFocusRequestHandled("PortfolioSubmissions", key),
+      },
       AdminManagement: { currentUser: currentUser },
       EmailManagement: {},
-      PortfolioSubmissions: {}, // <-- ADDED
     }),
-    [currentUser]
+    [currentUser, recordFocusRequest]
   );
 
   // --- Render Logic ---

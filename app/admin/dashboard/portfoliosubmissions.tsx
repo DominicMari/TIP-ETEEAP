@@ -87,7 +87,15 @@ const STATUS_ICONS: Record<string, ReactNode> = {
 };
 
 // 3. Main component
-export default function PortfolioSubmissions() {
+export default function PortfolioSubmissions({
+  focusSubmissionId,
+  focusRequestKey,
+  onFocusRequestHandled,
+}: {
+  focusSubmissionId?: string | null;
+  focusRequestKey?: number;
+  onFocusRequestHandled?: (key: number) => void;
+}) {
   const [submissions, setSubmissions] = useState<PortfolioSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +134,30 @@ export default function PortfolioSubmissions() {
 
     fetchSubmissions();
   }, []);
+
+  useEffect(() => {
+    if (!focusSubmissionId || submissions.length === 0) return;
+    const requestKey = focusRequestKey ?? 0;
+
+    const targetId = Number(focusSubmissionId);
+    if (Number.isNaN(targetId)) {
+      onFocusRequestHandled?.(requestKey);
+      return;
+    }
+
+    const targetSubmission = submissions.find((sub) => sub.id === targetId);
+    if (!targetSubmission) {
+      onFocusRequestHandled?.(requestKey);
+      return;
+    }
+
+    setSearchTerm("");
+    setStatusFilter("All");
+    setCurrentPage(1);
+    setSelectedSubmission(targetSubmission);
+    setIsModalOpen(true);
+    onFocusRequestHandled?.(requestKey);
+  }, [focusSubmissionId, focusRequestKey, submissions, onFocusRequestHandled]);
 
   // Memoized filtering logic
   const filteredSubmissions = useMemo(() => {
