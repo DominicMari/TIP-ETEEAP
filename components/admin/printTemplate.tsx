@@ -94,16 +94,16 @@ export function generatePrintHTML(data: any): string {
 <head>
   <title>TIP-ETEEAP Application — ${data.applicant_name || "Applicant"}</title>
   <style>
-    @page { margin: 0; }
+    @page { size: A4; margin: 25mm 10mm 10mm 10mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Times New Roman", Georgia, serif; color: #000; padding: 36px 42px; font-size: 10.5pt; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    @media print { body { padding: 28px 36px; } }
+    body { font-family: "Times New Roman", Georgia, serif; color: #000; padding: 10px 20px; font-size: 10.5pt; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @media print { body { padding: 5px 15px; } }
   </style>
 </head>
 <body>
 
   <!-- ===== HEADER ===== -->
-  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px double #000;padding-bottom:14px;margin-bottom:16px;margin-top:-10mm;">
+  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px double #000;padding-bottom:14px;margin-bottom:16px;margin-top:-1mm;">
     <div style="display:flex;gap:12px;align-items:center;">
       <img src="/assets/TIPLogo.png" alt="TIP Logo" style="width:56px;height:56px;object-fit:contain;" />
       <div>
