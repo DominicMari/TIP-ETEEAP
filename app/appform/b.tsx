@@ -352,7 +352,7 @@ export default function PersonalInformationForm({
               />
             </div>
             <div>
-              <label className="text-sm font-semibold text-black">Relationship: <span className="text-red-500">*</span></label>
+              <label className="text-sm font-semibold text-black">Relationship to the contact: <span className="text-red-500">*</span></label>
               <input
                 required
                 name="emergencyRelationship"
