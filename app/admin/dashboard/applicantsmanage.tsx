@@ -402,14 +402,39 @@ export default function ApplicantsManage({
   }, [filteredApplicants]);
 
   // --- Event Handlers ---
-  const handleViewDetails = (applicant: Applicant) => {
+  const handleViewDetails = async (applicant: Applicant) => {
     setSelectedApplicant(applicant);
     setIsModalOpen(true);
+
+    // Auto-change "Submitted" to "Pending" when admin opens to review
+    if (applicant.status === 'Submitted') {
+      const newStatus = 'Pending';
+      const template = getRemarksTemplate(newStatus);
+      setUpdatingStatusId(applicant.application_id);
+
+      const { data: updatedData, error: updateError } = await supabase
+        .from('applications')
+        .update({ status: newStatus, admin_remarks: template, updated_at: new Date().toISOString() })
+        .eq('application_id', applicant.application_id)
+        .select()
+        .single();
+
+      setUpdatingStatusId(null);
+
+      if (!updateError && updatedData) {
+        const updated = updatedData as Applicant;
+        setApplicants(prev => prev.map(a => a.application_id === applicant.application_id ? updated : a));
+        setSelectedApplicant(updated);
+        await sendStatusEmail(updated.email_address, updated.applicant_name, newStatus, template);
+      }
+    }
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedApplicant(null);
+    setRemarksModal(null);
+    setRemarksText('');
   };
 
   const handleStatusChange = (applicationId: string, newStatus: string) => {
@@ -445,7 +470,11 @@ export default function ApplicantsManage({
           app.application_id === applicationId ? (updatedData as Applicant) : app
         )
       );
-      
+      // Also update selectedApplicant if viewing the same one
+      if (selectedApplicant?.application_id === applicationId) {
+        setSelectedApplicant(updatedData as Applicant);
+      }
+
       // Send status notification email
       await sendStatusEmail(
         (updatedData as Applicant).email_address,
@@ -589,30 +618,18 @@ export default function ApplicantsManage({
                         </div>
                       </div>
 
-                      {/* Original Status Dropdown (Kept for functionality) */}
+                      {/* Status Badge - Click to view details */}
                       <div className='flex items-center gap-2 mt-1'>
                         {(updatingStatusId === app.application_id || deletingId === app.application_id) && <Loader2 className='h-3 w-3 animate-spin text-gray-400'/>}
-                        <select
-                          value={app.status || 'Submitted'}
-                          onChange={(e) => handleStatusChange(app.application_id, e.target.value)}
-                          disabled={updatingStatusId === app.application_id || deletingId === app.application_id}
-                          className={`text-[10px] font-bold uppercase rounded-md px-2 py-0.5 border-none outline-none ring-1 ring-inset cursor-pointer ${
+                        <button
+                          onClick={() => handleViewDetails(app)}
+                          className={`text-[10px] font-bold uppercase rounded-md px-2 py-0.5 ring-1 ring-inset cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${
                             STATUS_COLORS[app.status || 'Submitted']
                           }`}
                         >
-                          {STATUS_OPTIONS.filter(s => s !== 'All').map(status => (
-                            <option key={status} value={status}>{status}</option>
-                          ))}
-                        </select>
-                        {getSuggestedStatus(getCompletionPercentage(app), app.status) && (
-                          <div className='relative group'>
-                            <Zap size={14} className='text-yellow-500 animate-pulse cursor-help' />
-                            <div className='absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 whitespace-nowrap z-20 shadow-lg'>
-                              Suggested: {getSuggestedStatus(getCompletionPercentage(app), app.status)}
-                              <div className='absolute left-2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900'></div>
-                            </div>
-                          </div>
-                        )}
+                          {STATUS_ICONS[app.status || 'Submitted']}
+                          {app.status || 'Submitted'}
+                        </button>
                       </div>
                     </div>
                   </td>
@@ -621,7 +638,6 @@ export default function ApplicantsManage({
                       applicant={app}
                       onView={handleViewDetails}
                       onDelete={handleDelete}
-                      onStatusChange={handleStatusChange}
                       isDeleting={deletingId === app.application_id}
                       isUpdating={updatingStatusId === app.application_id}
                     />
@@ -645,12 +661,14 @@ export default function ApplicantsManage({
         <ViewApplicantModal
           applicant={selectedApplicant}
           onClose={handleCloseModal}
+          onStatusChange={handleStatusChange}
+          updatingStatusId={updatingStatusId}
         />
       )}
 
       {/* Remarks Modal */}
       {remarksModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm'>
+        <div className='fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm'>
           <div className='bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-black'>
             <h3 className='text-lg font-bold text-gray-900 mb-1'>
               Update Status to <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-sm font-semibold ${STATUS_COLORS[remarksModal.newStatus]}`}>{remarksModal.newStatus}</span>
@@ -778,9 +796,16 @@ const formatDate = (dateString: string | null | undefined, includeTime = false):
   };
 
 // 🔽 --- IMPROVED: View Details Modal ---
-const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
+const ViewApplicantModal: FC<{
+  applicant: Applicant;
+  onClose: () => void;
+  onStatusChange: (applicationId: string, newStatus: string) => void;
+  updatingStatusId: string | null;
+}> = ({
   applicant,
   onClose,
+  onStatusChange,
+  updatingStatusId,
 }) => {
   const handlePrint = () => {
     openPrintPreview(applicant);
@@ -788,7 +813,7 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
 
   return createPortal(
     <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm'>
-      <div className='bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col text-black'>
+      <div className='bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col text-black'>
         {/* Modal Header */}
         <div className='flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10'>
           <h2 className='text-2xl font-bold text-gray-800'>
@@ -823,14 +848,52 @@ const ViewApplicantModal: FC<{ applicant: Applicant; onClose: () => void }> = ({
                 {applicant.degree_applied_for || 'N/A'}
               </p>
               <p className='text-sm text-gray-500'>{applicant.campus} Campus</p>
-              <div 
+              {/* Current Status Badge */}
+              <div
                 className={`mt-2 text-sm font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${
                   STATUS_COLORS[applicant.status || 'Submitted']
                 }`}
               >
-                {STATUS_ICONS[applicant.status || 'Submitted']}
+                {updatingStatusId === applicant.application_id
+                  ? <Loader2 className='h-4 w-4 animate-spin' />
+                  : STATUS_ICONS[applicant.status || 'Submitted']
+                }
                 {applicant.status || 'Submitted'}
               </div>
+
+              {/* Approve / Decline Buttons */}
+              <div className='mt-4 flex items-center gap-2 w-full'>
+                <button
+                  onClick={() => onStatusChange(applicant.application_id, 'Approved')}
+                  disabled={updatingStatusId === applicant.application_id || applicant.status === 'Approved'}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    applicant.status === 'Approved'
+                      ? 'bg-green-500 text-white ring-2 ring-green-300 shadow-md cursor-default'
+                      : 'bg-green-50 text-green-700 ring-1 ring-green-200 hover:bg-green-100 hover:ring-green-300'
+                  } disabled:opacity-60`}
+                >
+                  <Check size={16} />
+                  Approve
+                </button>
+                <button
+                  onClick={() => onStatusChange(applicant.application_id, 'Declined')}
+                  disabled={updatingStatusId === applicant.application_id || applicant.status === 'Declined'}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    applicant.status === 'Declined'
+                      ? 'bg-red-500 text-white ring-2 ring-red-300 shadow-md cursor-default'
+                      : 'bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100 hover:ring-red-300'
+                  } disabled:opacity-60`}
+                >
+                  <X size={16} />
+                  Decline
+                </button>
+              </div>
+              {getSuggestedStatus(getCompletionPercentage(applicant), applicant.status) && (
+                <div className='flex items-center gap-1.5 text-xs text-yellow-600 bg-yellow-50 rounded-full px-2.5 py-1 mt-2'>
+                  <Zap size={12} className='text-yellow-500' />
+                  <span>Suggested: <strong>{getSuggestedStatus(getCompletionPercentage(applicant), applicant.status)}</strong></span>
+                </div>
+              )}
             </div>
 
             <InfoCard title='Applicant Information'>
@@ -1298,15 +1361,11 @@ const ActionsMenu: FC<{
   applicant: Applicant;
   onView: (applicant: Applicant) => void;
   onDelete: (applicationId: string, applicantName: string | null) => void;
-  onStatusChange: (applicationId: string, newStatus: string) => void;
   isDeleting: boolean;
   isUpdating: boolean;
-}> = ({ applicant, onView, onDelete, onStatusChange, isDeleting, isUpdating }) => {
+}> = ({ applicant, onView, onDelete, isDeleting, isUpdating }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  
-  const completionPercentage = getCompletionPercentage(applicant);
-  const suggestedStatus = getSuggestedStatus(completionPercentage, applicant.status);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1343,29 +1402,6 @@ const ActionsMenu: FC<{
       <Eye size={16} />
       View Details
     </button>
-
-    {suggestedStatus && (
-      <>
-        <div className="border-t border-gray-100 my-1"></div>
-        <div className="px-3 py-1.5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
-            <Zap size={12} className="text-yellow-500" />
-            Quick Actions
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            onStatusChange(applicant.application_id, suggestedStatus);
-            setIsOpen(false);
-          }}
-          className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
-        >
-          <TrendingUp size={16} />
-          Move to {suggestedStatus}
-          <span className="text-xs text-gray-500">({Math.round(completionPercentage)}% complete)</span>
-        </button>
-      </>
-    )}
 
     <div className="border-t border-gray-100 my-1"></div>
 

@@ -67,7 +67,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabName>("Home");
   const [recordFocusRequest, setRecordFocusRequest] = useState<RecordFocusRequest | null>(null);
-  
+
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Function to fetch the currently logged-in admin's profile

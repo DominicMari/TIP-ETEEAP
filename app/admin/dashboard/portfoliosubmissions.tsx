@@ -192,10 +192,31 @@ export default function PortfolioSubmissions({
   }, [filteredSubmissions]);
 
 
-  // --- Event Handlers (unchanged) ---
-  const handleViewDetails = (submission: PortfolioSubmission) => {
+  // --- Event Handlers ---
+  const handleViewDetails = async (submission: PortfolioSubmission) => {
     setSelectedSubmission(submission);
     setIsModalOpen(true);
+
+    // Auto-change "Submitted" to "Pending" when admin opens to review
+    if (submission.status === 'Submitted') {
+      const newStatus = 'Pending';
+      setUpdatingStatusId(submission.id);
+
+      const { data: updatedData, error: updateError } = await supabase
+        .from("portfolio_submissions")
+        .update({ status: newStatus })
+        .eq("id", submission.id)
+        .select()
+        .single();
+
+      setUpdatingStatusId(null);
+
+      if (!updateError && updatedData) {
+        const updated = updatedData as PortfolioSubmission;
+        setSubmissions(prev => prev.map(s => s.id === submission.id ? updated : s));
+        setSelectedSubmission(updated);
+      }
+    }
   };
 
   const handleCloseModal = () => {
@@ -225,6 +246,10 @@ export default function PortfolioSubmissions({
           sub.id === submissionId ? (updatedData as PortfolioSubmission) : sub
         )
       );
+      // Also update selectedSubmission if viewing the same one
+      if (selectedSubmission?.id === submissionId) {
+        setSelectedSubmission(updatedData as PortfolioSubmission);
+      }
     }
   };
 
@@ -362,23 +387,20 @@ export default function PortfolioSubmissions({
                     </div>
                   </div>
 
-                  {/* EXISTING: Status Dropdown (Wrapped in a div for layout) */}
+                  {/* Status Badge - Click to view details */}
                   <div className="flex items-center gap-2 mt-1">
                     {(updatingStatusId === sub.id || deletingId === sub.id) && (
                       <Loader2 className="h-4 w-4 animate-spin text-gray-400"/>
                     )}
-                    <select
-                      value={sub.status}
-                      onChange={(e) => handleStatusChange(sub.id, e.target.value)}
-                      disabled={updatingStatusId === sub.id || deletingId === sub.id}
-                      className={`text-xs font-semibold rounded-full px-2.5 py-1 border-none outline-none ring-1 ring-inset focus:ring-2 focus:ring-yellow-500 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer ${
+                    <button
+                      onClick={() => handleViewDetails(sub)}
+                      className={`text-xs font-semibold rounded-full px-2.5 py-1 ring-1 ring-inset cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${
                         STATUS_COLORS[sub.status]
                       }`}
                     >
-                      {STATUS_OPTIONS.filter(s => s !== "All").map(status => (
-                        <option key={status} value={status}>{status}</option>
-                      ))}
-                    </select>
+                      {STATUS_ICONS[sub.status]}
+                      {sub.status}
+                    </button>
                   </div>
                 </div>
               </td>
@@ -408,6 +430,8 @@ export default function PortfolioSubmissions({
         <ViewSubmissionModal
           submission={selectedSubmission}
           onClose={handleCloseModal}
+          onStatusChange={handleStatusChange}
+          updatingStatusId={updatingStatusId}
         />
       )}
     </div>
@@ -470,13 +494,20 @@ const PageHeader: FC<{
 
 
 // --- View Details Modal Component (unchanged) ---
-const ViewSubmissionModal: FC<{ submission: PortfolioSubmission; onClose: () => void }> = ({
+const ViewSubmissionModal: FC<{
+  submission: PortfolioSubmission;
+  onClose: () => void;
+  onStatusChange: (submissionId: number, newStatus: string) => void;
+  updatingStatusId: number | null;
+}> = ({
   submission,
   onClose,
+  onStatusChange,
+  updatingStatusId,
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col text-black">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col text-black">
         {/* Modal Header */}
         <div className="flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10">
           <h2 className="text-2xl font-bold text-gray-800">
@@ -506,13 +537,45 @@ const ViewSubmissionModal: FC<{ submission: PortfolioSubmission; onClose: () => 
             <p className="text-lg text-gray-600">
               {submission.degree_program || "N/A"}
             </p>
-            <div 
+            {/* Current Status Badge */}
+            <div
               className={`mt-2 text-sm font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${
                 STATUS_COLORS[submission.status]
               }`}
             >
-              {STATUS_ICONS[submission.status]}
+              {updatingStatusId === submission.id
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : STATUS_ICONS[submission.status]
+              }
               {submission.status}
+            </div>
+
+            {/* Approve / Decline Buttons */}
+            <div className="mt-4 flex items-center gap-2 w-full max-w-xs">
+              <button
+                onClick={() => onStatusChange(submission.id, 'Approved')}
+                disabled={updatingStatusId === submission.id || submission.status === 'Approved'}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  submission.status === 'Approved'
+                    ? 'bg-green-500 text-white ring-2 ring-green-300 shadow-md cursor-default'
+                    : 'bg-green-50 text-green-700 ring-1 ring-green-200 hover:bg-green-100 hover:ring-green-300'
+                } disabled:opacity-60`}
+              >
+                <Check size={16} />
+                Approve
+              </button>
+              <button
+                onClick={() => onStatusChange(submission.id, 'Declined')}
+                disabled={updatingStatusId === submission.id || submission.status === 'Declined'}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  submission.status === 'Declined'
+                    ? 'bg-red-500 text-white ring-2 ring-red-300 shadow-md cursor-default'
+                    : 'bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100 hover:ring-red-300'
+                } disabled:opacity-60`}
+              >
+                <X size={16} />
+                Decline
+              </button>
             </div>
           </div>
 
