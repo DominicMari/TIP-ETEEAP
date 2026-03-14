@@ -21,6 +21,9 @@ export default function PrioritiesGoalsForm({
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [guidance, setGuidance] = useState<{ message: string; suggestions: string[] } | null>(null);
   const [statementError, setStatementError] = useState(false);
+  const [planError,       setPlanError]       = useState(false);
+  const [overseasError,   setOverseasError]   = useState(false);
+  const [completionError, setCompletionError] = useState(false);
   const [formError, setFormError] = useState("");
   const statementRef = useRef<HTMLTextAreaElement>(null);
 
@@ -52,11 +55,12 @@ export default function PrioritiesGoalsForm({
     updated[index] = value;
     setFormData({ ...formData, degrees: updated });
   };
-
-  const handleAddDegree = () => {
-    const currentDegrees = Array.isArray(formData.degrees) ? formData.degrees : [];
-    setFormData({ ...formData, degrees: [...currentDegrees, ""] });
-  };
+//add degree
+const handleAddDegree = () => {
+  const currentDegrees = Array.isArray(formData.degrees) ? formData.degrees : [];
+  if (currentDegrees.length >= 3) return;
+  setFormData({ ...formData, degrees: [...currentDegrees, ""] });
+};
 
   const handleRemoveDegree = (index: number) => {
     const currentDegrees = Array.isArray(formData.degrees) ? formData.degrees : [];
@@ -71,19 +75,29 @@ export default function PrioritiesGoalsForm({
       setStatementError(false);
       setFormError("");
     }
+  if (name === "plan")       setPlanError(false);
+  if (name === "overseas")   setOverseasError(false);
+  if (name === "completion") setCompletionError(false);
   };
 
   const handleNext = (e: React.FormEvent) => {
-    e.preventDefault();
-    const { degrees, statement } = formData;
-    if (!Array.isArray(degrees) || degrees.some((d: string) => !d) || !statement?.trim()) {
-      setFormError("Please complete all required fields before proceeding.");
-      if (!statement?.trim()) setStatementError(true);
-      return;
-    }
-    setFormError("");
-    nextStep();
-  };
+  e.preventDefault();
+  const { degrees, statement, plan, overseas, completion } = formData;
+
+  let hasError = false;
+  if (!Array.isArray(degrees) || degrees.some((d: string) => !d)) hasError = true;
+  if (!statement?.trim())  { setStatementError(true);  hasError = true; }
+  if (!plan?.trim())       { setPlanError(true);       hasError = true; }
+  if (!overseas?.trim())   { setOverseasError(true);   hasError = true; }
+  if (!completion?.trim()) { setCompletionError(true); hasError = true; }
+
+  if (hasError) {
+    setFormError("Please complete all required fields before proceeding.");
+    return;
+  }
+  setFormError("");
+  nextStep();
+};
   // end of handlers
 
 
@@ -112,46 +126,59 @@ export default function PrioritiesGoalsForm({
           </label>
           
           {Array.isArray(formData.degrees) && formData.degrees.map((degree: string, index: number) => (
-            <div key={index} className="flex items-center gap-2 mb-3">
-              <select
-                required
-                value={degree}
-                onChange={(e) => handleDegreeChange(index, e.target.value)}
-                className="flex-1 border border-gray-400 rounded-lg p-2 text-black"
-              >
-                <option value="">Select degree</option>
-                <option value="BSCS">Bachelor of Science in Computer Science</option>
-                <option value="BSIS">Bachelor of Science in Information Systems</option>
-                <option value="BSIT">Bachelor of Science in Information Technology</option>
-                <option value="BSCpE">Bachelor of Science in Computer Engineering</option>
-                <option value="BSIE">Bachelor of Science in Industrial Engineering</option>
-                <optgroup label="Bachelor of Science in Business Administration">
-                  <option value="BSBA-LSCM">Logistics and Supply Chain Management</option>
-                  <option value="BSBA-FM">Financial Management</option>
-                  <option value="BSBA-HRM">Human Resources Management</option>
-                  <option value="BSBA-MM">Marketing Management</option>
-                </optgroup>
-              </select>
+          <div key={index} className="flex items-center gap-2 mb-3">
+            <select
+              required
+              value={degree}
+              onChange={(e) => handleDegreeChange(index, e.target.value)}
+              className="flex-1 border border-gray-400 rounded-lg p-2 text-black"
+            >
+              <option value="">Select degree</option>
+              {[
+                { value: "BSCS", label: "Bachelor of Science in Computer Science" },
+                { value: "BSIS", label: "Bachelor of Science in Information Systems" },
+                { value: "BSIT", label: "Bachelor of Science in Information Technology" },
+                { value: "BSCpE", label: "Bachelor of Science in Computer Engineering" },
+                { value: "BSIE", label: "Bachelor of Science in Industrial Engineering" },
+                { value: "BSBA-LSCM", label: "BSBA – Logistics and Supply Chain Management" },
+                { value: "BSBA-FM",   label: "BSBA – Financial Management" },
+                { value: "BSBA-HRM",  label: "BSBA – Human Resources Management" },
+                { value: "BSBA-MM",   label: "BSBA – Marketing Management" },
+              ].map(opt => (
+                <option
+                  key={opt.value}
+                  value={opt.value}
+                  disabled={formData.degrees.includes(opt.value) && formData.degrees[index] !== opt.value}
+                >
+                  {opt.label}
+                </option>
+              ))}
+            </select>
 
-              {index === 0 ? (
-                <button
-                  type="button"
-                  onClick={handleAddDegree}
-                  className="bg-yellow-500 text-white p-2 rounded-lg"
-                >
-                  <Plus size={18} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveDegree(index)}
-                  className="bg-red-500 text-white p-2 rounded-lg"
-                >
-                  <Minus size={18} />
-                </button>
-              )}
-            </div>
-          ))}
+            {index === 0 && (
+              <button
+                type="button"
+                onClick={handleAddDegree}
+                disabled={formData.degrees?.length >= 3}
+                className="bg-yellow-500 text-white p-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Plus size={18} />
+              </button>
+            )}
+            {index > 0 && (
+              <button
+                type="button"
+                onClick={() => handleRemoveDegree(index)}
+                className="bg-red-500 text-white p-2 rounded-lg"
+              >
+                <Minus size={18} />
+              </button>
+            )}
+          </div>
+        ))}
+          {formData.degrees?.length >= 3 && (
+          <p className="text-xs text-gray-400 mt-1">Maximum of 3 degree programs allowed.</p>
+          )}
         </div>
 
         {/* Statement field */}
@@ -274,47 +301,46 @@ export default function PrioritiesGoalsForm({
         {/* 3. Learning plan */}
         <div className="mb-4">
             <label className="block mb-2 text-sm font-semibold text-black">
-              3. Indicate how much time you plan to devote to personal learning
-              (hours/week) and how you can make improvements in the prescribed
-              program. Please specify your resources:
+              3. Indicate how much time... <span className="text-red-500">*</span>
             </label>
             <textarea
               name="plan"
               rows={3}
-              value={formData.plan}
+              value={formData.plan || ""}
               onChange={handleChange}
-              className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black"
+              className={`w-full border rounded-lg px-3 py-2 text-black ${planError ? "border-red-500 bg-red-50" : "border-gray-400"}`}
             />
+          {planError && <p className="flex items-center gap-1 text-red-500 text-xs mt-1"><AlertCircle size={12} /> This field is required.</p>}
           </div>
 
         {/* 4. Overseas */}
         <div className="mb-4">
-            <label className="block mb-2 text-sm font-semibold text-black">
-              4. For overseas applicants (otherwise, please indicate "Not
-              Applicable"), describe how you plan to conduct collaborative
-              relationships (e.g., where you plan to come to the Philippines):
-            </label>
-            <textarea
-              name="overseas"
-              rows={3}
-              value={formData.overseas}
-              onChange={handleChange}
-              className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black"
-            />
+          <label className="block mb-2 text-sm font-semibold text-black">
+            4. For overseas applicants... <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            name="overseas"
+            rows={3}
+            value={formData.overseas || ""}
+            onChange={handleChange}
+            className={`w-full border rounded-lg px-3 py-2 text-black ${overseasError ? "border-red-500 bg-red-50" : "border-gray-400"}`}
+          />
+          {overseasError && <p className="flex items-center gap-1 text-red-500 text-xs mt-1"><AlertCircle size={12} /> This field is required.</p>}
           </div>
 
           {/* 5. Completion */}
           <div className="mb-4">
             <label className="block mb-2 text-sm font-semibold text-black">
-                 5. How soon do you need to complete your education/credential?
+              5. How soon do you need to complete... <span className="text-red-500">*</span>
             </label>
             <textarea
               name="completion"
               rows={3}
-              value={formData.completion}
+              value={formData.completion || ""}
               onChange={handleChange}
-              className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black"
+              className={`w-full border rounded-lg px-3 py-2 text-black ${completionError ? "border-red-500 bg-red-50" : "border-gray-400"}`}
             />
+            {completionError && <p className="flex items-center gap-1 text-red-500 text-xs mt-1"><AlertCircle size={12} /> This field is required.</p>}
           </div>
 
       </div>

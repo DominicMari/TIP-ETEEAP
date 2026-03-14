@@ -11,8 +11,8 @@ import UserLoginsManage from "./userlogins";
 import ForcePasswordChange from "./ForcePasswordChange";
 import DashboardHome from "./DashboardHome";
 import EmailManagement from "./emailmanagement";
-// ✅ 1. Import your new component
 import PortfolioSubmissions from "./portfoliosubmissions";
+import SupportTicket from "./supportticket";
 
 // Define a type for your GoogleUser
 export interface GoogleUser {
@@ -39,9 +39,9 @@ type TabName =
   | "UserLogins"
   | "AdminLogins"
   | "AdminManagement"
-  | "EmailManagement";
+  | "EmailManagement"
+  | "SupportTicket";
 
-// ✅ 3. Add the new tab to the 'tabs' object
 const tabs: { [key in TabName]: { title: string; component: ComponentType<any> | null } } = {
   Home: { title: "Dashboard", component: DashboardHome },
   Applicants: { title: "Applicant Submissions", component: ApplicantsManage },
@@ -50,6 +50,7 @@ const tabs: { [key in TabName]: { title: string; component: ComponentType<any> |
   AdminLogins: { title: "Admin Login History", component: UserManage },
   AdminManagement: { title: "Admin Management", component: AdminManagement },
   EmailManagement: { title: "Email Management", component: EmailManagement }, 
+  SupportTicket: {title: "Support Ticket", component: SupportTicket }
 };
 
 // Define the shape of an admin's profile

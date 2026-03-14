@@ -26,8 +26,7 @@ const getTodayDateISO = () => {
 
 // --- Pagination Component ---
 function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: number; totalSteps: number; stepTitles: string[] }) {
-    // ✅ 4. FIX: Hide pagination on the Success screen (step 9)
-    if (currentStep > totalSteps) return null; // Was totalSteps + 1
+    if (currentStep > totalSteps) return null;
 
     const steps = stepTitles.map((title, index) => ({ number: index + 1, title }));
     return (
@@ -37,14 +36,16 @@ function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: numb
                     const isActive = step.number === currentStep;
                     const isCompleted = step.number < currentStep;
                     return (
-                        <div key={step.number} className="flex items-center">
-                            <div className="flex flex-col items-center text-center">
+                        <div key={step.number} className="flex items-start">
+                            <div className="flex flex-col items-center text-center w-20">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-300 ${isActive ? "bg-yellow-500 text-white" : isCompleted ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}>
                                     {isCompleted ? "✔" : step.number}
                                 </div>
                                 <p className={`mt-2 text-xs font-semibold w-20 ${isActive ? "text-yellow-600" : "text-gray-500"}`}>{step.title}</p>
                             </div>
-                            {index < steps.length - 1 && (<div className={`w-24 border-t-2 transition-colors duration-300 ${isCompleted ? "border-green-500" : "border-gray-200"}`}></div>)}
+                            {index < steps.length - 1 && (
+                                <div className={`w-16 border-t-2 self-start mt-5 transition-colors duration-300 ${isCompleted ? "border-green-500" : "border-gray-200"}`}></div>
+                            )}
                         </div>
                     );
                 })}
@@ -210,8 +211,8 @@ export default function ApplicationFormPage() {
         "Personal",
         "Goals",
         "Background & Achievements", // d.tsx
-        "Creative Works",
         "Learning",
+        "Self Assessment",
         "Portfolio",
         "Submit",
     ];

@@ -108,7 +108,7 @@ export default function PortfolioForm({
         </h2>
       </div>
 
-      <div className="bg-blue-50 text-blue-800 px-6 py-3 text-sm flex items-center gap-3 mx-6 mt-4 rounded-xl border border-blue-100">
+      <div className="bg-yellow-50 text-yellow-800 px-6 py-3 text-sm flex items-center gap-3 mx-6 mt-4 rounded-xl border border-yellow-100">
         <span className="text-lg">📋</span>
         <p>
           Please submit the required documents below. Supported formats: <b>PDF, PNG, JPG</b> (Max 10MB each).
@@ -117,7 +117,7 @@ export default function PortfolioForm({
 
       <div className="flex-1 overflow-y-auto max-h-[65vh] px-8 py-4">
         <h3 className="font-bold text-lg mb-2 text-black">
-          G. Portfolio - Document Submission
+         Portfolio - Document Submission
         </h3>
         <p className="text-sm text-gray-500 mb-6">
           Upload clear scanned copies or high-quality photos of your documents.
@@ -165,7 +165,7 @@ export default function PortfolioForm({
                 // IDLE STATE: Dropzone
                 <label className={`
                   group relative border-2 border-dashed rounded-xl p-6 transition-all cursor-pointer text-center
-                  ${errors[index] ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'}
+                  ${errors[index] ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-yellow-500 hover:bg-yellow-50'}
                 `}>
                   <input
                     type="file"
@@ -182,9 +182,9 @@ export default function PortfolioForm({
                       }
                     }}
                   />
-                  <Upload className={`mx-auto mb-2 transition-colors ${errors[index] ? 'text-red-400' : 'text-gray-400 group-hover:text-blue-500'}`} size={24} />
+                  <Upload className={`mx-auto mb-2 transition-colors ${errors[index] ? 'text-red-400' : 'text-gray-400 group-hover:text-yellow-500'}`} size={24} />
                   <p className="text-sm text-gray-600">
-                    <span className="font-semibold text-blue-600">Click to upload</span> or drag and drop
+                    <span className="font-semibold text-yellow-600">Click to upload</span> or drag and drop
                   </p>
                 </label>
               )}
