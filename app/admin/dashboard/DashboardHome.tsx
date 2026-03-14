@@ -322,13 +322,54 @@ export default function DashboardHome({
     return statusOrder.map(name => ({ name, value: counts[name] || 0 })).filter(e => e.value > 0);
   }, [filteredChartData, dataType]);
 
-  const timeSeriesData = useMemo(() => {
-    const byDate = filteredChartData.reduce((acc, item) => {
-      try { const d = new Date(item.created_at).toISOString().split("T")[0]; if (d) acc[d] = (acc[d] || 0) + 1; } catch { /* skip */ }
-      return acc;
-    }, {} as Record<string, number>);
-    return Object.entries(byDate).map(([date, count]) => ({ date, count })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [filteredChartData]);
+  const volumeTrendData = useMemo(() => {
+    if (selectedYear) {
+      const byMonth: Record<number, number> = {};
+      const src = campusFilteredData.filter(item => {
+        try { return new Date(item.created_at).getFullYear() === selectedYear; } catch { return false; }
+      });
+
+      src.forEach(item => {
+        try {
+          const month = new Date(item.created_at).getMonth();
+          byMonth[month] = (byMonth[month] || 0) + 1;
+        } catch {
+          /* skip */
+        }
+      });
+
+      return MONTHS.map((month, index) => ({
+        period: month,
+        count: byMonth[index] || 0,
+        sortKey: `${selectedYear}-${String(index + 1).padStart(2, "0")}`,
+      }));
+    }
+
+    const byMonthYear: Record<string, number> = {};
+    campusFilteredData.forEach(item => {
+      try {
+        const d = new Date(item.created_at);
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+        byMonthYear[key] = (byMonthYear[key] || 0) + 1;
+      } catch {
+        /* skip */
+      }
+    });
+
+    return Object.entries(byMonthYear)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, count]) => {
+        const [yearStr, monthStr] = key.split("-");
+        const monthIndex = Number(monthStr) - 1;
+        return {
+          period: `${MONTHS[monthIndex]} ${yearStr}`,
+          count,
+          sortKey: key,
+        };
+      });
+  }, [campusFilteredData, selectedYear]);
 
   const campusComparisonData = useMemo(() => {
     if (dataType !== "applicants") return [];
@@ -423,10 +464,10 @@ export default function DashboardHome({
   const yearMonthlyData = useMemo(() => selectedYear ? buildMonthlyData(selectedYear) : allMonthlyData, [campusFilteredData, dataType, selectedYear, allMonthlyData, allFilteredProgs]);
 
   const topProgram = programData[0];
-  const busiestDay = useMemo(() => {
-    if (!timeSeriesData.length) return null;
-    return timeSeriesData.reduce((max, item) => item.count > max.count ? item : max, timeSeriesData[0]);
-  }, [timeSeriesData]);
+  const busiestPeriod = useMemo(() => {
+    if (!volumeTrendData.length) return null;
+    return volumeTrendData.reduce((max, item) => item.count > max.count ? item : max, volumeTrendData[0]);
+  }, [volumeTrendData]);
   const topCampus = useMemo(() => campusComparisonData.length ? campusComparisonData[0] : null, [campusComparisonData]);
 
   // ─── Search Logic ──────────────────────────────────────────────────
@@ -524,7 +565,7 @@ export default function DashboardHome({
 
   // ─── Chart Tabs Definition ─────────────────────────────────────────
   const chartTabs = [
-    { id: "volume" as const, label: "Volume Trend", description: "Daily submissions over time", available: timeSeriesData.length > 0, icon: <Calendar size={16} /> },
+    { id: "volume" as const, label: "Volume Trend", description: "Monthly submission volume over time", available: filteredChartData.length > 0, icon: <Calendar size={16} /> },
     { id: "yearly" as const, label: "Program Trends", description: "Monthly submissions by program", available: yearlyData.length > 0, icon: <BarChart3 size={16} /> },
     { id: "status" as const, label: "Status Check", description: "Distribution by status", available: statusData.length > 0, icon: <BarChart3 size={16} /> },
     { id: "programs" as const, label: "Top Programs", description: "Applications vs Competency pipeline by program", available: programPipelineData.length > 0, icon: <GraduationCap size={16} /> },
@@ -538,10 +579,10 @@ export default function DashboardHome({
     if (activeChartId === "volume") {
       return (
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={timeSeriesData} margin={{ top: 10, right: 20, left: -5, bottom: 0 }}>
+          <AreaChart data={volumeTrendData} margin={{ top: 10, right: 20, left: -5, bottom: 0 }}>
             <defs><linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#F4C300" stopOpacity={0.65}/><stop offset="95%" stopColor="#F4C300" stopOpacity={0}/></linearGradient></defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false}/>
-            <XAxis dataKey="date" fontSize={11} tick={{ fill: "#6B7280" }} stroke="#D1D5DB" axisLine={false} tickLine={false} />
+            <XAxis dataKey="period" fontSize={11} tick={{ fill: "#6B7280" }} stroke="#D1D5DB" axisLine={false} tickLine={false} />
             <YAxis fontSize={11} tick={{ fill: "#6B7280" }} stroke="#D1D5DB" axisLine={false} tickLine={false} allowDecimals={false}/>
             <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "0.5rem" }} />
             <Area type="monotone" dataKey="count" stroke="#F4C300" fillOpacity={1} fill="url(#colorCount)" name="Submissions" strokeWidth={2}/>
@@ -783,7 +824,7 @@ export default function DashboardHome({
             </div>
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center"><Calendar size={16} /></div>
-              <div className="flex-1"><p className="text-sm font-semibold text-gray-800">Busiest Day</p><p className="text-sm text-gray-500">{busiestDay ? `${busiestDay.date} (${busiestDay.count})` : "No data yet"}</p></div>
+              <div className="flex-1"><p className="text-sm font-semibold text-gray-800">Busiest Period</p><p className="text-sm text-gray-500">{busiestPeriod ? `${busiestPeriod.period} (${busiestPeriod.count})` : "No data yet"}</p></div>
             </div>
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center"><ShieldUser size={16} /></div>
