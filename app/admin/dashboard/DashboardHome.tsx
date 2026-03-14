@@ -31,8 +31,6 @@ interface Applicant {
   user_id?: string;
 }
 
-type CampusMetric = "total" | "approved" | "pending" | "declined";
-
 type SearchResultItem = {
   id: string;
   formType: "Application" | "Portfolio";
@@ -45,18 +43,27 @@ type SearchResultItem = {
 };
 
 type SearchViewMode = "selected" | "all";
-type SearchStatusFilter = "All" | "Submitted" | "Pending" | "Approved" | "Declined";
+type SearchStatusFilter =
+  | "All"
+  | "Submitted"
+  | "Pending"
+  | "Competency Process"
+  | "Enrolled"
+  | "Graduated"
+  | "Approved"
+  | "Declined";
 
 // ─── Constants ───────────────────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
-  Approved: "#10B981", Pending: "#F59E0B", Declined: "#EF4444", Submitted: "#6B7280",
+  Submitted: "#6B7280",
+  Pending: "#F59E0B",
+  "Competency Process": "#2563EB",
+  Enrolled: "#14B8A6",
+  Graduated: "#8B5CF6",
+  Approved: "#10B981",
+  Declined: "#EF4444",
 };
-const CAMPUS_METRIC_COLORS: Record<CampusMetric, string> = {
-  total: "#F4C300", approved: "#1D4ED8", pending: "#F59E0B", declined: "#EF4444",
-};
-const CAMPUS_METRIC_LABELS: Record<CampusMetric, string> = {
-  total: "Total", approved: "Approved", pending: "Pending", declined: "Declined",
-};
+
 const programMap: Record<string, string> = {
   "BSCS": "CS", "BSIS": "IS", "BSIT": "IT", "BSCpE": "CpE", "BSIE": "IE",
   "BSBA-LSCM": "BA-LSCM", "BSBA-FM": "BA-FM", "BSBA-HRM": "BA-HRM", "BSBA-MM": "BA-MM",
@@ -73,12 +80,23 @@ const programMap: Record<string, string> = {
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const PROGRAM_COLORS = ["#1D4ED8","#10B981","#EF4444","#F4C300","#8B5CF6","#F59E0B","#06B6D4","#EC4899","#6B7280"];
 
+const APPLICATION_SEARCH_STATUSES: SearchStatusFilter[] = [
+  "All",
+  "Submitted",
+  "Pending",
+  "Competency Process",
+  "Enrolled",
+  "Graduated",
+];
+
+const PORTFOLIO_SEARCH_STATUSES: SearchStatusFilter[] = ["All", "Submitted", "Pending", "Approved", "Declined"];
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 const normalizeCampus = (campus: string | null | undefined): "Manila" | "Quezon City" | null => {
   const value = campus?.trim().toLowerCase();
   if (!value) return null;
-  if (["qc", "quezon city", "quezon", "q.c."].includes(value)) return "Quezon City";
-  if (["manila", "mnl", "m", "tip manila"].includes(value)) return "Manila";
+  if (value.includes("quezon") || value.includes("q.c") || value === "qc") return "Quezon City";
+  if (value.includes("manila") || value === "mnl") return "Manila";
   return null;
 };
 
@@ -93,6 +111,18 @@ const createWildcardRegex = (input: string): RegExp | null => {
     return escapeRegex(char);
   }).join("");
   try { return new RegExp(wildcardPattern, "i"); } catch { return null; }
+};
+
+const normalizeApplicationStatus = (status: string | null | undefined): SearchStatusFilter => {
+  const value = (status || "Submitted").trim().toLowerCase();
+  if (value === "submitted") return "Submitted";
+  if (value === "pending") return "Pending";
+  if (value === "competency process" || value === "competency") return "Competency Process";
+  if (value === "enrolled") return "Enrolled";
+  if (value === "graduated" || value === "graduate") return "Graduated";
+  if (value === "approved") return "Approved";
+  if (value === "declined") return "Declined";
+  return "Submitted";
 };
 
 // ─── Reusable Components ─────────────────────────────────────────────
@@ -120,11 +150,11 @@ export default function DashboardHome({
   const [allPortfolioSubmissions, setAllPortfolioSubmissions] = useState<PortfolioSubmission[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
   const [totalAdmins, setTotalAdmins] = useState(0);
-  const [chartCampus, setChartCampus] = useState<"Manila" | "Quezon City">("Manila");
+  const [chartCampus, setChartCampus] = useState<"Manila" | "Quezon City" | "All">("All");
   const [dataType, setDataType] = useState<"applicants" | "portfolios">("applicants");
   const [selectedChart, setSelectedChart] = useState<"volume" | "status" | "programs" | "campus" | "yearly">("volume");
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [campusMetric, setCampusMetric] = useState<CampusMetric>("total");
+
   const [searchTerm, setSearchTerm] = useState("");
   const [searchViewMode, setSearchViewMode] = useState<SearchViewMode>("selected");
   const [searchStatusFilter, setSearchStatusFilter] = useState<SearchStatusFilter>("All");
@@ -134,8 +164,17 @@ export default function DashboardHome({
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [selectedResult, setSelectedResult] = useState<SearchResultItem | null>(null);
   const [selectedResultDetails, setSelectedResultDetails] = useState<Record<string, any> | null>(null);
+  const trimmedSearchTerm = searchTerm.trim();
+  const canShowSearchResults = trimmedSearchTerm.length >= 3;
 
   useEffect(() => { setVisibleSearchCount(3); }, [searchTerm, dataType, searchViewMode, searchStatusFilter]);
+
+  useEffect(() => {
+    const allowedStatuses = dataType === "applicants" ? APPLICATION_SEARCH_STATUSES : PORTFOLIO_SEARCH_STATUSES;
+    if (!allowedStatuses.includes(searchStatusFilter)) {
+      setSearchStatusFilter("All");
+    }
+  }, [dataType, searchStatusFilter]);
 
   // ─── Data Fetching ─────────────────────────────────────────────────
   useEffect(() => {
@@ -173,21 +212,46 @@ export default function DashboardHome({
 
   // ─── Calculations ──────────────────────────────────────────────────
   const currentStats = useMemo(() => {
-    const src = dataType === "applicants" ? allApplicants : allPortfolioSubmissions;
+    const matchesYear = (item: { created_at: string }) => {
+      if (!selectedYear) return true;
+      try { return new Date(item.created_at).getFullYear() === selectedYear; } catch { return false; }
+    };
+    if (dataType === "applicants") {
+      const src = allApplicants.filter(matchesYear);
+      return {
+        total: src.length,
+        competency: src.filter(a => normalizeApplicationStatus(a.status) === "Competency Process").length,
+        pending: src.filter(a => { const s = normalizeApplicationStatus(a.status); return s === "Pending" || s === "Submitted"; }).length,
+        enrolled: src.filter(a => normalizeApplicationStatus(a.status) === "Enrolled").length,
+        graduated: src.filter(a => normalizeApplicationStatus(a.status) === "Graduated").length,
+      };
+    }
+    const src = allPortfolioSubmissions.filter(matchesYear);
     return {
       total: src.length,
-      approved: src.filter(a => a.status === "Approved").length,
+      competency: src.filter(a => a.status === "Approved").length,
       pending: src.filter(a => a.status === "Pending" || a.status === "Submitted").length,
-      declined: src.filter(a => a.status === "Declined").length,
+      enrolled: 0,
+      graduated: 0,
     };
-  }, [allApplicants, allPortfolioSubmissions, dataType]);
+  }, [allApplicants, allPortfolioSubmissions, dataType, selectedYear]);
 
-  const filteredChartData = useMemo(() => {
+  // Campus-filtered only (no year filter) — used for available years computation and yearly trend chart
+  const campusFilteredData = useMemo(() => {
     if (dataType === "applicants") {
+      if (chartCampus === "All") return allApplicants;
       return allApplicants.filter(app => normalizeCampus(app.campus) === chartCampus);
     }
     return allPortfolioSubmissions;
   }, [allApplicants, allPortfolioSubmissions, chartCampus, dataType]);
+
+  // Fully filtered (campus + year) — used for stat cards and all charts except multi-year Program Trends
+  const filteredChartData = useMemo(() => {
+    if (!selectedYear) return campusFilteredData;
+    return campusFilteredData.filter(item => {
+      try { return new Date(item.created_at).getFullYear() === selectedYear; } catch { return false; }
+    });
+  }, [campusFilteredData, selectedYear]);
 
   const programData = useMemo(() => {
     const byDegree = filteredChartData.reduce((acc, item) => {
@@ -199,14 +263,64 @@ export default function DashboardHome({
     return Object.entries(byDegree).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 7);
   }, [filteredChartData, dataType]);
 
+  const programPipelineData = useMemo(() => {
+    if (dataType !== "applicants") {
+      return programData.map((entry) => ({
+        name: entry.name,
+        applied: entry.count,
+        competencies: 0,
+        enrolled: 0,
+        graduated: 0,
+      }));
+    }
+
+    const grouped = filteredChartData.reduce((acc, item) => {
+      const app = item as Applicant;
+      const degreeKey = app.degree_applied_for || "N/A";
+      const shortName = programMap[degreeKey] || degreeKey;
+      const status = normalizeApplicationStatus(app.status);
+
+      if (!acc[shortName]) {
+        acc[shortName] = {
+          name: shortName,
+          applied: 0,
+          competencies: 0,
+          enrolled: 0,
+          graduated: 0,
+        };
+      }
+
+      if (status === "Competency Process") {
+        acc[shortName].competencies += 1;
+      } else if (status === "Enrolled") {
+        acc[shortName].enrolled += 1;
+      } else if (status === "Graduated") {
+        acc[shortName].graduated += 1;
+      } else {
+        acc[shortName].applied += 1;
+      }
+
+      return acc;
+    }, {} as Record<string, { name: string; applied: number; competencies: number; enrolled: number; graduated: number }>);
+
+    return Object.values(grouped)
+      .sort((a, b) => (b.applied + b.competencies + b.enrolled + b.graduated) - (a.applied + a.competencies + a.enrolled + a.graduated))
+      .slice(0, 7);
+  }, [dataType, filteredChartData, programData]);
+
   const statusData = useMemo(() => {
     const counts = filteredChartData.reduce((acc, item) => {
-      const status = item.status || "Submitted";
+      const status = dataType === "applicants"
+        ? normalizeApplicationStatus((item as Applicant).status)
+        : ((item.status || "Submitted") as SearchStatusFilter);
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    return ["Approved", "Pending", "Declined", "Submitted"].map(name => ({ name, value: counts[name] || 0 })).filter(e => e.value > 0);
-  }, [filteredChartData]);
+    const statusOrder = dataType === "applicants"
+      ? ["Submitted", "Pending", "Competency Process", "Enrolled", "Graduated"]
+      : ["Approved", "Pending", "Declined", "Submitted"];
+    return statusOrder.map(name => ({ name, value: counts[name] || 0 })).filter(e => e.value > 0);
+  }, [filteredChartData, dataType]);
 
   const timeSeriesData = useMemo(() => {
     const byDate = filteredChartData.reduce((acc, item) => {
@@ -218,18 +332,21 @@ export default function DashboardHome({
 
   const campusComparisonData = useMemo(() => {
     if (dataType !== "applicants") return [];
-    const counts = allApplicants.reduce((acc, item) => {
-      const key = normalizeCampus(item.campus);
-      if (!key) return acc;
-      const status = item.status?.trim().toLowerCase() || "submitted";
-      if (campusMetric === "approved" && status !== "approved") return acc;
-      if (campusMetric === "pending" && status !== "pending" && status !== "submitted") return acc;
-      if (campusMetric === "declined" && status !== "declined") return acc;
-      acc[key] = (acc[key] || 0) + 1;
+    const src = selectedYear
+      ? allApplicants.filter(item => { try { return new Date(item.created_at).getFullYear() === selectedYear; } catch { return false; } })
+      : allApplicants;
+    const grouped = src.reduce((acc, item) => {
+      const key = normalizeCampus(item.campus) ?? "Unknown";
+      const status = normalizeApplicationStatus(item.status);
+      if (!acc[key]) acc[key] = { name: key, applied: 0, competencies: 0, enrolled: 0, graduated: 0 };
+      if (status === "Competency Process") acc[key].competencies += 1;
+      else if (status === "Enrolled") acc[key].enrolled += 1;
+      else if (status === "Graduated") acc[key].graduated += 1;
+      else acc[key].applied += 1;
       return acc;
-    }, {} as Record<string, number>);
-    return Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
-  }, [allApplicants, dataType, campusMetric]);
+    }, {} as Record<string, { name: string; applied: number; competencies: number; enrolled: number; graduated: number }>);
+    return Object.values(grouped).sort((a, b) => (b.applied + b.competencies + b.enrolled + b.graduated) - (a.applied + a.competencies + a.enrolled + a.graduated));
+  }, [allApplicants, dataType, selectedYear]);
 
   // Helper to get program short name from any item
   const getProgShortName = (item: any) => {
@@ -240,14 +357,15 @@ export default function DashboardHome({
   // Collect all program names from filtered data
   const allFilteredProgs = useMemo(() => {
     const s = new Set<string>();
-    for (const item of filteredChartData) { try { s.add(getProgShortName(item)); } catch { /* skip */ } }
+    for (const item of campusFilteredData) { try { s.add(getProgShortName(item)); } catch { /* skip */ } }
     return Array.from(s);
-  }, [filteredChartData, dataType]);
+  }, [campusFilteredData, dataType]);
 
+  // yearlyData uses campusFilteredData (all years) so the multi-year line chart always works
   const { yearlyData, yearlyPrograms } = useMemo(() => {
     const byYear: Record<string, Record<string, number>> = {};
     const programSet = new Set<string>();
-    for (const item of filteredChartData) {
+    for (const item of campusFilteredData) {
       try {
         const year = new Date(item.created_at).getFullYear().toString();
         const prog = getProgShortName(item);
@@ -257,7 +375,6 @@ export default function DashboardHome({
       } catch { /* skip */ }
     }
     const allProgs = Array.from(programSet);
-    // Pad a second year if only one exists, so lines can be drawn
     const years = Object.keys(byYear).sort();
     if (years.length === 1) {
       const padYear = String(parseInt(years[0]) + 1);
@@ -271,17 +388,25 @@ export default function DashboardHome({
       })
       .sort((a, b) => a.year.localeCompare(b.year));
     return { yearlyData: rows, yearlyPrograms: allProgs };
-  }, [filteredChartData, dataType]);
+  }, [campusFilteredData, dataType]);
 
-  const availableYears = useMemo(() => yearlyData.map(r => parseInt(r.year)).sort((a, b) => a - b), [yearlyData]);
+  // availableYears from all campus data so year picker always shows every year
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    for (const item of campusFilteredData) {
+      try { years.add(new Date(item.created_at).getFullYear()); } catch { /* skip */ }
+    }
+    return Array.from(years).sort((a, b) => a - b);
+  }, [campusFilteredData]);
 
   const buildMonthlyData = (filterYear?: number | null) => {
     const byMonth: Record<number, Record<string, number>> = {};
-    for (const item of filteredChartData) {
+    const src = filterYear
+      ? campusFilteredData.filter(item => { try { return new Date(item.created_at).getFullYear() === filterYear; } catch { return false; } })
+      : campusFilteredData;
+    for (const item of src) {
       try {
-        const d = new Date(item.created_at);
-        if (filterYear && d.getFullYear() !== filterYear) continue;
-        const month = d.getMonth();
+        const month = new Date(item.created_at).getMonth();
         const prog = getProgShortName(item);
         if (!byMonth[month]) byMonth[month] = {};
         byMonth[month][prog] = (byMonth[month][prog] || 0) + 1;
@@ -294,8 +419,8 @@ export default function DashboardHome({
     });
   };
 
-  const allMonthlyData = useMemo(() => buildMonthlyData(), [filteredChartData, dataType, allFilteredProgs]);
-  const yearMonthlyData = useMemo(() => selectedYear ? buildMonthlyData(selectedYear) : allMonthlyData, [filteredChartData, dataType, selectedYear, allMonthlyData, allFilteredProgs]);
+  const allMonthlyData = useMemo(() => buildMonthlyData(), [campusFilteredData, dataType, allFilteredProgs]);
+  const yearMonthlyData = useMemo(() => selectedYear ? buildMonthlyData(selectedYear) : allMonthlyData, [campusFilteredData, dataType, selectedYear, allMonthlyData, allFilteredProgs]);
 
   const topProgram = programData[0];
   const busiestDay = useMemo(() => {
@@ -306,37 +431,45 @@ export default function DashboardHome({
 
   // ─── Search Logic ──────────────────────────────────────────────────
   const allSearchResults = useMemo(() => {
-    const effectiveSearchTerm = searchTerm.trim() ? searchTerm : "*";
-    const wildcard = createWildcardRegex(effectiveSearchTerm);
-    const normalizedTerm = effectiveSearchTerm.trim().toLowerCase();
+    const applicationItems: SearchResultItem[] = allApplicants.map(app => ({
+      id: app.application_id,
+      formType: "Application" as const,
+      name: app.applicant_name?.trim() || "Unnamed Applicant",
+      status: normalizeApplicationStatus(app.status),
+      program: app.degree_applied_for || "N/A",
+      campus: app.campus || "N/A",
+      createdAt: app.created_at,
+      score: 0,
+    }));
+
+    const portfolioItems: SearchResultItem[] = allPortfolioSubmissions.map(p => ({
+      id: String(p.id),
+      formType: "Portfolio" as const,
+      name: p.full_name?.trim() || "Unnamed Applicant",
+      status: p.status || "Submitted",
+      program: p.degree_program || "N/A",
+      campus: p.campus || "N/A",
+      createdAt: p.created_at,
+      score: 0,
+    }));
+
+    const allItems = [...applicationItems, ...portfolioItems];
+
+    // Only show results when query has at least 3 characters.
+    if (trimmedSearchTerm.length < 3) return [];
+
+    const wildcard = createWildcardRegex(searchTerm);
+    const normalizedTerm = trimmedSearchTerm.toLowerCase();
     if (!wildcard && !normalizedTerm) return [];
 
-    const scoreItem = (name: string, status: string, id: string, program: string, campus: string, formType: string): number => {
-      const formTypeSearchText = `${formType} type`;
-      const test = (val: string) => wildcard ? wildcard.test(val) : val.toLowerCase().includes(normalizedTerm);
-      return (test(name) ? 5 : 0) + (test(status) ? 4 : 0) + (test(id) ? 2 : 0) + (test(program) ? 1 : 0) + (test(campus) ? 1 : 0) + (test(formTypeSearchText) ? 1 : 0);
-    };
+    const test = (val: string) => wildcard ? wildcard.test(val) : val.toLowerCase().includes(normalizedTerm);
+    const scored = allItems.map(item => ({
+      ...item,
+      score: (test(item.name) ? 5 : 0) + (test(item.status) ? 4 : 0) + (test(item.id) ? 2 : 0) + (test(item.program) ? 1 : 0) + (test(item.campus) ? 1 : 0),
+    })).filter(i => i.score > 0);
 
-    const applicationItems: SearchResultItem[] = allApplicants.map(app => {
-      const name = app.applicant_name?.trim() || "Unnamed Applicant";
-      const status = app.status || "Submitted";
-      const program = app.degree_applied_for || "N/A";
-      const campus = app.campus || "N/A";
-      const id = app.application_id;
-      return { id, formType: "Application" as const, name, status, program, campus, createdAt: app.created_at, score: scoreItem(name, status, id, program, campus, "Application") };
-    }).filter(i => i.score > 0);
-
-    const portfolioItems: SearchResultItem[] = allPortfolioSubmissions.map(p => {
-      const name = p.full_name?.trim() || "Unnamed Applicant";
-      const status = p.status || "Submitted";
-      const program = p.degree_program || "N/A";
-      const campus = p.campus || "N/A";
-      const id = String(p.id);
-      return { id, formType: "Portfolio" as const, name, status, program, campus, createdAt: p.created_at, score: scoreItem(name, status, id, program, campus, "Portfolio") };
-    }).filter(i => i.score > 0);
-
-    return [...applicationItems, ...portfolioItems].sort((a, b) => b.score !== a.score ? b.score - a.score : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [allApplicants, allPortfolioSubmissions, searchTerm]);
+    return scored.sort((a, b) => b.score !== a.score ? b.score - a.score : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [allApplicants, allPortfolioSubmissions, searchTerm, trimmedSearchTerm]);
 
   const scopedSearchResults = useMemo(() => {
     const byDataset = searchViewMode === "all" ? allSearchResults : allSearchResults.filter(i => dataType === "applicants" ? i.formType === "Application" : i.formType === "Portfolio");
@@ -345,10 +478,24 @@ export default function DashboardHome({
   }, [allSearchResults, dataType, searchStatusFilter, searchViewMode]);
 
   const searchStatusCounts = useMemo(() => {
-    const counts: Record<SearchStatusFilter, number> = { All: scopedSearchResults.length, Submitted: 0, Pending: 0, Approved: 0, Declined: 0 };
+    const counts: Record<SearchStatusFilter, number> = {
+      All: scopedSearchResults.length,
+      Submitted: 0,
+      Pending: 0,
+      "Competency Process": 0,
+      Enrolled: 0,
+      Graduated: 0,
+      Approved: 0,
+      Declined: 0,
+    };
     scopedSearchResults.forEach(i => { const s = i.status as SearchStatusFilter; if (counts[s] !== undefined) counts[s]++; });
     return counts;
   }, [scopedSearchResults]);
+
+  const activeSearchStatuses = useMemo(
+    () => (dataType === "applicants" ? APPLICATION_SEARCH_STATUSES : PORTFOLIO_SEARCH_STATUSES),
+    [dataType]
+  );
 
   const displayedSearchResults = useMemo(() => scopedSearchResults.slice(0, visibleSearchCount), [scopedSearchResults, visibleSearchCount]);
 
@@ -380,8 +527,8 @@ export default function DashboardHome({
     { id: "volume" as const, label: "Volume Trend", description: "Daily submissions over time", available: timeSeriesData.length > 0, icon: <Calendar size={16} /> },
     { id: "yearly" as const, label: "Program Trends", description: "Monthly submissions by program", available: yearlyData.length > 0, icon: <BarChart3 size={16} /> },
     { id: "status" as const, label: "Status Check", description: "Distribution by status", available: statusData.length > 0, icon: <BarChart3 size={16} /> },
-    { id: "programs" as const, label: "Top Programs", description: "Top programs by count", available: programData.length > 0, icon: <GraduationCap size={16} /> },
-    { id: "campus" as const, label: "Campus Comparison", description: "Applicants by campus", available: dataType === "applicants" && campusComparisonData.length > 0, icon: <ShieldUser size={16} /> },
+    { id: "programs" as const, label: "Top Programs", description: "Applications vs Competency pipeline by program", available: programPipelineData.length > 0, icon: <GraduationCap size={16} /> },
+    { id: "campus" as const, label: "Campus Comparison", description: "Stacked status pipeline by campus", available: dataType === "applicants" && campusComparisonData.length > 0, icon: <ShieldUser size={16} /> },
   ];
 
   const activeChartId = chartTabs.some(t => t.id === selectedChart && t.available) ? selectedChart : (chartTabs.find(t => t.available)?.id ?? "volume");
@@ -434,23 +581,32 @@ export default function DashboardHome({
     if (activeChartId === "programs") {
       return (
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={programData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" horizontal={false} />
-            <XAxis type="number" tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} allowDecimals={false} />
-            <YAxis type="category" dataKey="name" width={70} tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "0.5rem" }}/><Bar dataKey="count" name="Count" fill="#1D4ED8" barSize={20} radius={[0, 4, 4, 0]}/>
+          <BarChart data={programPipelineData} margin={{ top: 10, right: 20, left: -5, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
+            <XAxis dataKey="name" tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} allowDecimals={false} />
+            <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "0.5rem" }}/>
+            <Legend iconType="circle" wrapperStyle={{ fontSize: "12px", paddingTop: "6px" }} />
+            <Bar dataKey="applied" name="Applied" fill="#1D4ED8" stackId="pipeline" radius={[0, 0, 4, 4]} />
+            <Bar dataKey="competencies" name="Competency" fill="#F59E0B" stackId="pipeline" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="enrolled" name="Enrolled" fill="#10B981" stackId="pipeline" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="graduated" name="Graduated" fill="#8B5CF6" stackId="pipeline" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       );
     }
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={campusComparisonData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+        <BarChart data={campusComparisonData} layout="vertical" margin={{ top: 6, right: 24, left: 10, bottom: 6 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" horizontal={false} />
           <XAxis type="number" tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} allowDecimals={false} />
-          <YAxis type="category" dataKey="name" width={80} tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} />
-          <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "0.5rem" }}/>
-          <Bar dataKey="count" name={`${CAMPUS_METRIC_LABELS[campusMetric]} Applicants`} fill={CAMPUS_METRIC_COLORS[campusMetric]} barSize={24} radius={[0, 6, 6, 0]} />
+          <YAxis type="category" dataKey="name" width={95} tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} />
+          <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "0.5rem" }} />
+          <Legend iconType="circle" wrapperStyle={{ fontSize: "12px", paddingTop: "6px" }} />
+          <Bar dataKey="applied" name="Applied" fill="#1D4ED8" stackId="campus" barSize={18} radius={[4, 0, 0, 4]} />
+          <Bar dataKey="competencies" name="Competency" fill="#F59E0B" stackId="campus" barSize={18} radius={[0, 0, 0, 0]} />
+          <Bar dataKey="enrolled" name="Enrolled" fill="#10B981" stackId="campus" barSize={18} radius={[0, 0, 0, 0]} />
+          <Bar dataKey="graduated" name="Graduated" fill="#8B5CF6" stackId="campus" barSize={18} radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
     );
@@ -479,9 +635,10 @@ export default function DashboardHome({
       {/* ═══ ROW 1: Stat Cards ═══ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title={dataType === "applicants" ? "Total Applications" : "Total Submissions"} value={currentStats.total} icon={<Users size={20} />} />
-        <StatCard title="Approved" value={currentStats.approved} icon={<CheckCircle size={20} />} />
+        <StatCard title={dataType === "applicants" ? "Competency Process" : "Approved"} value={currentStats.competency} icon={<CheckCircle size={20} />} />
         <StatCard title="Pending / Submitted" value={currentStats.pending} icon={<Clock size={20} />} />
-        <StatCard title="Declined" value={currentStats.declined} icon={<XCircle size={20} />} />
+        <StatCard title={dataType === "applicants" ? "Enrolled" : "Declined"} value={currentStats.enrolled} icon={<XCircle size={20} />} />
+        <StatCard title={dataType === "applicants" ? "Graduated" : "Completed"} value={currentStats.graduated} icon={<GraduationCap size={20} />} />
         <StatCard title="Total Unique Users" value={totalUsers} icon={<LogIn size={20} />} />
         <StatCard title="Total Unique Admins" value={totalAdmins} icon={<ShieldUser size={20} />} />
       </div>
@@ -495,28 +652,16 @@ export default function DashboardHome({
               <button onClick={() => setDataType("applicants")} className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${dataType === "applicants" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-white"}`}>Application Submissions</button>
               <button onClick={() => setDataType("portfolios")} className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${dataType === "portfolios" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-white"}`}>Portfolio Submissions</button>
             </div>
-            {/* Campus Toggle (shown when not on Campus Comparison chart) */}
-            {dataType === "applicants" && activeChartId !== "campus" && (
+            {/* Campus Toggle */}
+            {dataType === "applicants" && (
               <div className="inline-flex items-center bg-gray-50 border border-gray-200 rounded-full p-1 ml-2">
+                <button onClick={() => setChartCampus("All")} className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${chartCampus === "All" ? "bg-white text-black shadow" : "text-gray-600 hover:bg-white"}`}>All</button>
                 <button onClick={() => setChartCampus("Manila")} className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${chartCampus === "Manila" ? "bg-white text-black shadow" : "text-gray-600 hover:bg-white"}`}>Manila</button>
                 <button onClick={() => setChartCampus("Quezon City")} className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${chartCampus === "Quezon City" ? "bg-white text-black shadow" : "text-gray-600 hover:bg-white"}`}>Quezon City</button>
               </div>
             )}
-            {/* Campus Metric Toggle (shown only on Campus Comparison chart) */}
-            {dataType === "applicants" && activeChartId === "campus" && (
-              <div className="inline-flex items-center bg-gray-50 border border-gray-200 rounded-full p-1 ml-2">
-                {(Object.keys(CAMPUS_METRIC_LABELS) as CampusMetric[]).map(metric => (
-                  <button key={metric} onClick={() => setCampusMetric(metric)}
-                    className={`px-3 py-1.5 text-sm font-semibold rounded-full transition-colors border ${campusMetric === metric ? "text-black shadow" : "text-gray-600 hover:bg-white border-transparent"}`}
-                    style={campusMetric === metric ? { backgroundColor: `${CAMPUS_METRIC_COLORS[metric]}22`, borderColor: CAMPUS_METRIC_COLORS[metric] } : undefined}
-                  >{CAMPUS_METRIC_LABELS[metric]}</button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
-        <p className="text-xs text-gray-500">Select a dataset and switch between available visualizations.</p>
-
         {/* Search */}
         <div className="mt-1 border-t border-gray-100 pt-3">
           <label htmlFor="dashboard-form-search" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Search Applicant Forms</label>
@@ -530,40 +675,52 @@ export default function DashboardHome({
           <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
               <div className="inline-flex items-center bg-white border border-gray-200 rounded-full p-1">
-                <button onClick={() => setSearchViewMode("selected")} className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${searchViewMode === "selected" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-50"}`}>Selected Dataset</button>
+                <button onClick={() => setSearchViewMode("selected")} className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${searchViewMode === "selected" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-50"}`}>Selected</button>
                 <button onClick={() => setSearchViewMode("all")} className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${searchViewMode === "all" ? "bg-yellow-400 text-black shadow" : "text-gray-600 hover:bg-gray-50"}`}>All Submissions</button>
               </div>
-              <p className="text-xs text-gray-500">Showing {displayedSearchResults.length} of {scopedSearchResults.length} match(es)</p>
+              <p className="text-xs text-gray-500">
+                {canShowSearchResults
+                  ? `Showing ${displayedSearchResults.length} of ${scopedSearchResults.length} match(es)`
+                  : "Type at least 3 characters to show results"}
+              </p>
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(["All", "Submitted", "Pending", "Approved", "Declined"] as SearchStatusFilter[]).map(status => (
-                <button key={status} onClick={() => setSearchStatusFilter(status)} className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${searchStatusFilter === status ? "bg-white text-gray-900 border-yellow-400" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-white"}`}>{status} ({searchStatusCounts[status]})</button>
-              ))}
-            </div>
+            {canShowSearchResults && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {activeSearchStatuses.map(status => (
+                  <button key={status} onClick={() => setSearchStatusFilter(status)} className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${searchStatusFilter === status ? "bg-white text-gray-900 border-yellow-400" : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-white"}`}>{status} ({searchStatusCounts[status]})</button>
+                ))}
+              </div>
+            )}
 
             <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-2.5">
               {displayedSearchResults.length > 0 ? displayedSearchResults.map(item => (
-                <div key={`${item.formType}-${item.id}`} className="rounded-lg border border-gray-200 bg-white p-3">
+                <div key={`${item.formType}-${item.id}`} className="rounded-md border border-gray-200 bg-white p-2.5">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{item.name}</p>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200 text-gray-600 whitespace-nowrap">{item.formType}</span>
+                    <p className="text-xs font-semibold text-gray-900 truncate">{item.name}</p>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-50 border border-gray-200 text-gray-600 whitespace-nowrap">{item.formType}</span>
                   </div>
-                  <p className="text-xs text-gray-600 mt-1">Form ID: {item.id}</p>
-                  <p className="text-xs text-gray-600">Status: {item.status}</p>
-                  <p className="text-xs text-gray-600">Program: {item.program}</p>
-                  <p className="text-xs text-gray-600">Campus: {item.campus}</p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <p className="text-[11px] text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</p>
-                    <button onClick={() => openDetailsFromDashboard(item)} className="text-xs font-semibold text-yellow-700 hover:text-yellow-800">Open Details</button>
+                  <p className="text-[11px] text-gray-600 mt-1">Form ID: {item.id}</p>
+                  <p className="text-[11px] text-gray-600">Status: {item.status}</p>
+                  <p className="text-[11px] text-gray-600">Program: {item.program}</p>
+                  <p className="text-[11px] text-gray-600">Campus: {item.campus}</p>
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <p className="text-[10px] text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</p>
+                    <button onClick={() => openDetailsFromDashboard(item)} className="text-[11px] font-semibold text-yellow-700 hover:text-yellow-800">Open Details</button>
                   </div>
                 </div>
               )) : (
-                <div className="lg:col-span-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3 text-sm text-gray-500">No matching forms found for this filter.</div>
+                <div className="lg:col-span-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3 text-sm text-gray-500">
+                  {trimmedSearchTerm.length === 0
+                    ? "No results shown. Start typing to search forms."
+                    : trimmedSearchTerm.length < 3
+                      ? "Type at least 3 characters to show results."
+                      : "No matching forms found for this filter."}
+                </div>
               )}
             </div>
 
-            {scopedSearchResults.length > displayedSearchResults.length && (
+            {canShowSearchResults && scopedSearchResults.length > displayedSearchResults.length && (
               <div className="mt-3 flex justify-center">
                 <button onClick={() => setVisibleSearchCount(prev => prev + 3)} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50">Show 3 more</button>
               </div>
@@ -591,7 +748,7 @@ export default function DashboardHome({
             <div>
               <p className="text-xs font-semibold uppercase text-gray-500 tracking-wide">{chartTabs.find(t => t.id === activeChartId)?.label}</p>
               <p className="text-sm text-gray-500">{chartTabs.find(t => t.id === activeChartId)?.description}</p>
-              {activeChartId === "yearly" && availableYears.length > 0 && (
+              {availableYears.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   <button onClick={() => setSelectedYear(null)} className={`px-3 py-1 text-xs font-semibold rounded-full border transition-colors ${selectedYear === null ? "bg-yellow-400 border-yellow-400 text-black" : "border-gray-200 text-gray-600 bg-white hover:bg-gray-50"}`}>All Years</button>
                   {availableYears.map(yr => (
@@ -601,8 +758,8 @@ export default function DashboardHome({
               )}
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: dataType === "applicants" && activeChartId === "campus" ? CAMPUS_METRIC_COLORS[campusMetric] : "#F4C300" }}></div>
-              <span>{dataType === "applicants" ? (activeChartId === "campus" ? `All campuses • ${CAMPUS_METRIC_LABELS[campusMetric]} data` : `${chartCampus} data`) : "Portfolio data"}</span>
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#F4C300" }}></div>
+              <span>{dataType === "applicants" ? (chartCampus === "All" ? "All campuses" : `${chartCampus} campus`) : "Portfolio data"}{selectedYear ? ` • ${selectedYear}` : " • All years"}</span>
             </div>
           </div>
 
@@ -630,7 +787,7 @@ export default function DashboardHome({
             </div>
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center"><ShieldUser size={16} /></div>
-              <div className="flex-1"><p className="text-sm font-semibold text-gray-800">Top Campus</p><p className="text-sm text-gray-500">{topCampus ? `${topCampus.name} (${topCampus.count})` : "No campus data"}</p></div>
+              <div className="flex-1"><p className="text-sm font-semibold text-gray-800">Top Campus</p><p className="text-sm text-gray-500">{topCampus ? `${topCampus.name} (${topCampus.applied + topCampus.competencies + topCampus.enrolled + topCampus.graduated})` : "No campus data"}</p></div>
             </div>
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center"><LogIn size={16} /></div>

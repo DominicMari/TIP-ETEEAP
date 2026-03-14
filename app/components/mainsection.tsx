@@ -176,7 +176,7 @@ function ProgramModal({
               alt={`${program.title} banner`} 
               className={`w-full h-full object-cover transition-all duration-700 ease-out ${isImageLoaded ? 'opacity-100' : 'opacity-0'}`} 
               onLoad={() => setIsImageLoaded(true)} 
-              onError={(e) => {(e.target as HTMLImageElement).src = 'https://via.placeholder.com/800x200?text=Image+Unavailable'; setIsImageLoaded(true);}} 
+              onError={(e) => { const img = e.target as HTMLImageElement; img.onerror = null; img.src = '/assets/default-avatar.png'; setIsImageLoaded(true); }} 
             />
             
             <button onClick={onClose} className="absolute top-4 right-4 z-10 text-gray-900 hover:text-white transition-colors p-3 rounded-full bg-yellow-400 hover:bg-red-600 shadow-lg transform hover:scale-105" aria-label="Close modal" type="button">
@@ -211,7 +211,6 @@ function ProgramModal({
             </div>
         </div>
       </div>
-      <style global jsx>{`/* Custom Scrollbar CSS here if needed */`}</style>
     </div>
   );
 }
@@ -274,7 +273,7 @@ export default function MainSection({
         <div className="relative flex flex-col justify-center items-center lg:w-1/2 p-8 lg:p-12 bg-gradient-to-br from-gray-800 via-gray-900 to-black">
           <div className="relative z-10 text-center max-w-lg">
             <div className="flex items-center justify-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center shadow-xl"><img src="/assets/TIPLogo.png" className="w-12 h-12 object-contain" onError={(e) => {(e.target as HTMLImageElement).style.display = "none";}}/></div>
+              <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center shadow-xl"><img src="/assets/TIPLogo.png" className="w-12 h-12 object-contain" onError={(e) => { const img = e.target as HTMLImageElement; img.onerror = null; img.style.display = "none"; }}/></div>
               <div className="text-left"><p className="text-yellow-400 text-lg font-bold tracking-wider">Technological</p><p className="text-xs text-gray-400 uppercase tracking-widest">Institute of the Philippines</p></div>
             </div>
             <h1 className="text-5xl lg:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-500 drop-shadow-2xl mb-4 tracking-tight leading-none">ETEEAP</h1>
