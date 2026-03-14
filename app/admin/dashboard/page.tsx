@@ -316,7 +316,7 @@ export default function DashboardPage() {
         {/* Sidebar */}
         <aside className="w-64 bg-white border-r border-gray-200 p-5 flex flex-col shrink-0 h-screen sticky top-0">
           <div className="flex items-center gap-3 mb-8 flex-shrink-0">
-            <img src="/assets/TIPLogo.png" alt="TIP Logo" className="w-9 h-9" />
+            <img src="/assets/NewTIPLogo.png" alt="TIP Logo" className="w-13 h-10" />
             <h1 className="text-xl font-bold text-gray-800">Admin Panel</h1>
           </div>
           <div className="flex flex-col flex-grow overflow-y-auto overflow-x-hidden">
