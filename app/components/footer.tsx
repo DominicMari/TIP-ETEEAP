@@ -10,7 +10,7 @@ export default function Footer() {
           <div className="lg:col-span-2 border-b border-gray-700 pb-8 lg:border-none lg:pb-0">
             <div className="flex items-center gap-4 mb-4">
               <img
-                src="/assets/TIPLogo.png"
+                src="/assets/NewTIPLogo.png"
                 alt="TIP Logo"
                 className="w-14 h-14 object-contain"
               />

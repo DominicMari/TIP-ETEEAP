@@ -26,7 +26,7 @@ export default function Header() {
       <div className="flex items-center gap-3">
         {/* Added a Link to home on the logo/title for better UX */}
         <Link href="/" className="flex items-center gap-3">
-          <img src="/assets/TIPLogo.png" alt="TIP Logo" className="w-10 h-10" />
+          <img src="/assets/NewTIPLogo.png" alt="TIP Logo" className="w-15 h-10" />
           <h1 className="text-lg font-bold">ETEEAP</h1>
         </Link>
       </div>
