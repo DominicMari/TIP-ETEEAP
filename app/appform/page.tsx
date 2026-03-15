@@ -1,17 +1,15 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-// ✅ 1. IMPORT THE SHARED CLIENT
 import supabase from "@/lib/supabase/client";
 import { useSession } from "next-auth/react";
-// ✅ 2. IMPORT Link and ArrowLeft
 import Link from "next/link";
-import { PenTool, Loader2, ArrowLeft } from "lucide-react";
+import { PenTool, Loader2, ArrowLeft, AlertCircle } from "lucide-react";
 import SignatureCanvas from 'react-signature-canvas';
 import InitialForm from "./a";
 import PersonalInformationForm from "./b";
 import PrioritiesGoalsForm from "./c-h";
-import BackgroundAchievementsForm from "./d"; //missing page
+import BackgroundAchievementsForm from "./d";
 import CreativeWorksForm from "./i";
 import LifelongLearningForm from "./j";
 import PortfolioForm from "./portfolio";
@@ -163,8 +161,38 @@ export default function ApplicationFormPage() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const signaturePadRef = useRef<SignatureCanvas>(null);
-    const [hasConsented, setHasConsented] = useState(false); 
+   const [hasConsented, setHasConsented] = useState(false); 
+    const [hasExistingApplication, setHasExistingApplication] = useState(false);
+    const [checkingExisting, setCheckingExisting] = useState(true);
     const router = useRouter();
+
+    // Check if user already submitted an application
+    useEffect(() => {
+      const checkExisting = async () => {
+        if (session?.user?.email) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', session.user.email)
+            .single();
+
+          if (userData?.id) {
+            const { data: existingApp } = await supabase
+              .from('applications')
+              .select('application_id')
+              .eq('user_id', userData.id)
+              .limit(1)
+              .single();
+
+            if (existingApp) {
+              setHasExistingApplication(true);
+            }
+          }
+        }
+        setCheckingExisting(false);
+      };
+      checkExisting();
+    }, [session]);
 
     const defaultFormData = {
         initial: { name: "", degree: "", campus: "", date: getTodayDateISO(), folderLink: "", photo: null as File | null },
@@ -517,11 +545,32 @@ export default function ApplicationFormPage() {
     // --- FINAL RETURN ---
     return (
         <div className="min-h-screen flex flex-col justify-center items-center bg-gray-100 p-6 font-sans">
-            
-            {hasConsented ? (
+            {hasExistingApplication ? (
+                <div className="bg-white p-10 rounded-2xl shadow-2xl text-center flex flex-col items-center max-w-md">
+                    <div className="bg-yellow-100 text-yellow-600 p-4 rounded-full mb-4">
+                        <AlertCircle size={40} />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-3">Application Already Submitted</h2>
+                    <p className="text-gray-600 mb-6">
+                        You have already submitted an application. Only one application per account is allowed. If you need to make changes, please contact an administrator.
+                    </p>
+                    <div className="flex gap-3">
+                        <Link href="/tracker" className="px-6 py-3 bg-slate-700 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors">
+                            Track Application
+                        </Link>
+                        <Link href="/" className="px-6 py-3 bg-yellow-500 text-gray-900 font-bold rounded-lg hover:bg-yellow-400 transition-colors">
+                            Back to Home
+                        </Link>
+                    </div>
+                </div>
+            ) : checkingExisting ? (
+                <div className="flex items-center gap-3 text-gray-600">
+                    <Loader2 className="animate-spin" size={24} />
+                    <span>Checking application status...</span>
+                </div>
+            ) : hasConsented ? (
                 // --- If they HAVE consented, show the form ---
                 <>
-                    {/* ✅ 10. ADDED: Back to Home button (hides on success) */}
                     {currentStep <= totalSteps && ( // 8 <= 8
                         <div className="w-full max-w-5xl mb-4">
                             <Link 
@@ -537,7 +586,7 @@ export default function ApplicationFormPage() {
                     <Pagination currentStep={currentStep} totalSteps={totalSteps} stepTitles={stepTitles} />
                     {renderStep()}
                 </>
-            ) : (
+                ) : (
                 // --- If they have NOT consented, show the modal ---
                 <DataPrivacyConsent
                     onAgree={handleConsentAgree}

@@ -1,31 +1,26 @@
 "use client";
 import React, { useState, ReactNode, useRef } from "react";
 import { Plus, Minus, Paperclip, X } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "YOUR_SUPABASE_URL";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 /* ---------------- Types ---------------- */
 type WithFile = { fileName?: string };
-type EducationEntry   = WithFile & { schoolName: string; schoolAddress: string; degreeProgram?: string; yearGraduated: string; startDate: string; endDate: string; };
-type EducationState   = { tertiary: EducationEntry[]; secondary: EducationEntry[]; elementary: EducationEntry[]; technical: EducationEntry[]; };
-type NonFormalEntry   = WithFile & { title: string; sponsor: string; venue: string; startDate: string; endDate: string; };
-type CertificationEntry = WithFile & { title: string; certifyingBodyName: string; certifyingBodyAddress: string; dateCertified: string; rating: string; };
-type PublicationEntry   = WithFile & { title: string; circulation: string; level: string; yearPublished: string; yearPresented: string; };
-type InventionEntry     = WithFile & { title: string; agency: string; applicationDate: string; level: string; yearPublished: string; };
-type EmploymentEntry    = WithFile & { company: string; companyAddress: string; designation: string; startDate: string; endDate: string; description: string; };
-type ConsultancyEntry   = WithFile & { consultancy: string; companyName: string; companyAddress: string; startDate: string; endDate: string; };
-type SelfEmploymentEntry = WithFile & { company: string; companyAddress: string; designation: string; reference: string; startDate: string; endDate: string; description: string; };
-type WorkExperienceState = { employment: EmploymentEntry[]; consultancy: ConsultancyEntry[]; selfEmployment: SelfEmploymentEntry[]; };
-type RecognitionEntry   = WithFile & { title: string; awardingBodyName: string; awardingBodyAddress: string; startDate: string; endDate: string; };
-type MembershipEntry    = WithFile & { organization: string; designation: string; startDate: string; endDate: string; };
-type ProjectEntry       = WithFile & { title: string; designation: string; startDate: string; endDate: string; description: string; };
-type ResearchEntry      = WithFile & { title: string; institution: string; startDate: string; endDate: string; description: string; };
-type CreativeWork       = WithFile & { title: string; institutionName: string; institutionAddress: string; startDate: string; endDate: string; };
+type EducationEntry = WithFile & { schoolName: string; schoolAddress: string; degreeProgram?: string; yearGraduated: string; startDate: string; endDate: string };
+type EducationState = { tertiary: EducationEntry[]; secondary: EducationEntry[]; elementary: EducationEntry[]; technical: EducationEntry[] };
+type NonFormalEntry = WithFile & { title: string; sponsor: string; venue: string; startDate: string; endDate: string };
+type CertificationEntry = WithFile & { title: string; certifyingBodyName: string; certifyingBodyAddress: string; dateCertified: string; rating: string };
+type PublicationEntry = WithFile & { title: string; circulation: string; level: string; yearPublished: string; yearPresented: string };
+type InventionEntry = WithFile & { title: string; agency: string; applicationDate: string; level: string; yearPublished: string };
+type EmploymentEntry = WithFile & { company: string; companyAddress: string; designation: string; startDate: string; endDate: string; description: string };
+type ConsultancyEntry = WithFile & { consultancy: string; companyName: string; companyAddress: string; startDate: string; endDate: string };
+type SelfEmploymentEntry = WithFile & { company: string; companyAddress: string; designation: string; reference: string; startDate: string; endDate: string; description: string };
+type WorkExperienceState = { employment: EmploymentEntry[]; consultancy: ConsultancyEntry[]; selfEmployment: SelfEmploymentEntry[] };
+type RecognitionEntry = WithFile & { title: string; awardingBodyName: string; awardingBodyAddress: string; startDate: string; endDate: string };
+type MembershipEntry = WithFile & { organization: string; designation: string; startDate: string; endDate: string };
+type ProjectEntry = WithFile & { title: string; designation: string; startDate: string; endDate: string; description: string };
+type ResearchEntry = WithFile & { title: string; institution: string; startDate: string; endDate: string; description: string };
+type CreativeWork = WithFile & { title: string; institutionName: string; institutionAddress: string; startDate: string; endDate: string };
 
-type FieldErrors     = Partial<Record<keyof EducationEntry, string>>;
+type FieldErrors = Partial<Record<keyof EducationEntry, string>>;
 type EducationErrors = Partial<Record<keyof EducationState, FieldErrors[]>>;
 type ValidationErrors = { education?: EducationErrors };
 
@@ -54,8 +49,8 @@ function NoneBadge({ onUndo }: { onUndo: () => void }) {
   );
 }
 
-/* ---------------- None + Add button bar (for empty list) ---------------- */
-function NoneAddBar({ onNone, onAdd, limit, count, limitLabel }: { onNone: () => void; onAdd: () => void; limit?: number; count: number; limitLabel?: string; }) {
+/* ---------------- None + Add button bar ---------------- */
+function NoneAddBar({ onNone, onAdd, limit, count, limitLabel }: { onNone: () => void; onAdd: () => void; limit?: number; count: number; limitLabel?: string }) {
   const atLimit = limit !== undefined && count >= limit;
   return (
     <div className="flex justify-end gap-2 mb-3">
@@ -67,7 +62,7 @@ function NoneAddBar({ onNone, onAdd, limit, count, limitLabel }: { onNone: () =>
 }
 
 /* ---------------- AccordionItem ---------------- */
-function AccordionItem({ title, children, defaultOpen = false, hasError = false }: { title: string; children: ReactNode; defaultOpen?: boolean; hasError?: boolean; }) {
+function AccordionItem({ title, children, defaultOpen = false, hasError = false }: { title: string; children: ReactNode; defaultOpen?: boolean; hasError?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className={`border rounded-lg mb-4 bg-white shadow-sm ${hasError ? "border-red-400" : ""}`}>
@@ -85,43 +80,45 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-red-600 text-sm mt-1">{message}</p>;
 }
 
-/* ---- Inline error banner ---- */
 function SectionError({ message }: { message?: string }) {
   if (!message) return null;
   return <div className="mb-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-red-600 text-sm font-medium">{message}</div>;
 }
 
 /* ============================================================
-   SECTION C: Educational Background
+   SECTION C: Formal Education — All levels have None/Add
    ============================================================ */
-function FormalEducationSection({ education, onChange, onAdd, onRemove, errors, hasNoTechnical, onNoneTechnical }: {
+function FormalEducationSection({ education, onChange, onAdd, onRemove, errors,
+  hasNoTertiary, onNoneTertiary, hasNoSecondary, onNoneSecondary, hasNoElementary, onNoneElementary, hasNoTechnical, onNoneTechnical
+}: {
   education: EducationState;
   onChange: (level: keyof EducationState, i: number, f: keyof EducationEntry, v: string) => void;
   onAdd: (level: keyof EducationState) => void;
   onRemove: (level: keyof EducationState, i: number) => void;
   errors?: ValidationErrors["education"];
-  hasNoTechnical: boolean;
-  onNoneTechnical: () => void;
+  hasNoTertiary: boolean; onNoneTertiary: () => void;
+  hasNoSecondary: boolean; onNoneSecondary: () => void;
+  hasNoElementary: boolean; onNoneElementary: () => void;
+  hasNoTechnical: boolean; onNoneTechnical: () => void;
 }) {
   const levels = [
-    { key: "tertiary" as const,   label: "Tertiary",            req: true  },
-    { key: "secondary" as const,  label: "Secondary",           req: true  },
-    { key: "elementary" as const, label: "Elementary",          req: true  },
-    { key: "technical" as const,  label: "Technical/Vocational", req: false },
+    { key: "tertiary" as const, label: "Tertiary", req: true, isNone: hasNoTertiary, onNone: onNoneTertiary },
+    { key: "secondary" as const, label: "Secondary", req: true, isNone: hasNoSecondary, onNone: onNoneSecondary },
+    { key: "elementary" as const, label: "Elementary", req: true, isNone: hasNoElementary, onNone: onNoneElementary },
+    { key: "technical" as const, label: "Technical/Vocational", req: false, isNone: hasNoTechnical, onNone: onNoneTechnical },
   ];
   return (
     <div>
-      {levels.map(({ key, label, req }) => {
+      {levels.map(({ key, label, req, isNone, onNone }) => {
         const list = education[key];
-        const isTech = key === "technical";
         return (
           <div key={key} className="mb-8">
             <h4 className="font-semibold text-black mb-3">{label}{req ? <span className="text-red-500">*</span> : " (Optional)"}</h4>
-            {isTech && hasNoTechnical && <NoneBadge onUndo={onNoneTechnical} />}
-            {isTech && !hasNoTechnical && list.length === 0 && (
-              <NoneAddBar onNone={onNoneTechnical} onAdd={() => onAdd(key)} count={list.length} />
+            {isNone && <NoneBadge onUndo={onNone} />}
+            {!isNone && list.length === 0 && (
+              <NoneAddBar onNone={onNone} onAdd={() => onAdd(key)} count={list.length} />
             )}
-            {(!isTech || !hasNoTechnical) && list.map((entry, idx) => (
+            {!isNone && list.map((entry, idx) => (
               <div key={idx} className="bg-white border border-gray-200 p-5 rounded-xl shadow-sm mb-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
@@ -157,7 +154,7 @@ function FormalEducationSection({ education, onChange, onAdd, onRemove, errors, 
                 <FileUploadRow fileName={entry.fileName} onFileChange={(n) => onChange(key, idx, "fileName" as any, n)} />
                 <div className="flex justify-end gap-2 mt-3">
                   {idx > 0 && <button type="button" onClick={() => onRemove(key, idx)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm"><Minus size={16} /> Remove</button>}
-                  {isTech && idx === 0 && <button type="button" onClick={onNoneTechnical} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold">None</button>}
+                  {idx === 0 && <button type="button" onClick={onNone} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold">None</button>}
                   {idx === list.length - 1 && <button type="button" onClick={() => onAdd(key)} className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm"><Plus size={16} /> Add</button>}
                 </div>
               </div>
@@ -170,7 +167,7 @@ function FormalEducationSection({ education, onChange, onAdd, onRemove, errors, 
 }
 
 /* ============================================================
-   Generic subsection: one type, has None, has file upload
+   Generic SubSection: one type, has None, has file upload
    ============================================================ */
 type SubSectionProps<T extends WithFile> = {
   label?: string;
@@ -207,9 +204,9 @@ function SubSection<T extends WithFile>({ label, entries, isNone, onNone, onAdd,
 }
 
 /* ============================================================
-   SECTION C: Non-Formal
+   Non-Formal Education
    ============================================================ */
-function NonFormalSection({ nonFormal, isNone, onNone, onChange, onAdd, onRemove }: { nonFormal: NonFormalEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof NonFormalEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void; }) {
+function NonFormalSection({ nonFormal, isNone, onNone, onChange, onAdd, onRemove }: { nonFormal: NonFormalEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof NonFormalEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <SubSection entries={nonFormal} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
       onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
@@ -218,22 +215,16 @@ function NonFormalSection({ nonFormal, isNone, onNone, onChange, onAdd, onRemove
           <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Title of Training/Seminar</label><input type="text" value={entry.title} onChange={(e) => onChange(idx, "title", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Sponsor</label><input type="text" value={entry.sponsor} onChange={(e) => onChange(idx, "sponsor", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Venue</label><input type="text" value={entry.venue} onChange={(e) => onChange(idx, "venue", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Inclusive Dates</label>
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-xs text-gray-500 mb-1">Start</label><input type="month" value={entry.startDate} onChange={(e) => onChange(idx, "startDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
-              <div><label className="block text-xs text-gray-500 mb-1">End</label><input type="month" value={entry.endDate} onChange={(e) => onChange(idx, "endDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
-            </div>
-          </div>
+          <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Inclusive Dates</label><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-gray-500 mb-1">Start</label><input type="month" value={entry.startDate} onChange={(e) => onChange(idx, "startDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div><div><label className="block text-xs text-gray-500 mb-1">End</label><input type="month" value={entry.endDate} onChange={(e) => onChange(idx, "endDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div></div></div>
         </div>
       )} />
   );
 }
 
 /* ============================================================
-   SECTION D: Certifications
+   Certifications
    ============================================================ */
-function CertificationSection({ certifications, isNone, onNone, onChange, onAdd, onRemove }: { certifications: CertificationEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof CertificationEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void; }) {
+function CertificationSection({ certifications, isNone, onNone, onChange, onAdd, onRemove }: { certifications: CertificationEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof CertificationEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <SubSection entries={certifications} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
       onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
@@ -250,9 +241,9 @@ function CertificationSection({ certifications, isNone, onNone, onChange, onAdd,
 }
 
 /* ============================================================
-   SECTION E: Publications + Inventions (each has own None)
+   Publications
    ============================================================ */
-function PublicationSection({ publications, isNone, onNone, onChange, onAdd, onRemove }: { publications: PublicationEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof PublicationEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void; }) {
+function PublicationSection({ publications, isNone, onNone, onChange, onAdd, onRemove }: { publications: PublicationEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof PublicationEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <SubSection label="Publications" entries={publications} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
       onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
@@ -268,7 +259,10 @@ function PublicationSection({ publications, isNone, onNone, onChange, onAdd, onR
   );
 }
 
-function InventionSection({ inventions, isNone, onNone, onChange, onAdd, onRemove }: { inventions: InventionEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof InventionEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void; }) {
+/* ============================================================
+   Inventions
+   ============================================================ */
+function InventionSection({ inventions, isNone, onNone, onChange, onAdd, onRemove }: { inventions: InventionEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof InventionEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <SubSection label="Inventions" entries={inventions} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
       onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
@@ -285,9 +279,7 @@ function InventionSection({ inventions, isNone, onNone, onChange, onAdd, onRemov
 }
 
 /* ============================================================
-   SECTION F: Work Experience — at least ONE sub-type must have
-   entries. Each sub-type individually can be marked None,
-   but not all three at the same time.
+   Work Experience
    ============================================================ */
 function WorkExperienceSection({ work, onEmploymentChange, onConsultancyChange, onSelfEmploymentChange, onAdd, onRemove, noneEmp, onNoneEmp, noneCon, onNoneCon, noneSE, onNoneSE }: {
   work: WorkExperienceState;
@@ -298,18 +290,14 @@ function WorkExperienceSection({ work, onEmploymentChange, onConsultancyChange, 
   onRemove: (t: keyof WorkExperienceState, i: number) => void;
   noneEmp: boolean; onNoneEmp: () => void;
   noneCon: boolean; onNoneCon: () => void;
-  noneSE: boolean;  onNoneSE: () => void;
+  noneSE: boolean; onNoneSE: () => void;
 }) {
   return (
     <div>
       {/* Employment */}
-      <h4 className="font-semibold text-black mb-3">
-        Employment <span className="italic text-gray-500 font-normal text-sm">(from current to previous)</span>
-      </h4>
+      <h4 className="font-semibold text-black mb-3">Employment <span className="italic text-gray-500 font-normal text-sm">(from current to previous)</span></h4>
       {noneEmp && <NoneBadge onUndo={onNoneEmp} />}
-      {!noneEmp && work.employment.length === 0 && (
-        <NoneAddBar onNone={onNoneEmp} onAdd={() => onAdd("employment")} count={0} />
-      )}
+      {!noneEmp && work.employment.length === 0 && <NoneAddBar onNone={onNoneEmp} onAdd={() => onAdd("employment")} count={0} />}
       {!noneEmp && work.employment.map((entry, idx) => (
         <div key={idx} className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm mb-4">
           <div className="grid grid-cols-2 gap-4">
@@ -333,9 +321,7 @@ function WorkExperienceSection({ work, onEmploymentChange, onConsultancyChange, 
       {/* Consultancy */}
       <h4 className="font-semibold text-black mb-3">Consultancy Services</h4>
       {noneCon && <NoneBadge onUndo={onNoneCon} />}
-      {!noneCon && work.consultancy.length === 0 && (
-        <NoneAddBar onNone={onNoneCon} onAdd={() => onAdd("consultancy")} count={0} />
-      )}
+      {!noneCon && work.consultancy.length === 0 && <NoneAddBar onNone={onNoneCon} onAdd={() => onAdd("consultancy")} count={0} />}
       {!noneCon && work.consultancy.map((entry, idx) => (
         <div key={idx} className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm mb-4">
           <div className="grid grid-cols-2 gap-4">
@@ -358,9 +344,7 @@ function WorkExperienceSection({ work, onEmploymentChange, onConsultancyChange, 
       {/* Self-Employment */}
       <h4 className="font-semibold text-black mb-3">Self-Employment</h4>
       {noneSE && <NoneBadge onUndo={onNoneSE} />}
-      {!noneSE && work.selfEmployment.length === 0 && (
-        <NoneAddBar onNone={onNoneSE} onAdd={() => onAdd("selfEmployment")} count={0} />
-      )}
+      {!noneSE && work.selfEmployment.length === 0 && <NoneAddBar onNone={onNoneSE} onAdd={() => onAdd("selfEmployment")} count={0} />}
       {!noneSE && work.selfEmployment.map((entry, idx) => (
         <div key={idx} className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm mb-4">
           <div className="grid grid-cols-2 gap-4">
@@ -384,9 +368,9 @@ function WorkExperienceSection({ work, onEmploymentChange, onConsultancyChange, 
 }
 
 /* ============================================================
-   SECTION G: Recognitions
+   Recognitions
    ============================================================ */
-function RecognitionSection({ recognitions, isNone, onNone, onChange, onAdd, onRemove }: { recognitions: RecognitionEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof RecognitionEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void; }) {
+function RecognitionSection({ recognitions, isNone, onNone, onChange, onAdd, onRemove }: { recognitions: RecognitionEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof RecognitionEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <div>
       <p className="italic text-sm text-gray-600 mb-3">Describe honors, awards, citations, etc.</p>
@@ -405,7 +389,7 @@ function RecognitionSection({ recognitions, isNone, onNone, onChange, onAdd, onR
 }
 
 /* ============================================================
-   SECTION H: Professional Development — each subsection has own None + limit
+   Professional Development
    ============================================================ */
 function ProfessionalDevelopmentSection({ memberships, projects, research, noneMem, onNoneMem, noneProj, onNoneProj, noneRes, onNoneRes, onChange, onAdd, onRemove }: {
   memberships: MembershipEntry[]; projects: ProjectEntry[]; research: ResearchEntry[];
@@ -418,7 +402,6 @@ function ProfessionalDevelopmentSection({ memberships, projects, research, noneM
 }) {
   return (
     <div>
-      {/* Memberships */}
       <SubSection label="Membership in Professional Organizations" entries={memberships} isNone={noneMem} onNone={onNoneMem}
         onAdd={() => onAdd("memberships")} onRemove={(i) => onRemove("memberships", i)}
         onFileChange={(i, n) => onChange("memberships", i, "fileName", n)}
@@ -429,10 +412,7 @@ function ProfessionalDevelopmentSection({ memberships, projects, research, noneM
             <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Inclusive Dates</label><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-gray-500 mb-1">Start</label><input type="month" value={entry.startDate} onChange={(e) => onChange("memberships", idx, "startDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div><div><label className="block text-xs text-gray-500 mb-1">End</label><input type="month" value={entry.endDate} onChange={(e) => onChange("memberships", idx, "endDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div></div></div>
           </div>
         )} />
-
       <hr className="my-6" />
-
-      {/* Projects — limit 5 */}
       <SubSection label="Projects Undertaken" entries={projects} isNone={noneProj} onNone={onNoneProj} limit={5}
         onAdd={() => onAdd("projects")} onRemove={(i) => onRemove("projects", i)}
         onFileChange={(i, n) => onChange("projects", i, "fileName", n)}
@@ -444,10 +424,7 @@ function ProfessionalDevelopmentSection({ memberships, projects, research, noneM
             <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Brief Description</label><textarea value={entry.description} onChange={(e) => onChange("projects", idx, "description", e.target.value)} rows={3} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
           </div>
         )} />
-
       <hr className="my-6" />
-
-      {/* Research — limit 5 */}
       <SubSection label="Research Undertaken" entries={research} isNone={noneRes} onNone={onNoneRes} limit={5}
         onAdd={() => onAdd("research")} onRemove={(i) => onRemove("research", i)}
         onFileChange={(i, n) => onChange("research", i, "fileName", n)}
@@ -464,9 +441,9 @@ function ProfessionalDevelopmentSection({ memberships, projects, research, noneM
 }
 
 /* ============================================================
-   SECTION I: Creative Works
+   Creative Works
    ============================================================ */
-function CreativeWorksSection({ works, isNone, onNone, onChange, onAdd, onRemove }: { works: CreativeWork[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof CreativeWork, v: string) => void; onAdd: () => void; onRemove: (i: number) => void; }) {
+function CreativeWorksSection({ works, isNone, onNone, onChange, onAdd, onRemove }: { works: CreativeWork[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof CreativeWork, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <div>
       <p className="italic text-sm text-gray-700 mb-4">(Please enumerate the various creative works and special accomplishments you have done in the past...)</p>
@@ -493,44 +470,45 @@ function CreativeWorksSection({ works, isNone, onNone, onChange, onAdd, onRemove
 /* ============================================================
    PARENT FORM
    ============================================================ */
-export default function BackgroundAchievementsForm({ formData, setFormData, nextStep, prevStep }: { formData: any; setFormData: any; nextStep: () => void; prevStep: () => void; }) {
+export default function BackgroundAchievementsForm({ formData, setFormData, nextStep, prevStep }: { formData: any; setFormData: any; nextStep: () => void; prevStep: () => void }) {
   const [education, setEducation] = useState<EducationState>(formData.education || {
-    tertiary:  [{ schoolName: "", schoolAddress: "", degreeProgram: "", yearGraduated: "", startDate: "", endDate: "" }],
-    secondary: [{ schoolName: "", schoolAddress: "", yearGraduated: "", startDate: "", endDate: "" }],
-    elementary:[{ schoolName: "", schoolAddress: "", yearGraduated: "", startDate: "", endDate: "" }],
+    tertiary: [],
+    secondary: [],
+    elementary: [],
     technical: [],
   });
-  const [nonFormal,      setNonFormal]      = useState<NonFormalEntry[]>(formData.non_formal_education || []);
+  const [nonFormal, setNonFormal] = useState<NonFormalEntry[]>(formData.non_formal_education || []);
   const [certifications, setCertifications] = useState<CertificationEntry[]>(formData.certifications || []);
-  const [publications,   setPublications]   = useState<PublicationEntry[]>(formData.publications || []);
-  const [inventions,     setInventions]     = useState<InventionEntry[]>(formData.inventions || []);
-  const [work,           setWork]           = useState<WorkExperienceState>(formData.work_experience || { employment: [], consultancy: [], selfEmployment: [] });
-  const [recognitions,   setRecognitions]   = useState<RecognitionEntry[]>(formData.recognitions || []);
-  const [memberships,    setMemberships]    = useState<MembershipEntry[]>(formData.professional_development?.memberships || []);
-  const [projects,       setProjects]       = useState<ProjectEntry[]>(formData.professional_development?.projects || []);
-  const [research,       setResearch]       = useState<ResearchEntry[]>(formData.professional_development?.research || []);
-  const [creativeWorks,  setCreativeWorks]  = useState<CreativeWork[]>(formData.creative_works?.length > 0 ? formData.creative_works : [{ title: "", institutionName: "", institutionAddress: "", startDate: "", endDate: "" }]);
+  const [publications, setPublications] = useState<PublicationEntry[]>(formData.publications || []);
+  const [inventions, setInventions] = useState<InventionEntry[]>(formData.inventions || []);
+  const [work, setWork] = useState<WorkExperienceState>(formData.work_experience || { employment: [], consultancy: [], selfEmployment: [] });
+  const [recognitions, setRecognitions] = useState<RecognitionEntry[]>(formData.recognitions || []);
+  const [memberships, setMemberships] = useState<MembershipEntry[]>(formData.professional_development?.memberships || []);
+  const [projects, setProjects] = useState<ProjectEntry[]>(formData.professional_development?.projects || []);
+  const [research, setResearch] = useState<ResearchEntry[]>(formData.professional_development?.research || []);
+  const [creativeWorks, setCreativeWorks] = useState<CreativeWork[]>(formData.creative_works?.length > 0 ? formData.creative_works : []);
 
   /* --- None states --- */
-  const [hasNoTechnical,   setHasNoTechnical]   = useState(false);
-  const [hasNoNonFormal,   setHasNoNonFormal]   = useState(false);
-  const [hasNoCert,        setHasNoCert]        = useState(false);
-  const [hasNoPub,         setHasNoPub]         = useState(false);
-  const [hasNoInv,         setHasNoInv]         = useState(false);
-  // Work Experience: each sub-type can be None, but not ALL three
-  const [hasNoEmp,  setHasNoEmp]  = useState(false);
-  const [hasNoCon,  setHasNoCon]  = useState(false);
-  const [hasNoSE,   setHasNoSE]   = useState(false);
-  const [hasNoRec,         setHasNoRec]         = useState(false);
-  // Prof Dev: each sub-type has own none
-  const [hasNoMem,         setHasNoMem]         = useState(false);
-  const [hasNoProj,        setHasNoProj]        = useState(false);
-  const [hasNoRes,         setHasNoRes]         = useState(false);
-  const [hasNoCW,          setHasNoCW]          = useState(false);
+  const [hasNoTertiary, setHasNoTertiary] = useState(false);
+  const [hasNoSecondary, setHasNoSecondary] = useState(false);
+  const [hasNoElementary, setHasNoElementary] = useState(false);
+  const [hasNoTechnical, setHasNoTechnical] = useState(false);
+  const [hasNoNonFormal, setHasNoNonFormal] = useState(false);
+  const [hasNoCert, setHasNoCert] = useState(false);
+  const [hasNoPub, setHasNoPub] = useState(false);
+  const [hasNoInv, setHasNoInv] = useState(false);
+  const [hasNoEmp, setHasNoEmp] = useState(false);
+  const [hasNoCon, setHasNoCon] = useState(false);
+  const [hasNoSE, setHasNoSE] = useState(false);
+  const [hasNoRec, setHasNoRec] = useState(false);
+  const [hasNoMem, setHasNoMem] = useState(false);
+  const [hasNoProj, setHasNoProj] = useState(false);
+  const [hasNoRes, setHasNoRes] = useState(false);
+  const [hasNoCW, setHasNoCW] = useState(false);
 
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
-  const [eduErrors,     setEduErrors]     = useState<ValidationErrors>({});
-  const [isSubmitting,  setIsSubmitting]  = useState(false);
+  const [eduErrors, setEduErrors] = useState<ValidationErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   /* --- Education handlers --- */
   const handleEduChange = (level: keyof EducationState, i: number, f: keyof EducationEntry, v: string) =>
@@ -543,34 +521,30 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
   const removeEdu = (level: keyof EducationState, i: number) =>
     setEducation(prev => ({ ...prev, [level]: prev[level].filter((_, x) => x !== i) }));
 
-  /* --- Simple list handlers factory --- */
+  /* --- List handlers factory --- */
   const makeListHandlers = <T extends WithFile>(setter: React.Dispatch<React.SetStateAction<T[]>>) => ({
     onChange: (i: number, f: keyof T, v: string) => setter(prev => { const u = [...prev]; u[i] = { ...u[i], [f]: v }; return u; }),
-    onAdd:    (blank: T) => setter(prev => [...prev, blank]),
+    onAdd: (blank: T) => setter(prev => [...prev, blank]),
     onRemove: (i: number) => setter(prev => prev.filter((_, x) => x !== i)),
   });
 
-  const nfH   = makeListHandlers(setNonFormal);
-  const certH  = makeListHandlers(setCertifications);
-  const pubH   = makeListHandlers(setPublications);
-  const invH   = makeListHandlers(setInventions);
-  const recH   = makeListHandlers(setRecognitions);
-  const cwH    = makeListHandlers(setCreativeWorks);
+  const nfH = makeListHandlers(setNonFormal);
+  const certH = makeListHandlers(setCertifications);
+  const pubH = makeListHandlers(setPublications);
+  const invH = makeListHandlers(setInventions);
+  const recH = makeListHandlers(setRecognitions);
+  const cwH = makeListHandlers(setCreativeWorks);
 
-  const handleEmpChange = (i: number, f: keyof EmploymentEntry, v: string) =>
-    setWork(prev => { const u = [...prev.employment]; u[i] = { ...u[i], [f]: v }; return { ...prev, employment: u }; });
-  const handleConChange = (i: number, f: keyof ConsultancyEntry, v: string) =>
-    setWork(prev => { const u = [...prev.consultancy]; u[i] = { ...u[i], [f]: v }; return { ...prev, consultancy: u }; });
-  const handleSEChange  = (i: number, f: keyof SelfEmploymentEntry, v: string) =>
-    setWork(prev => { const u = [...prev.selfEmployment]; u[i] = { ...u[i], [f]: v }; return { ...prev, selfEmployment: u }; });
+  const handleEmpChange = (i: number, f: keyof EmploymentEntry, v: string) => setWork(prev => { const u = [...prev.employment]; u[i] = { ...u[i], [f]: v }; return { ...prev, employment: u }; });
+  const handleConChange = (i: number, f: keyof ConsultancyEntry, v: string) => setWork(prev => { const u = [...prev.consultancy]; u[i] = { ...u[i], [f]: v }; return { ...prev, consultancy: u }; });
+  const handleSEChange = (i: number, f: keyof SelfEmploymentEntry, v: string) => setWork(prev => { const u = [...prev.selfEmployment]; u[i] = { ...u[i], [f]: v }; return { ...prev, selfEmployment: u }; });
   const addWork_ = (t: keyof WorkExperienceState) => setWork(prev => {
     const e: any = t === "employment" ? { company: "", companyAddress: "", designation: "", startDate: "", endDate: "", description: "" }
       : t === "consultancy" ? { consultancy: "", companyName: "", companyAddress: "", startDate: "", endDate: "" }
       : { company: "", companyAddress: "", designation: "", reference: "", startDate: "", endDate: "", description: "" };
     return { ...prev, [t]: [...prev[t], e] };
   });
-  const removeWork_ = (t: keyof WorkExperienceState, i: number) =>
-    setWork(prev => ({ ...prev, [t]: prev[t].filter((_, x) => x !== i) }));
+  const removeWork_ = (t: keyof WorkExperienceState, i: number) => setWork(prev => ({ ...prev, [t]: prev[t].filter((_, x) => x !== i) }));
 
   const handlePDChange = (cat: "memberships" | "projects" | "research", i: number, f: string, v: string) => {
     if (cat === "memberships") setMemberships(prev => { const u = [...prev]; u[i] = { ...u[i] as any, [f]: v } as MembershipEntry; return u; });
@@ -588,7 +562,6 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
     else setResearch(prev => prev.filter((_, x) => x !== i));
   };
 
-  /* --- Helper: is a sub-section "answered"? (has entries OR is none) --- */
   const answered = (isNone: boolean, list: any[]) => isNone || list.length > 0;
 
   /* --- Validation --- */
@@ -597,49 +570,45 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
     const eduErr: ValidationErrors["education"] = {};
     let valid = true;
 
-    // C: required levels
+    // C: education — skip levels marked as None
     const reqLevels: (keyof EducationState)[] = ["tertiary", "secondary", "elementary"];
+    const noneMap: Record<string, boolean> = { tertiary: hasNoTertiary, secondary: hasNoSecondary, elementary: hasNoElementary };
     let eduOk = true;
     reqLevels.forEach(level => {
       eduErr[level] = [];
+      if (noneMap[level]) return;
+      if (education[level].length === 0) { errs["C"] = "Please complete all required Education fields or mark as None."; eduOk = false; valid = false; return; }
       education[level].forEach((entry, i) => {
         const e: Partial<EducationEntry> = {};
-        if (!entry.schoolName.trim())      { e.schoolName = "Required."; eduOk = false; valid = false; }
-        if (!entry.schoolAddress.trim())   { e.schoolAddress = "Required."; eduOk = false; valid = false; }
-        if (!entry.yearGraduated.trim())   { e.yearGraduated = "Required."; eduOk = false; valid = false; }
-        if (!entry.startDate.trim())       { e.startDate = "Required."; eduOk = false; valid = false; }
-        if (!entry.endDate.trim())         { e.endDate = "Required."; eduOk = false; valid = false; }
+        if (!entry.schoolName.trim()) { e.schoolName = "Required."; eduOk = false; valid = false; }
+        if (!entry.schoolAddress.trim()) { e.schoolAddress = "Required."; eduOk = false; valid = false; }
+        if (!entry.yearGraduated.trim()) { e.yearGraduated = "Required."; eduOk = false; valid = false; }
+        if (!entry.startDate.trim()) { e.startDate = "Required."; eduOk = false; valid = false; }
+        if (!entry.endDate.trim()) { e.endDate = "Required."; eduOk = false; valid = false; }
         if (level === "tertiary" && !entry.degreeProgram?.trim()) { e.degreeProgram = "Required."; eduOk = false; valid = false; }
         eduErr[level]![i] = e;
       });
     });
     setEduErrors({ education: eduErr });
-    if (!eduOk) errs["C"] = "Please complete all required Education fields.";
+    if (!eduOk) errs["C"] = errs["C"] || "Please complete all required Education fields.";
 
-    // D
-    if (!answered(hasNoCert, certifications))           { errs["D"] = "Select None or add at least one certification."; valid = false; }
-    // E – each sub-type must be answered
-    if (!answered(hasNoPub, publications))              { errs["E-pub"] = "Publications: select None or add at least one entry."; valid = false; }
-    if (!answered(hasNoInv, inventions))                { errs["E-inv"] = "Inventions: select None or add at least one entry."; valid = false; }
-    // F – each sub-type must be answered (None or entries), but not ALL can be None
-    if (!answered(hasNoEmp, work.employment))  { errs["F-emp"] = "Employment: select None or add at least one entry."; valid = false; }
+    if (!answered(hasNoCert, certifications)) { errs["D"] = "Select None or add at least one certification."; valid = false; }
+    if (!answered(hasNoPub, publications)) { errs["E-pub"] = "Publications: select None or add at least one entry."; valid = false; }
+    if (!answered(hasNoInv, inventions)) { errs["E-inv"] = "Inventions: select None or add at least one entry."; valid = false; }
+    if (!answered(hasNoEmp, work.employment)) { errs["F-emp"] = "Employment: select None or add at least one entry."; valid = false; }
     if (!answered(hasNoCon, work.consultancy)) { errs["F-con"] = "Consultancy: select None or add at least one entry."; valid = false; }
-    if (!answered(hasNoSE,  work.selfEmployment)) { errs["F-se"] = "Self-Employment: select None or add at least one entry."; valid = false; }
-    if (hasNoEmp && hasNoCon && hasNoSE)       { errs["F-emp"] = "Work Experience is required. At least one sub-type must have entries."; valid = false; }
-    // G
-    if (!answered(hasNoRec, recognitions))              { errs["G"] = "Select None or add at least one recognition."; valid = false; }
-    // H – each sub-type must be answered
-    if (!answered(hasNoMem,  memberships))              { errs["H-mem"]  = "Memberships: select None or add at least one entry."; valid = false; }
-    if (!answered(hasNoProj, projects))                 { errs["H-proj"] = "Projects: select None or add at least one entry."; valid = false; }
-    if (!answered(hasNoRes,  research))                 { errs["H-res"]  = "Research: select None or add at least one entry."; valid = false; }
-    // I
+    if (!answered(hasNoSE, work.selfEmployment)) { errs["F-se"] = "Self-Employment: select None or add at least one entry."; valid = false; }
+    if (hasNoEmp && hasNoCon && hasNoSE) { errs["F-emp"] = "Work Experience is required. At least one sub-type must have entries."; valid = false; }
+    if (!answered(hasNoRec, recognitions)) { errs["G"] = "Select None or add at least one recognition."; valid = false; }
+    if (!answered(hasNoMem, memberships)) { errs["H-mem"] = "Memberships: select None or add at least one entry."; valid = false; }
+    if (!answered(hasNoProj, projects)) { errs["H-proj"] = "Projects: select None or add at least one entry."; valid = false; }
+    if (!answered(hasNoRes, research)) { errs["H-res"] = "Research: select None or add at least one entry."; valid = false; }
     if (!hasNoCW) {
-      for (const w of creativeWorks) {
-        if (!w.title.trim() || !w.institutionName.trim() || !w.institutionAddress.trim() || !w.startDate || !w.endDate) {
-          errs["I"] = "Fill in all required fields or select None."; valid = false; break;
-        }
-        if (new Date(w.startDate) > new Date(w.endDate)) {
-          errs["I"] = "End date cannot be before start date."; valid = false; break;
+      if (creativeWorks.length === 0) { errs["I"] = "Select None or add at least one creative work."; valid = false; }
+      else {
+        for (const w of creativeWorks) {
+          if (!w.title.trim() || !w.institutionName.trim() || !w.institutionAddress.trim() || !w.startDate || !w.endDate) { errs["I"] = "Fill in all required fields or select None."; valid = false; break; }
+          if (new Date(w.startDate) > new Date(w.endDate)) { errs["I"] = "End date cannot be before start date."; valid = false; break; }
         }
       }
     }
@@ -649,22 +618,19 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
   };
 
   const collectData = () => ({
-    education: { ...education, technical: hasNoTechnical ? [] : education.technical },
+    education: {
+      tertiary: hasNoTertiary ? [] : education.tertiary,
+      secondary: hasNoSecondary ? [] : education.secondary,
+      elementary: hasNoElementary ? [] : education.elementary,
+      technical: hasNoTechnical ? [] : education.technical,
+    },
     non_formal_education: hasNoNonFormal ? [] : nonFormal,
-    certifications:       hasNoCert ? [] : certifications,
-    publications:         hasNoPub  ? [] : publications,
-    inventions:           hasNoInv  ? [] : inventions,
-    work_experience: {
-      employment:     work.employment,
-      consultancy:    work.consultancy,
-      selfEmployment: work.selfEmployment,
-    },
-    recognitions:         hasNoRec  ? [] : recognitions,
-    professional_development: {
-      memberships: hasNoMem  ? [] : memberships,
-      projects:    hasNoProj ? [] : projects,
-      research:    hasNoRes  ? [] : research,
-    },
+    certifications: hasNoCert ? [] : certifications,
+    publications: hasNoPub ? [] : publications,
+    inventions: hasNoInv ? [] : inventions,
+    work_experience: { employment: work.employment, consultancy: work.consultancy, selfEmployment: work.selfEmployment },
+    recognitions: hasNoRec ? [] : recognitions,
+    professional_development: { memberships: hasNoMem ? [] : memberships, projects: hasNoProj ? [] : projects, research: hasNoRes ? [] : research },
     creative_works: hasNoCW ? [] : creativeWorks,
   });
 
@@ -685,14 +651,13 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
     prevStep();
   };
 
-  /* Determine which accordion headers should show as error */
-  const hasEErr  = !!sectionErrors["C"];
-  const hasDErr  = !!sectionErrors["D"];
+  const hasEErr = !!sectionErrors["C"];
+  const hasDErr = !!sectionErrors["D"];
   const hasEsErr = !!sectionErrors["E-pub"] || !!sectionErrors["E-inv"];
-  const hasFErr  = !!sectionErrors["F-emp"] || !!sectionErrors["F-con"] || !!sectionErrors["F-se"];
-  const hasGErr  = !!sectionErrors["G"];
-  const hasHErr  = !!sectionErrors["H-mem"] || !!sectionErrors["H-proj"] || !!sectionErrors["H-res"];
-  const hasIErr  = !!sectionErrors["I"];
+  const hasFErr = !!sectionErrors["F-emp"] || !!sectionErrors["F-con"] || !!sectionErrors["F-se"];
+  const hasGErr = !!sectionErrors["G"];
+  const hasHErr = !!sectionErrors["H-mem"] || !!sectionErrors["H-proj"] || !!sectionErrors["H-res"];
+  const hasIErr = !!sectionErrors["I"];
 
   return (
     <form onSubmit={handleSubmit} className="w-7xl max-w mx-auto bg-white rounded-xl shadow-md flex flex-col h-full">
@@ -700,13 +665,18 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
 
         {Object.keys(sectionErrors).length > 0 && (
           <div className="mb-4 bg-red-50 border border-red-300 text-red-700 rounded-lg px-4 py-3 text-sm font-medium">
-            Some sections are incomplete. Please fill in all fields or mark them as "None" before proceeding.
+            Some sections are incomplete. Please fill in all fields or mark them as &quot;None&quot; before proceeding.
           </div>
         )}
 
         {/* C */}
         <AccordionItem title="C. Educational Background" defaultOpen hasError={hasEErr}>
-          <FormalEducationSection education={education} onChange={handleEduChange} onAdd={addEdu} onRemove={removeEdu} errors={eduErrors.education} hasNoTechnical={hasNoTechnical} onNoneTechnical={() => setHasNoTechnical(p => !p)} />
+          <FormalEducationSection education={education} onChange={handleEduChange} onAdd={addEdu} onRemove={removeEdu} errors={eduErrors.education}
+            hasNoTertiary={hasNoTertiary} onNoneTertiary={() => setHasNoTertiary(p => !p)}
+            hasNoSecondary={hasNoSecondary} onNoneSecondary={() => setHasNoSecondary(p => !p)}
+            hasNoElementary={hasNoElementary} onNoneElementary={() => setHasNoElementary(p => !p)}
+            hasNoTechnical={hasNoTechnical} onNoneTechnical={() => setHasNoTechnical(p => !p)}
+          />
           <hr className="my-6" />
           <h4 className="font-semibold text-black mb-2">Non-Formal Education <span className="text-gray-400 font-normal text-sm">(Optional)</span></h4>
           <NonFormalSection nonFormal={nonFormal} isNone={hasNoNonFormal} onNone={() => setHasNoNonFormal(p => !p)} onChange={nfH.onChange as any} onAdd={() => nfH.onAdd({ title: "", sponsor: "", venue: "", startDate: "", endDate: "" })} onRemove={nfH.onRemove} />
@@ -735,7 +705,7 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
             onAdd={addWork_} onRemove={removeWork_}
             noneEmp={hasNoEmp} onNoneEmp={() => setHasNoEmp(p => !p)}
             noneCon={hasNoCon} onNoneCon={() => setHasNoCon(p => !p)}
-            noneSE={hasNoSE}   onNoneSE={() => setHasNoSE(p => !p)}
+            noneSE={hasNoSE} onNoneSE={() => setHasNoSE(p => !p)}
           />
         </AccordionItem>
 
@@ -749,9 +719,9 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
         <AccordionItem title="H. Professional Development Activities" hasError={hasHErr}>
           <SectionError message={sectionErrors["H-mem"] || sectionErrors["H-proj"] || sectionErrors["H-res"]} />
           <ProfessionalDevelopmentSection memberships={memberships} projects={projects} research={research}
-            noneMem={hasNoMem}   onNoneMem={() => setHasNoMem(p => !p)}
+            noneMem={hasNoMem} onNoneMem={() => setHasNoMem(p => !p)}
             noneProj={hasNoProj} onNoneProj={() => setHasNoProj(p => !p)}
-            noneRes={hasNoRes}   onNoneRes={() => setHasNoRes(p => !p)}
+            noneRes={hasNoRes} onNoneRes={() => setHasNoRes(p => !p)}
             onChange={handlePDChange} onAdd={addPD} onRemove={removePD}
           />
         </AccordionItem>
@@ -762,7 +732,7 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
           <CreativeWorksSection works={creativeWorks} isNone={hasNoCW} onNone={() => setHasNoCW(p => !p)}
             onChange={cwH.onChange as any}
             onAdd={() => cwH.onAdd({ title: "", institutionName: "", institutionAddress: "", startDate: "", endDate: "" })}
-            onRemove={(i) => { setCreativeWorks(prev => { const u = prev.filter((_, x) => x !== i); return u.length === 0 ? [{ title: "", institutionName: "", institutionAddress: "", startDate: "", endDate: "" }] : u; }); }}
+            onRemove={(i) => { setCreativeWorks(prev => { const u = prev.filter((_, x) => x !== i); return u; }); }}
           />
         </AccordionItem>
       </div>
