@@ -200,31 +200,14 @@ const getCompletionPercentage = (app: Applicant): number => {
   return (completedSteps / 8) * 100;
 };
 
-// Get suggested status based on completion percentage
-const getSuggestedStatus = (percentage: number, currentStatus: string | null): string | null => {
-  if (percentage < 40) {
-    // Incomplete - should remain Submitted
-    return currentStatus === 'Submitted' ? null : 'Submitted';
-  } else if (percentage >= 40 && percentage < 75) {
-    // Partial completion - suggest Pending for review
-    return currentStatus === 'Pending' ? null : 'Pending';
-  } else if (percentage >= 75) {
-    // Nearly complete or complete - ready for decision
-    if (currentStatus === 'Approved' || currentStatus === 'Declined') {
-      return null; // Already decided
-    }
-    return 'Pending'; // Suggest moving to review if not already
-  }
-  return null;
-};
-
 // Get suggested remarks templates
 const getRemarksTemplate = (status: string): string => {
   const templates: Record<string, string> = {
     Submitted: 'Thank you for starting your application. Please complete all required sections to proceed with the review process.',
     Pending: 'Your application is currently under review. Our team will carefully assess your qualifications and experience. You will be notified once a decision has been made.',
-    Approved: 'Congratulations! Your application has been approved. Please check your email for next steps and enrollment instructions.',
-    Declined: 'Thank you for your interest in our program. Unfortunately, we are unable to approve your application at this time. [Add specific reason or feedback here]'
+    'Competency Process': 'Your application review is complete and you are now proceeding to the Competency Process. Please wait for further instructions from the admissions team.',
+    Enrolled: 'Congratulations! You are now marked as Enrolled. Please check your email for your enrollment instructions and schedule.',
+    Graduated: 'Congratulations! Your status is now marked as Graduated. We are proud of your achievement.'
   };
   return templates[status] || '';
 };
@@ -250,13 +233,17 @@ const sendStatusEmail = async (
       subject: 'Application Under Review - TIP ETEEAP',
       body: `Dear ${applicantName || 'Applicant'},\n\nYour application is now under review. Our assessment team is carefully evaluating your qualifications, experience, and fit for the program.\n\nYou will be notified of the decision as soon as the review process is complete.\n\nThank you for your patience.\n\nBest regards,\nTIP ETEEAP Team`
     },
-    Approved: {
-      subject: 'Application Approved - TIP ETEEAP',
-      body: `Dear ${applicantName || 'Applicant'},\n\nCongratulations! We are pleased to inform you that your application has been approved.\n\nPlease check your email for details regarding next steps, enrollment procedures, and program information.\n\nWe look forward to welcoming you to the TIP ETEEAP program!\n\nBest regards,\nTIP ETEEAP Team`
+    'Competency Process': {
+      subject: 'Proceed to Competency Process - TIP ETEEAP',
+      body: `Dear ${applicantName || 'Applicant'},\n\nYour application review has been completed and you are now endorsed to proceed to the Competency Process.\n\nPlease wait for the next instructions from the TIP ETEEAP team regarding schedules and requirements.\n\nBest regards,\nTIP ETEEAP Team`
     },
-    Declined: {
-      subject: 'Application Decision - TIP ETEEAP',
-      body: `Dear ${applicantName || 'Applicant'},\n\nThank you for your interest in the TIP ETEEAP program. We have completed our review of your application.\n\nUnfortunately, we are unable to approve your application at this time. We encourage you to apply again in future cycles.\n\nBest regards,\nTIP ETEEAP Team`
+    Enrolled: {
+      subject: 'Enrollment Status Update - TIP ETEEAP',
+      body: `Dear ${applicantName || 'Applicant'},\n\nCongratulations! Your status has been updated to Enrolled.\n\nPlease review your email and follow the enrollment instructions sent by the TIP ETEEAP team.\n\nBest regards,\nTIP ETEEAP Team`
+    },
+    Graduated: {
+      subject: 'Graduation Status Update - TIP ETEEAP',
+      body: `Dear ${applicantName || 'Applicant'},\n\nCongratulations! Your status has been updated to Graduated.\n\nWe commend your accomplishment and wish you continued success.\n\nBest regards,\nTIP ETEEAP Team`
     }
   };
 
@@ -288,19 +275,21 @@ const sendStatusEmail = async (
   }
 };
 
-const STATUS_OPTIONS = ['All', 'Submitted', 'Pending', 'Approved', 'Declined'];
+const STATUS_OPTIONS = ['All', 'Submitted', 'Pending', 'Competency Process', 'Enrolled', 'Graduated'];
 const STATUS_COLORS: Record<string, string> = {
   Submitted: 'bg-gray-100 text-gray-800 ring-gray-300',
   Pending: 'bg-yellow-100 text-yellow-800 ring-yellow-300',
-  Approved: 'bg-green-100 text-green-800 ring-green-300',
-  Declined: 'bg-red-100 text-red-800 ring-red-300',
+  'Competency Process': 'bg-blue-100 text-blue-800 ring-blue-300',
+  Enrolled: 'bg-emerald-100 text-emerald-800 ring-emerald-300',
+  Graduated: 'bg-purple-100 text-purple-800 ring-purple-300',
   All: 'bg-blue-100 text-blue-800 ring-blue-300',
 };
 const STATUS_ICONS: Record<string, ReactNode> = {
   Submitted: <Clock className='w-4 h-4' />,
   Pending: <Loader2 className='w-4 h-4 animate-spin' />,
-  Approved: <Check className='w-4 h-4' />,
-  Declined: <X className='w-4 h-4' />,
+  'Competency Process': <TrendingUp className='w-4 h-4' />,
+  Enrolled: <Check className='w-4 h-4' />,
+  Graduated: <Check className='w-4 h-4' />,
 };
 
 
@@ -861,39 +850,28 @@ const ViewApplicantModal: FC<{
                 {applicant.status || 'Submitted'}
               </div>
 
-              {/* Approve / Decline Buttons */}
+              {/* Proceed to Competency Process */}
               <div className='mt-4 flex items-center gap-2 w-full'>
                 <button
-                  onClick={() => onStatusChange(applicant.application_id, 'Approved')}
-                  disabled={updatingStatusId === applicant.application_id || applicant.status === 'Approved'}
+                  onClick={() => onStatusChange(applicant.application_id, 'Competency Process')}
+                  disabled={
+                    updatingStatusId === applicant.application_id ||
+                    applicant.status === 'Competency Process' ||
+                    applicant.status === 'Enrolled' ||
+                    applicant.status === 'Graduated'
+                  }
                   className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    applicant.status === 'Approved'
-                      ? 'bg-green-500 text-white ring-2 ring-green-300 shadow-md cursor-default'
-                      : 'bg-green-50 text-green-700 ring-1 ring-green-200 hover:bg-green-100 hover:ring-green-300'
+                    applicant.status === 'Competency Process' ||
+                    applicant.status === 'Enrolled' ||
+                    applicant.status === 'Graduated'
+                      ? 'bg-blue-500 text-white ring-2 ring-blue-300 shadow-md cursor-default'
+                      : 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100 hover:ring-blue-300'
                   } disabled:opacity-60`}
                 >
-                  <Check size={16} />
-                  Approve
-                </button>
-                <button
-                  onClick={() => onStatusChange(applicant.application_id, 'Declined')}
-                  disabled={updatingStatusId === applicant.application_id || applicant.status === 'Declined'}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    applicant.status === 'Declined'
-                      ? 'bg-red-500 text-white ring-2 ring-red-300 shadow-md cursor-default'
-                      : 'bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100 hover:ring-red-300'
-                  } disabled:opacity-60`}
-                >
-                  <X size={16} />
-                  Decline
+                  <TrendingUp size={16} />
+                  Proceed to Competency Process
                 </button>
               </div>
-              {getSuggestedStatus(getCompletionPercentage(applicant), applicant.status) && (
-                <div className='flex items-center gap-1.5 text-xs text-yellow-600 bg-yellow-50 rounded-full px-2.5 py-1 mt-2'>
-                  <Zap size={12} className='text-yellow-500' />
-                  <span>Suggested: <strong>{getSuggestedStatus(getCompletionPercentage(applicant), applicant.status)}</strong></span>
-                </div>
-              )}
             </div>
 
             <InfoCard title='Applicant Information'>
@@ -1035,7 +1013,11 @@ const InfoItem: FC<{ label: string; value?: ReactNode; children?: ReactNode }> =
 }) => (
   <div className='text-sm'>
     <p className='font-medium text-gray-500 mb-0.5'>{label}</p>
-    {value ? <div className='text-gray-800 break-words'>{value}</div> : null}
+    {value !== undefined && value !== null && value !== '' ? (
+      <div className='text-gray-800 break-words'>{value}</div>
+    ) : !children ? (
+      <div className='text-gray-800 break-words'>N/A</div>
+    ) : null}
     {children}
   </div>
 );
@@ -1047,12 +1029,14 @@ const GoalStatement: FC<{ data: any }> = ({ data }) => {
   let content = data;
   if (!content) return null;
   // Try to parse if it's a stringified JSON (e.g., from old data)
-  try { content = JSON.parse(data); } catch (e) {}
+  try { content = typeof data === 'string' ? JSON.parse(data) : data; } catch (e) {}
 
   return (
     <div className='prose prose-base max-w-none text-gray-800'>
       {typeof content === 'string' ? (
         <p>{content}</p>
+      ) : typeof content === 'object' && content !== null ? (
+        <p>{String((content as Record<string, unknown>).goal || (content as Record<string, unknown>).statement || (content as Record<string, unknown>).text || 'N/A')}</p>
       ) : (
         <p className='italic text-gray-500'>Could not parse goal statement.</p>
       )}
@@ -1204,7 +1188,10 @@ const GenericList: FC<{ data: any[] | string; title?: string }> = ({ data, title
         parsedData = result;
       }
     } catch (e) {
-      // Not valid JSON, treat as no data
+      // If plain text, render as a single row instead of hiding it.
+      if (data.trim()) {
+        parsedData = [data.trim()];
+      }
     }
   }
 
@@ -1228,7 +1215,7 @@ const GenericList: FC<{ data: any[] | string; title?: string }> = ({ data, title
         ))}
       </div>
     ) : (
-      <p className="italic text-gray-500 text-sm">No information provided, In addition.</p>
+      <p className="italic text-gray-500 text-sm">No information provided.</p>
     )
   );
 
@@ -1301,7 +1288,7 @@ const WorkExperiences: FC<{ data: any }> = ({ data }) => {
   const hasContent = sections.some(sec => Array.isArray(sec.data) && sec.data.length > 0);
 
   if (!hasContent) {
-    return <p className="italic text-gray-500 text-sm">No information provided, In addition.</p>;
+    return <p className="italic text-gray-500 text-sm">No information provided.</p>;
   }
 
   return (
@@ -1340,7 +1327,7 @@ const ProfessionalDevelopment: FC<{ data: any }> = ({ data }) => {
   const hasContent = sections.some(sec => Array.isArray(sec.data) && sec.data.length > 0);
 
   if (!hasContent) {
-    return <p className="italic text-gray-500 text-sm">No information provided, In addition.</p>;
+    return <p className="italic text-gray-500 text-sm">No information provided.</p>;
   }
 
   return (
