@@ -111,7 +111,7 @@ export default function PersonalInformationForm({
       <form
         ref={formRef}
         noValidate
-        className="bg-white shadow-lg rounded-2xl  w-7xl max-w flex flex-col"
+        className="bg-white shadow-lg rounded-2xl w-full max-w-5xl p-6 mx-auto"
         onSubmit={(e) => { e.preventDefault(); validateAndProceed(); }}
       >
         <h2 className="text-center font-bold text-xl mt-4 mb-2 text-black">

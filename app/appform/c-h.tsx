@@ -9,11 +9,13 @@ export default function PrioritiesGoalsForm({
   setFormData, 
   nextStep,
   prevStep,
+  isOverseas,
 }: {
   formData: any;
   setFormData: Function;
   nextStep: () => void;
   prevStep: () => void;
+  isOverseas?: boolean;  
 }) {
   
   // recommendation logic
@@ -88,7 +90,7 @@ const handleAddDegree = () => {
   if (!Array.isArray(degrees) || degrees.some((d: string) => !d)) hasError = true;
   if (!statement?.trim())  { setStatementError(true);  hasError = true; }
   if (!plan?.trim())       { setPlanError(true);       hasError = true; }
-  if (!overseas?.trim())   { setOverseasError(true);   hasError = true; }
+  if (!overseas?.trim() && isOverseas) { setOverseasError(true); hasError = true; } 
   if (!completion?.trim()) { setCompletionError(true); hasError = true; }
 
   if (hasError) {
@@ -104,9 +106,9 @@ const handleAddDegree = () => {
   return (
     <form
       onSubmit={handleNext}
-      className="bg-white shadow-lg rounded-2xl w-7xl max-w flex flex-col"
+      className="bg-white shadow-lg rounded-2xl w-full max-w-5xl mx-auto flex flex-col"
     >
-      <div className="flex-1 overflow-y-auto max-h-[70vh] p-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden max-h-[70vh] p-4 sm:p-6">
         <h3 className="font-semibold text-lg mb-4 text-black">
           B. Priorities and Goals
         </h3>
@@ -122,60 +124,62 @@ const handleAddDegree = () => {
         {/* Degree selection */}
         <div className="mb-6">
           <label className="block mb-2 text-sm font-semibold text-black">
-           1. Degree program(s) being applied for: <span className="text-red-500">*</span>
+           Degree program(s) being applied for: <span className="text-red-500">*</span>
           </label>
           
           {Array.isArray(formData.degrees) && formData.degrees.map((degree: string, index: number) => (
-          <div key={index} className="flex items-center gap-2 mb-3">
-            <select
-              required
-              value={degree}
-              onChange={(e) => handleDegreeChange(index, e.target.value)}
-              className="flex-1 border border-gray-400 rounded-lg p-2 text-black"
-            >
-              <option value="">Select degree</option>
-              {[
-                { value: "BSCS", label: "Bachelor of Science in Computer Science" },
-                { value: "BSIS", label: "Bachelor of Science in Information Systems" },
-                { value: "BSIT", label: "Bachelor of Science in Information Technology" },
-                { value: "BSCpE", label: "Bachelor of Science in Computer Engineering" },
-                { value: "BSIE", label: "Bachelor of Science in Industrial Engineering" },
-                { value: "BSBA-LSCM", label: "BSBA – Logistics and Supply Chain Management" },
-                { value: "BSBA-FM",   label: "BSBA – Financial Management" },
-                { value: "BSBA-HRM",  label: "BSBA – Human Resources Management" },
-                { value: "BSBA-MM",   label: "BSBA – Marketing Management" },
-              ].map(opt => (
-                <option
-                  key={opt.value}
-                  value={opt.value}
-                  disabled={formData.degrees.includes(opt.value) && formData.degrees[index] !== opt.value}
+            <div key={index} className="flex items-center gap-2 mb-3">
+              <div className="flex-1 min-w-0">
+                <select
+                  required
+                  value={degree}
+                  onChange={(e) => handleDegreeChange(index, e.target.value)}
+                  className="w-full border border-gray-400 rounded-lg p-2 text-black text-sm"
                 >
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+                  <option value="">Select degree</option>
+                  {[
+                    { value: "BSCS", label: "BS Computer Science" },
+                    { value: "BSIS", label: "BS Information Systems" },
+                    { value: "BSIT", label: "BS Information Technology" },
+                    { value: "BSCpE", label: "BS Computer Engineering" },
+                    { value: "BSIE", label: "BS Industrial Engineering" },
+                    { value: "BSBA-LSCM", label: "BSBA – Logistics & Supply Chain" },
+                    { value: "BSBA-FM",   label: "BSBA – Financial Management" },
+                    { value: "BSBA-HRM",  label: "BSBA – Human Resources" },
+                    { value: "BSBA-MM",   label: "BSBA – Marketing Management" },
+                  ].map(opt => (
+                    <option
+                      key={opt.value}
+                      value={opt.value}
+                      disabled={formData.degrees.includes(opt.value) && formData.degrees[index] !== opt.value}
+                    >
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            {index === 0 && (
-              <button
-                type="button"
-                onClick={handleAddDegree}
-                disabled={formData.degrees?.length >= 3}
-                className="bg-yellow-500 text-white p-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Plus size={18} />
-              </button>
-            )}
-            {index > 0 && (
-              <button
-                type="button"
-                onClick={() => handleRemoveDegree(index)}
-                className="bg-red-500 text-white p-2 rounded-lg"
-              >
-                <Minus size={18} />
-              </button>
-            )}
-          </div>
-        ))}
+              {index === 0 && (
+                <button
+                  type="button"
+                  onClick={handleAddDegree}
+                  disabled={formData.degrees?.length >= 3}
+                  className="shrink-0 bg-yellow-500 text-white p-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
+              {index > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveDegree(index)}
+                  className="shrink-0 bg-red-500 text-white p-2 rounded-lg"
+                >
+                  <Minus size={18} />
+                </button>
+              )}
+            </div>
+          ))}
           {formData.degrees?.length >= 3 && (
           <p className="text-xs text-gray-400 mt-1">Maximum of 3 degree programs allowed.</p>
           )}
@@ -184,7 +188,7 @@ const handleAddDegree = () => {
         {/* Statement field */}
         <div className="mb-4">
           <label className="block mb-2 text-sm font-semibold text-black">
-           2. Statement of your goals: <span className="text-red-500">*</span>
+           Statement of your goals: <span className="text-red-500">*</span>
           </label>
           <textarea
             ref={statementRef}
@@ -301,7 +305,10 @@ const handleAddDegree = () => {
         {/* 3. Learning plan */}
         <div className="mb-4">
             <label className="block mb-2 text-sm font-semibold text-black">
-              3. Indicate how much time... <span className="text-red-500">*</span>
+              Indicate how much time you plan to devote 
+              to personal learning activities 
+              so that you can finish the requirements 
+              in the prescribed program. Please specify your response. <span className="text-red-500">*</span>
             </label>
             <textarea
               name="plan"
@@ -314,24 +321,29 @@ const handleAddDegree = () => {
           </div>
 
         {/* 4. Overseas */}
-        <div className="mb-4">
-          <label className="block mb-2 text-sm font-semibold text-black">
-            4. For overseas applicants... <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            name="overseas"
-            rows={3}
-            value={formData.overseas || ""}
-            onChange={handleChange}
-            className={`w-full border rounded-lg px-3 py-2 text-black ${overseasError ? "border-red-500 bg-red-50" : "border-gray-400"}`}
-          />
-          {overseasError && <p className="flex items-center gap-1 text-red-500 text-xs mt-1"><AlertCircle size={12} /> This field is required.</p>}
+        {isOverseas && (
+          <div className="mb-4">
+            <label className="block mb-2 text-sm font-semibold text-black">
+              For overseas applicants, 
+              describe how you plan to obtain accreditation/equivalency 
+              (e.g., when you plan to come to the Philippines). <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              name="overseas"
+              rows={3}
+              value={formData.overseas || ""}
+              onChange={handleChange}
+              className={`w-full border rounded-lg px-3 py-2 text-black ${overseasError ? "border-red-500 bg-red-50" : "border-gray-400"}`}
+            />
+            {overseasError && <p className="flex items-center gap-1 text-red-500 text-xs mt-1"><AlertCircle size={12} /> This field is required.</p>}
           </div>
+        )}
+
 
           {/* 5. Completion */}
           <div className="mb-4">
             <label className="block mb-2 text-sm font-semibold text-black">
-              5. How soon do you need to complete... <span className="text-red-500">*</span>
+              How soon do you need to complete equivalency/accreditation? <span className="text-red-500">*</span>
             </label>
             <textarea
               name="completion"

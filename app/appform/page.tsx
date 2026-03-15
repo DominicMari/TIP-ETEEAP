@@ -30,25 +30,27 @@ function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: numb
 
     const steps = stepTitles.map((title, index) => ({ number: index + 1, title }));
     return (
-        <div className="w-full max-w-5xl mb-8">
-            <div className="flex items-start justify-center">
-                {steps.map((step, index) => {
-                    const isActive = step.number === currentStep;
-                    const isCompleted = step.number < currentStep;
-                    return (
-                        <div key={step.number} className="flex items-start">
-                            <div className="flex flex-col items-center text-center w-20">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition-colors duration-300 ${isActive ? "bg-yellow-500 text-white" : isCompleted ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}>
-                                    {isCompleted ? "✔" : step.number}
+        <div className="w-full max-w-5xl mb-8 px-2">
+            <div className="overflow-x-auto pb-2">
+                <div className="flex items-start justify-start sm:justify-center min-w-max mx-auto">
+                    {steps.map((step, index) => {
+                        const isActive = step.number === currentStep;
+                        const isCompleted = step.number < currentStep;
+                        return (
+                            <div key={step.number} className="flex items-start">
+                                <div className="flex flex-col items-center text-center w-16 sm:w-20">
+                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm sm:text-lg font-bold transition-colors duration-300 ${isActive ? "bg-yellow-500 text-white" : isCompleted ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+                                        {isCompleted ? "✔" : step.number}
+                                    </div>
+                                    <p className={`mt-1 text-[10px] sm:text-xs font-semibold w-16 sm:w-20 ${isActive ? "text-yellow-600" : "text-gray-500"}`}>{step.title}</p>
                                 </div>
-                                <p className={`mt-2 text-xs font-semibold w-20 ${isActive ? "text-yellow-600" : "text-gray-500"}`}>{step.title}</p>
+                                {index < steps.length - 1 && (
+                                    <div className={`w-8 sm:w-16 border-t-2 self-start mt-4 sm:mt-5 transition-colors duration-300 ${isCompleted ? "border-green-500" : "border-gray-200"}`}></div>
+                                )}
                             </div>
-                            {index < steps.length - 1 && (
-                                <div className={`w-16 border-t-2 self-start mt-5 transition-colors duration-300 ${isCompleted ? "border-green-500" : "border-gray-200"}`}></div>
-                            )}
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
@@ -485,7 +487,8 @@ export default function ApplicationFormPage() {
             case 2:
                 return ( <PersonalInformationForm formData={formData.personalInfo} setFormData={handlePersonalChange} nextStep={nextStep} prevStep={prevStep} /> );
             case 3:
-                return ( <PrioritiesGoalsForm formData={formData.goals} setFormData={handleGoalsChange} nextStep={nextStep} prevStep={prevStep} /> );
+               case 3:
+            return ( <PrioritiesGoalsForm formData={formData.goals} setFormData={handleGoalsChange} nextStep={nextStep} prevStep={prevStep} isOverseas={formData.personalInfo.isOverseas} /> );
             case 4:
                 return ( <BackgroundAchievementsForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} /> );
             case 5:
