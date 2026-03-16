@@ -452,7 +452,7 @@ export default function ApplicationFormPage() {
             folder_link: formData.initial.folderLink,
             full_address: formData.personalInfo.fullAddress,
             mobile_number: formData.personalInfo.mobile,
-            email_address: formData.personalInfo.email,
+            email_address: formData.personalInfo.email || session?.user?.email,
             age: formData.personalInfo.age,
             birth_date: formData.personalInfo.birthday,
             birth_place: formData.personalInfo.birthplace,
