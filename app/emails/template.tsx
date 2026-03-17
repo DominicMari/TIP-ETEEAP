@@ -21,7 +21,7 @@ const baseUrl = process.env.VERCEL_URL
   : 'https://tip-eteeap.vercel.app'; 
 
 
-const logoUrl = `https://zwqrpmnpboyvvniboqrh.supabase.co/storage/v1/object/public/Assets/images/TIPLogo.png`;
+const logoUrl = `https://zwqrpmnpboyvvniboqrh.supabase.co/storage/v1/object/public/Assets/images/NewTIPLogo.png`;
 const fbUrl = `https://zwqrpmnpboyvvniboqrh.supabase.co/storage/v1/object/public/Assets/images/FB.png`;
 const xUrl = `https://zwqrpmnpboyvvniboqrh.supabase.co/storage/v1/object/public/Assets/images/x.png`;
 const igUrl = `https://zwqrpmnpboyvvniboqrh.supabase.co/storage/v1/object/public/Assets/images/IG.png`;

@@ -93,7 +93,7 @@ export default function AdminLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       <div className="bg-white shadow-xl rounded-xl p-8 w-full max-w-sm">
         <div className="flex justify-center mb-6">
-           <img src="/assets/TIPLogo.png" alt="TIP Logo" className="w-12 h-12" />
+           <img src="/assets/NewTIPLogo.png" alt="TIP Logo" className="w-30 h-20" />
         </div>
         <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">
            Admin Portal Login
