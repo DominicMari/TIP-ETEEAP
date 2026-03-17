@@ -4,8 +4,7 @@ import { createClient } from '@supabase/supabase-js'; // Use the standard client
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
+export const dynamic = 'force-dynamic';
 
 // Function to generate a random, secure password
 function generateTemporaryPassword() {
@@ -24,6 +23,8 @@ export async function POST(request: Request) {
   if (!name || !email) {
     return NextResponse.json({ error: 'Name and email are required.' }, { status: 400 });
   }
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
   // This is the correct way to create a SERVICE client in an API route.
   // It will now work because Vercel has the SERVICE_ROLE_KEY from Step 1.
@@ -69,11 +70,11 @@ export async function POST(request: Request) {
     // This is the error your user sees:
     return NextResponse.json({ error: 'Failed to create admin profile.' }, { status: 500 });
   }
-  
+
   // 3. Send the temporary password via email
   try {
     console.log(`[API] Sending temporary password to: ${email}`);
-    
+
     const loginUrl = process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/admin` : 'http://localhost:3000/admin';
 
     await resend.emails.send({
@@ -102,6 +103,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     message: 'Admin created successfully.',
     user: authData.user,
-    temporaryPassword: temporaryPassword, 
+    temporaryPassword: temporaryPassword,
   });
 }

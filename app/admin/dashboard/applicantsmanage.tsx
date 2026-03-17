@@ -556,185 +556,187 @@ export default function ApplicantsManage({
   ) : null;
 
   return (
-    <div className='relative min-h-screen'>
+    <>
+      <div className='relative min-h-screen'>
 
-      {/* 1. ADD print:hidden TO YOUR MAIN UI WRAPPER */}
-      <div className='space-y-6 print:hidden'>
-        <ErrorAlert />
+        {/* 1. ADD print:hidden TO YOUR MAIN UI WRAPPER */}
+        <div className='space-y-6 print:hidden'>
+          <ErrorAlert />
 
-        <PageHeader
-          title='Applicant Management'
-          applicantCount={filteredApplicants.length}
-          totalApplicants={applicants.length}
-          searchTerm={searchTerm}
-          onSearchChange={(e) => setSearchTerm(e.target.value)}
-          statusFilter={statusFilter}
-          onStatusChange={(e) => setStatusFilter(e.target.value)}
-          dateSort={dateSort}
-          onDateSortChange={(v) => { setDateSort(v); setCurrentPage(1); }}
-        />
+          <PageHeader
+            title='Applicant Management'
+            applicantCount={filteredApplicants.length}
+            totalApplicants={applicants.length}
+            searchTerm={searchTerm}
+            onSearchChange={(e) => setSearchTerm(e.target.value)}
+            statusFilter={statusFilter}
+            onStatusChange={(e) => setStatusFilter(e.target.value)}
+            dateSort={dateSort}
+            onDateSortChange={(v) => { setDateSort(v); setCurrentPage(1); }}
+          />
 
-        {/* --- Main Table --- */}
-        <div className='overflow-x-auto border border-gray-200 rounded-lg shadow-sm'>
-          <table className='min-w-full bg-white divide-y divide-gray-200'>
-            <thead className='bg-gray-50'>
-              <tr>
-                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Applicant</th>
-                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Degree Applied For</th>
-                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Campus</th>
-                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Date Submitted</th>
-                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Status</th>
-                <th className='px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider'>Actions</th>
-              </tr>
-            </thead>
-            <tbody className='divide-y divide-gray-200'>
-              {filteredApplicants.length === 0 ? (
+          {/* --- Main Table --- */}
+          <div className='overflow-x-auto border border-gray-200 rounded-lg shadow-sm'>
+            <table className='min-w-full bg-white divide-y divide-gray-200'>
+              <thead className='bg-gray-50'>
                 <tr>
-                  <td colSpan={6} className='p-6 text-center text-gray-500'>
-                    No applications found
-                    {searchTerm && ' matching your search.'}
-                    {statusFilter !== 'All' && ` with status '${statusFilter}'.`}
-                  </td>
+                  <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Applicant</th>
+                  <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Degree Applied For</th>
+                  <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Campus</th>
+                  <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Date Submitted</th>
+                  <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Status</th>
+                  <th className='px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider'>Actions</th>
                 </tr>
-              ) : (
-                paginatedApplicants.map((app) => (
-                  <tr key={app.application_id} className='text-black hover:bg-gray-50 transition-colors duration-150'>
-                    <td className='px-6 py-4 whitespace-nowrap'>
-                      <div className='flex items-center'>
-                        <div className='flex-shrink-0 h-10 w-10'>
-                          <img
-                            className='h-10 w-10 rounded-full object-cover bg-gray-200'
-                            src={app.photo_url || '/assets/default-avatar.png'}
-                            alt='Applicant Photo'
-                            onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
-                          />
-                        </div>
-                        <div className='ml-4'>
-                          <div className='text-sm font-medium text-gray-900'>{app.applicant_name || 'N/A'}</div>
-                          <div className='text-xs text-gray-500'>{app.email_address || ''}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.degree_applied_for || 'N/A'}</td>
-                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.campus || 'N/A'}</td>
-                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>
-                      {formatDate(app.application_date || app.created_at)}
-                    </td>
-                    <td className='px-6 py-4 whitespace-nowrap min-w-[200px]'>
-                      {/* Progress Bar Container */}
-                      <div className="flex flex-col gap-2">
-
-                        {/* Percentage Text & Bar */}
-                        <div className="w-full">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="font-medium text-gray-500">Progress</span>
-                            <span className="font-bold text-gray-700">
-                              {Math.round(getCompletionPercentage(app))}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div
-                              className={`h-2.5 rounded-full transition-all duration-500 ${getCompletionPercentage(app) >= 100 ? 'bg-green-500' :
-                                getCompletionPercentage(app) >= 50 ? 'bg-yellow-400' : 'bg-red-400'
-                                }`}
-                              style={{ width: `${getCompletionPercentage(app)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-
-                        {/* Status Badge - Click to view details */}
-                        <div className='flex items-center gap-2 mt-1'>
-                          {(updatingStatusId === app.application_id || deletingId === app.application_id) && <Loader2 className='h-3 w-3 animate-spin text-gray-400' />}
-                          <button
-                            onClick={() => handleViewDetails(app)}
-                            className={`text-[10px] font-bold uppercase rounded-md px-2 py-0.5 ring-1 ring-inset cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${STATUS_COLORS[app.status || 'Submitted']
-                              }`}
-                          >
-                            {STATUS_ICONS[app.status || 'Submitted']}
-                            {app.status || 'Submitted'}
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                    <td className='px-6 py-4 text-sm font-medium text-center'>
-                      <ActionsMenu
-                        applicant={app}
-                        onView={handleViewDetails}
-                        onDelete={handleDelete}
-                        isDeleting={deletingId === app.application_id}
-                        isUpdating={updatingStatusId === app.application_id}
-                      />
+              </thead>
+              <tbody className='divide-y divide-gray-200'>
+                {filteredApplicants.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className='p-6 text-center text-gray-500'>
+                      No applications found
+                      {searchTerm && ' matching your search.'}
+                      {statusFilter !== 'All' && ` with status '${statusFilter}'.`}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  paginatedApplicants.map((app) => (
+                    <tr key={app.application_id} className='text-black hover:bg-gray-50 transition-colors duration-150'>
+                      <td className='px-6 py-4 whitespace-nowrap'>
+                        <div className='flex items-center'>
+                          <div className='flex-shrink-0 h-10 w-10'>
+                            <img
+                              className='h-10 w-10 rounded-full object-cover bg-gray-200'
+                              src={app.photo_url || '/assets/default-avatar.png'}
+                              alt='Applicant Photo'
+                              onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
+                            />
+                          </div>
+                          <div className='ml-4'>
+                            <div className='text-sm font-medium text-gray-900'>{app.applicant_name || 'N/A'}</div>
+                            <div className='text-xs text-gray-500'>{app.email_address || ''}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.degree_applied_for || 'N/A'}</td>
+                      <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.campus || 'N/A'}</td>
+                      <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>
+                        {formatDate(app.application_date || app.created_at)}
+                      </td>
+                      <td className='px-6 py-4 whitespace-nowrap min-w-[200px]'>
+                        {/* Progress Bar Container */}
+                        <div className="flex flex-col gap-2">
+
+                          {/* Percentage Text & Bar */}
+                          <div className="w-full">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="font-medium text-gray-500">Progress</span>
+                              <span className="font-bold text-gray-700">
+                                {Math.round(getCompletionPercentage(app))}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5">
+                              <div
+                                className={`h-2.5 rounded-full transition-all duration-500 ${getCompletionPercentage(app) >= 100 ? 'bg-green-500' :
+                                  getCompletionPercentage(app) >= 50 ? 'bg-yellow-400' : 'bg-red-400'
+                                  }`}
+                                style={{ width: `${getCompletionPercentage(app)}%` }}
+                              ></div>
+                            </div>
+                          </div>
+
+                          {/* Status Badge - Click to view details */}
+                          <div className='flex items-center gap-2 mt-1'>
+                            {(updatingStatusId === app.application_id || deletingId === app.application_id) && <Loader2 className='h-3 w-3 animate-spin text-gray-400' />}
+                            <button
+                              onClick={() => handleViewDetails(app)}
+                              className={`text-[10px] font-bold uppercase rounded-md px-2 py-0.5 ring-1 ring-inset cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${STATUS_COLORS[app.status || 'Submitted']
+                                }`}
+                            >
+                              {STATUS_ICONS[app.status || 'Submitted']}
+                              {app.status || 'Submitted'}
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                      <td className='px-6 py-4 text-sm font-medium text-center'>
+                        <ActionsMenu
+                          applicant={app}
+                          onView={handleViewDetails}
+                          onDelete={handleDelete}
+                          isDeleting={deletingId === app.application_id}
+                          isUpdating={updatingStatusId === app.application_id}
+                        />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
         </div>
 
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+        {/* View Details Modal */}
+        {isModalOpen && selectedApplicant && (
+          <ViewApplicantModal
+            applicant={selectedApplicant}
+            onClose={handleCloseModal}
+            onStatusChange={handleStatusChange}
+            updatingStatusId={updatingStatusId}
+          />
+        )}
 
-      {/* View Details Modal */}
-      {isModalOpen && selectedApplicant && (
-        <ViewApplicantModal
-          applicant={selectedApplicant}
-          onClose={handleCloseModal}
-          onStatusChange={handleStatusChange}
-          updatingStatusId={updatingStatusId}
-        />
-      )}
-
-      {/* Remarks Modal */}
-      {remarksModal && (
-        <div className='fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm'>
-          <div className='bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-black'>
-            <h3 className='text-lg font-bold text-gray-900 mb-1'>
-              Update Status to <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-sm font-semibold ${STATUS_COLORS[remarksModal.newStatus]}`}>{remarksModal.newStatus}</span>
-            </h3>
-            <p className='text-sm text-gray-500 mb-4'>Add optional remarks for the applicant. These will be visible on their application tracker.</p>
-            <textarea
-              value={remarksText}
-              onChange={(e) => setRemarksText(e.target.value)}
-              placeholder='e.g., Your application has been reviewed and approved. Please check your email for next steps...'
-              rows={5}
-              className='w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none'
-            />
-            {!remarksModal.currentRemarks && (
-              <button
-                onClick={() => setRemarksText(getRemarksTemplate(remarksModal.newStatus))}
-                className='text-xs text-blue-600 hover:text-blue-800 font-medium mb-3 flex items-center gap-1'
-              >
-                <Zap size={12} />
-                Use suggested template
-              </button>
-            )}
-            <div className='flex justify-end gap-3 mt-4'>
-              <button
-                onClick={() => { setRemarksModal(null); setRemarksText(''); }}
-                className='px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors'
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleStatusChangeConfirm}
-                disabled={updatingStatusId === remarksModal.applicationId}
-                className='px-4 py-2 text-sm font-semibold text-white bg-yellow-500 rounded-lg hover:bg-yellow-600 transition-colors disabled:opacity-50 flex items-center gap-2'
-              >
-                {updatingStatusId === remarksModal.applicationId && <Loader2 className='w-4 h-4 animate-spin' />}
-                Confirm
-              </button>
+        {/* Remarks Modal */}
+        {remarksModal && (
+          <div className='fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm'>
+            <div className='bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-black'>
+              <h3 className='text-lg font-bold text-gray-900 mb-1'>
+                Update Status to <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-sm font-semibold ${STATUS_COLORS[remarksModal.newStatus]}`}>{remarksModal.newStatus}</span>
+              </h3>
+              <p className='text-sm text-gray-500 mb-4'>Add optional remarks for the applicant. These will be visible on their application tracker.</p>
+              <textarea
+                value={remarksText}
+                onChange={(e) => setRemarksText(e.target.value)}
+                placeholder='e.g., Your application has been reviewed and approved. Please check your email for next steps...'
+                rows={5}
+                className='w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none'
+              />
+              {!remarksModal.currentRemarks && (
+                <button
+                  onClick={() => setRemarksText(getRemarksTemplate(remarksModal.newStatus))}
+                  className='text-xs text-blue-600 hover:text-blue-800 font-medium mb-3 flex items-center gap-1'
+                >
+                  <Zap size={12} />
+                  Use suggested template
+                </button>
+              )}
+              <div className='flex justify-end gap-3 mt-4'>
+                <button
+                  onClick={() => { setRemarksModal(null); setRemarksText(''); }}
+                  className='px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors'
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleStatusChangeConfirm}
+                  disabled={updatingStatusId === remarksModal.applicationId}
+                  className='px-4 py-2 text-sm font-semibold text-white bg-yellow-500 rounded-lg hover:bg-yellow-600 transition-colors disabled:opacity-50 flex items-center gap-2'
+                >
+                  {updatingStatusId === remarksModal.applicationId && <Loader2 className='w-4 h-4 animate-spin' />}
+                  Confirm
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-    </div>
-    <Modal {...modalProps} />
+      </div>
+      <Modal {...modalProps} />
+    </>
   );
 }
 
@@ -1098,8 +1100,8 @@ const GoalStatement: FC<{ data: any }> = ({ data }) => {
 const AssessmentList: FC<{ data: any }> = ({ data }) => {
   let items = data;
   if (!items) return null;
-  try { items = JSON.parse(data); } catch (e) {}
-  
+  try { items = JSON.parse(data); } catch (e) { }
+
   const entries = Object.entries(items);
 
   if (typeof items !== 'object' || items === null || entries.length === 0) {
@@ -1130,24 +1132,24 @@ const AssessmentList: FC<{ data: any }> = ({ data }) => {
 const CreativeWorks: FC<{ data: any }> = ({ data }) => {
   let works = data;
   if (!works) return null;
-  try { works = JSON.parse(data); } catch (e) {}
-  
+  try { works = JSON.parse(data); } catch (e) { }
+
   if (!Array.isArray(works) || works.length === 0) {
     return null;
   }
 
   return (
-      <div className='space-y-3'>
-        {works.map((work, index) => (
-          <div key={index} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
-            <p className='text-base font-bold text-gray-800'>
-              {work.title || `Work #${index + 1}`}
-            </p>
-            {work.link && <p className='text-sm text-blue-600'>{work.link}</p>}
-            <p className='text-sm text-gray-700 mt-1'>{work.description}</p>
-          </div>
-        ))}
-      </div>
+    <div className='space-y-3'>
+      {works.map((work, index) => (
+        <div key={index} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
+          <p className='text-base font-bold text-gray-800'>
+            {work.title || `Work #${index + 1}`}
+          </p>
+          {work.link && <p className='text-sm text-blue-600'>{work.link}</p>}
+          <p className='text-sm text-gray-700 mt-1'>{work.description}</p>
+        </div>
+      ))}
+    </div>
   );
 };
 
