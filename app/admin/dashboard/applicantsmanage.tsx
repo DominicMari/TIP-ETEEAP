@@ -17,6 +17,8 @@ import {
   Zap,
   TrendingUp
 } from 'lucide-react';
+import Modal from "@/components/ui/Modal";
+import { useModal } from "@/components/ui/useModal";
 
 interface DegreePriority {
   priority: string;
@@ -312,6 +314,7 @@ export default function ApplicantsManage({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [remarksModal, setRemarksModal] = useState<{ applicationId: string; newStatus: string; currentRemarks: string } | null>(null);
   const [remarksText, setRemarksText] = useState('');
+  const { modalProps, showConfirm } = useModal();
 
   // 🔽 --- NEW: State for search and filtering ---
   const [searchTerm, setSearchTerm] = useState('');
@@ -484,9 +487,12 @@ export default function ApplicantsManage({
   };
 
   const handleDelete = async (applicationId: string, applicantName: string | null) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to permanently delete the application for '${applicantName || 'this applicant'
-      }'? This action cannot be undone.`
+    const confirmed = await showConfirm(
+      `Are you sure you want to permanently delete the application for '${applicantName || 'this applicant'}'? This action cannot be undone.`,
+      "Delete Application",
+      "danger",
+      "Yes, Delete",
+      "Cancel"
     );
 
     if (!confirmed) return;
@@ -708,6 +714,7 @@ export default function ApplicantsManage({
       )}
 
     </div>
+    <Modal {...modalProps} />
   );
 }
 

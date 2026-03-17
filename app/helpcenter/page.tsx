@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import Header from "../components/header";
 import Footer from "../components/footer";
 import { supabase } from "@/lib/supabase";
+import Modal from "@/components/ui/Modal";
+import { useModal } from "@/components/ui/useModal";
 
 export default function Page() {
   const [formData, setFormData] = useState({
@@ -13,6 +15,7 @@ export default function Page() {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const { modalProps, showAlert } = useModal();
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -39,7 +42,7 @@ export default function Page() {
         }]);
 
       if (insertError) {
-        alert(`Failed to save ticket: ${insertError.message}`);
+        await showAlert(`Failed to save ticket: ${insertError.message}`, "Error", "danger");
         setSubmitting(false);
         return;
       }
@@ -66,21 +69,21 @@ ${formData.message}
       try {
         data = JSON.parse(text);
       } catch {
-        alert("Ticket saved, but email response was invalid.");
+        await showAlert("Ticket saved, but email response was invalid.", "Notice");
         setSubmitting(false);
         return;
       }
 
       if (res.ok) {
-        alert("Your support ticket has been submitted successfully! Our team will review your concern and get back to you at your provided email address. Thank you for reaching out!");
+        await showAlert("Your support ticket has been submitted successfully! Our team will review your concern and get back to you at your provided email address. Thank you for reaching out!", "Ticket Submitted", "success");
         setFormData({ name: "", email: "", subject: "", message: "" });
       } else {
-        alert(`Ticket saved, but failed to send email: ${data?.error || "Unknown error"}`);
+        await showAlert(`Ticket saved, but failed to send email: ${data?.error || "Unknown error"}`, "Notice");
       }
 
     } catch (err) {
       console.error(err);
-      alert("An error occurred while submitting your ticket.");
+      await showAlert("An error occurred while submitting your ticket.", "Error", "danger");
     } finally {
       setSubmitting(false);
     }
@@ -221,6 +224,7 @@ ${formData.message}
       </main>
 
       <Footer />
+      <Modal {...modalProps} />
     </div>
   );
 }

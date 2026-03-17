@@ -5,6 +5,8 @@ import React, { useState } from "react";
 // 1. Use the shared client
 import supabase from "../../../lib/supabase/client"; // Adjust path if needed
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import Modal from "@/components/ui/Modal";
+import { useModal } from "@/components/ui/useModal";
 
 // --- Rest of the component remains the same ---
 
@@ -20,6 +22,7 @@ export default function ForcePasswordChange({ userId, onPasswordChanged }: Force
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const { modalProps, showAlert } = useModal();
 
   // ✅ 1. Add a new state just for real-time password rule validation.
   const [passwordRuleError, setPasswordRuleError] = useState("");
@@ -50,8 +53,8 @@ export default function ForcePasswordChange({ userId, onPasswordChanged }: Force
     // ✅ 3. Run all validations one last time on submit.
     const validationError = validatePassword(newPassword);
     if (!newPassword) { // Check for empty password *only* on submit
-        setPasswordRuleError("Password is required.");
-        return;
+      setPasswordRuleError("Password is required.");
+      return;
     }
     if (validationError) {
       console.warn("[ForcePasswordChange] Validation failed:", validationError);
@@ -71,8 +74,8 @@ export default function ForcePasswordChange({ userId, onPasswordChanged }: Force
       console.log("[ForcePasswordChange] Updating Supabase Auth user...");
       const { error: updateAuthError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateAuthError) {
-         console.error("[ForcePasswordChange] Auth update error:", updateAuthError.message);
-         throw updateAuthError;
+        console.error("[ForcePasswordChange] Auth update error:", updateAuthError.message);
+        throw updateAuthError;
       }
       console.log("[ForcePasswordChange] Auth user updated.");
 
@@ -84,12 +87,12 @@ export default function ForcePasswordChange({ userId, onPasswordChanged }: Force
         .eq("id", userId); // For the specific user
 
       if (updateProfileError) {
-           console.error("[ForcePasswordChange] Profile update error:", updateProfileError.message);
-           throw updateProfileError;
+        console.error("[ForcePasswordChange] Profile update error:", updateProfileError.message);
+        throw updateProfileError;
       }
       console.log("[ForcePasswordChange] 'admin' table flag updated.");
 
-      alert("Password updated successfully! The dashboard will now load.");
+      await showAlert("Password updated successfully! The dashboard will now load.", "Password Updated", "success");
       onPasswordChanged(); // Trigger a refresh of the parent component (dashboard)
 
     } catch (err) {
@@ -144,10 +147,10 @@ export default function ForcePasswordChange({ userId, onPasswordChanged }: Force
               <p className="text-red-600 text-xs text-center">Passwords do not match.</p>
             )}
           </div>
-          
+
           {/* ✅ 6. Show the main submission error */}
           {submitError && <p className="text-red-600 mt-4 text-center font-medium">{submitError}</p>}
-          
+
           <button
             type="submit"
             // ✅ 7. Update disabled logic to check the real-time rule error
@@ -158,6 +161,7 @@ export default function ForcePasswordChange({ userId, onPasswordChanged }: Force
           </button>
         </form>
       </div>
+      <Modal {...modalProps} />
     </div>
   );
 }

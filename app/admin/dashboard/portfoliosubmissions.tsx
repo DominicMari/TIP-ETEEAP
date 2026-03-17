@@ -4,10 +4,10 @@
 
 import { useEffect, useState, FC, ReactNode, useMemo, useRef } from "react";
 import supabase from "../../../lib/supabase/client";
-import { 
-  Loader2, 
-  AlertCircle, 
-  ExternalLink, 
+import {
+  Loader2,
+  AlertCircle,
+  ExternalLink,
   Camera,
   Check,
   X,
@@ -18,6 +18,8 @@ import {
   Eye,
   Trash2
 } from "lucide-react";
+import Modal from "@/components/ui/Modal";
+import { useModal } from "@/components/ui/useModal";
 
 // 1. NEW interface for the file objects in the JSONB array
 interface PortfolioFile {
@@ -105,7 +107,8 @@ export default function PortfolioSubmissions({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  
+  const { modalProps, showConfirm } = useModal();
+
   // --- State for search and filtering ---
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -162,13 +165,13 @@ export default function PortfolioSubmissions({
   // Memoized filtering logic
   const filteredSubmissions = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
-    
+
     // ✅✅✅ THIS IS THE FIX ✅✅✅
     // Add a "guard clause" to ensure 'submissions' is an array before filtering.
     if (!Array.isArray(submissions)) {
       return [];
     }
-    
+
     return submissions.filter(sub => {
       const statusMatch = statusFilter === "All" || sub.status === statusFilter;
       const searchMatch = (
@@ -254,8 +257,12 @@ export default function PortfolioSubmissions({
   };
 
   const handleDelete = async (submissionId: number, submissionName: string) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete the submission for "${submissionName}"?`
+    const confirmed = await showConfirm(
+      `Are you sure you want to delete the submission for "${submissionName}"?`,
+      "Delete Submission",
+      "danger",
+      "Yes, Delete",
+      "Cancel"
     );
     if (!confirmed) return;
 
@@ -292,16 +299,16 @@ export default function PortfolioSubmissions({
   }
 
   const ErrorAlert = () => error ? (
-     <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200 flex items-center gap-2">
-       <AlertCircle className="w-5 h-5 flex-shrink-0" />
-       <span><span className="font-medium">Error:</span> {error}</span>
-     </div>
+    <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200 flex items-center gap-2">
+      <AlertCircle className="w-5 h-5 flex-shrink-0" />
+      <span><span className="font-medium">Error:</span> {error}</span>
+    </div>
   ) : null;
 
   return (
     <div className="space-y-6">
       <ErrorAlert />
-      
+
       <PageHeader
         title="Portfolio Submissions"
         submissionCount={filteredSubmissions.length}
@@ -364,46 +371,44 @@ export default function PortfolioSubmissions({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {sub.created_at ? new Date(sub.created_at).toLocaleDateString() : "N/A"}
                   </td>
-              <td className="px-6 py-4 whitespace-nowrap min-w-[200px]">
-                {/* NEW: Progress Bar Container */}
-                <div className="flex flex-col gap-2">
-                  
-                  {/* Percentage Text & Bar */}
-                  <div className="w-full">
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="font-medium text-gray-500">Completeness</span>
-                      <span className="font-bold text-gray-700">
-                        {Math.round(getPortfolioProgress(sub))}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className={`h-2.5 rounded-full transition-all duration-500 ${
-                          getPortfolioProgress(sub) >= 100 ? 'bg-green-500' : 
-                          getPortfolioProgress(sub) >= 50 ? 'bg-yellow-400' : 'bg-red-400'
-                        }`} 
-                        style={{ width: `${getPortfolioProgress(sub)}%` }}
-                      ></div>
-                    </div>
-                  </div>
+                  <td className="px-6 py-4 whitespace-nowrap min-w-[200px]">
+                    {/* NEW: Progress Bar Container */}
+                    <div className="flex flex-col gap-2">
 
-                  {/* Status Badge - Click to view details */}
-                  <div className="flex items-center gap-2 mt-1">
-                    {(updatingStatusId === sub.id || deletingId === sub.id) && (
-                      <Loader2 className="h-4 w-4 animate-spin text-gray-400"/>
-                    )}
-                    <button
-                      onClick={() => handleViewDetails(sub)}
-                      className={`text-xs font-semibold rounded-full px-2.5 py-1 ring-1 ring-inset cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${
-                        STATUS_COLORS[sub.status]
-                      }`}
-                    >
-                      {STATUS_ICONS[sub.status]}
-                      {sub.status}
-                    </button>
-                  </div>
-                </div>
-              </td>
+                      {/* Percentage Text & Bar */}
+                      <div className="w-full">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-medium text-gray-500">Completeness</span>
+                          <span className="font-bold text-gray-700">
+                            {Math.round(getPortfolioProgress(sub))}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                          <div
+                            className={`h-2.5 rounded-full transition-all duration-500 ${getPortfolioProgress(sub) >= 100 ? 'bg-green-500' :
+                              getPortfolioProgress(sub) >= 50 ? 'bg-yellow-400' : 'bg-red-400'
+                              }`}
+                            style={{ width: `${getPortfolioProgress(sub)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Status Badge - Click to view details */}
+                      <div className="flex items-center gap-2 mt-1">
+                        {(updatingStatusId === sub.id || deletingId === sub.id) && (
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                        )}
+                        <button
+                          onClick={() => handleViewDetails(sub)}
+                          className={`text-xs font-semibold rounded-full px-2.5 py-1 ring-1 ring-inset cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${STATUS_COLORS[sub.status]
+                            }`}
+                        >
+                          {STATUS_ICONS[sub.status]}
+                          {sub.status}
+                        </button>
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-6 py-4 text-sm font-medium text-center">
                     <ActionsMenu
                       submission={sub}
@@ -434,6 +439,7 @@ export default function PortfolioSubmissions({
           updatingStatusId={updatingStatusId}
         />
       )}
+      <Modal {...modalProps} />
     </div>
   );
 }
@@ -456,41 +462,40 @@ const PageHeader: FC<{
   statusFilter,
   onStatusChange,
 }) => (
-  <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-    <div className="flex items-center gap-3">
-      <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-      <span className="px-3 py-1 text-sm font-semibold text-blue-800 bg-blue-100 rounded-full">
-        {submissionCount} / {totalSubmissions}
-      </span>
-    </div>
-    <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-      <div className="relative w-full md:w-64">
-        <input
-          type="text"
-          placeholder="Search name, degree, campus..."
-          value={searchTerm}
-          onChange={onSearchChange}
-          className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-black"
-        />
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+      <div className="flex items-center gap-3">
+        <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
+        <span className="px-3 py-1 text-sm font-semibold text-blue-800 bg-blue-100 rounded-full">
+          {submissionCount} / {totalSubmissions}
+        </span>
       </div>
-      <div className="relative w-full md:w-auto">
-        <select
-          value={statusFilter}
-          onChange={onStatusChange}
-          className={`w-full appearance-none pl-4 pr-10 py-2 text-sm font-semibold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 ${
-            STATUS_COLORS[statusFilter]
-          }`}
-        >
-          {STATUS_OPTIONS.map(status => (
-            <option key={status} value={status}>{status}</option>
-          ))}
-        </select>
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+      <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+        <div className="relative w-full md:w-64">
+          <input
+            type="text"
+            placeholder="Search name, degree, campus..."
+            value={searchTerm}
+            onChange={onSearchChange}
+            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-black"
+          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        </div>
+        <div className="relative w-full md:w-auto">
+          <select
+            value={statusFilter}
+            onChange={onStatusChange}
+            className={`w-full appearance-none pl-4 pr-10 py-2 text-sm font-semibold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 ${STATUS_COLORS[statusFilter]
+              }`}
+          >
+            {STATUS_OPTIONS.map(status => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 
 
 // --- View Details Modal Component (unchanged) ---
@@ -505,151 +510,148 @@ const ViewSubmissionModal: FC<{
   onStatusChange,
   updatingStatusId,
 }) => {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col text-black">
-        {/* Modal Header */}
-        <div className="flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10">
-          <h2 className="text-2xl font-bold text-gray-800">
-            Portfolio Submission Details
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-700"
-            aria-label="Close modal"
-          >
-            <X size={28} />
-          </button>
-        </div>
-
-        {/* Single Column Modal Body */}
-        <div className="flex-1 p-8 overflow-y-auto space-y-6">
-          <div className="flex flex-col items-center text-center mb-6">
-            <img
-              className="h-32 w-32 rounded-full object-cover bg-gray-200 flex-shrink-0 shadow-md mb-4"
-              src={submission.photo_url || "/assets/default-avatar.png"}
-              alt="Applicant Photo"
-              onError={(e) => { e.currentTarget.src = "/assets/default-avatar.png"; }}
-            />
-            <h3 className="text-2xl font-bold text-gray-900">
-              {submission.full_name || "N/A"}
-            </h3>
-            <p className="text-lg text-gray-600">
-              {submission.degree_program || "N/A"}
-            </p>
-            {/* Current Status Badge */}
-            <div
-              className={`mt-2 text-sm font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${
-                STATUS_COLORS[submission.status]
-              }`}
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col text-black">
+          {/* Modal Header */}
+          <div className="flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10">
+            <h2 className="text-2xl font-bold text-gray-800">
+              Portfolio Submission Details
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-700"
+              aria-label="Close modal"
             >
-              {updatingStatusId === submission.id
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : STATUS_ICONS[submission.status]
-              }
-              {submission.status}
-            </div>
-
-            {/* Approve / Decline Buttons */}
-            <div className="mt-4 flex items-center gap-2 w-full max-w-xs">
-              <button
-                onClick={() => onStatusChange(submission.id, 'Approved')}
-                disabled={updatingStatusId === submission.id || submission.status === 'Approved'}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  submission.status === 'Approved'
-                    ? 'bg-green-500 text-white ring-2 ring-green-300 shadow-md cursor-default'
-                    : 'bg-green-50 text-green-700 ring-1 ring-green-200 hover:bg-green-100 hover:ring-green-300'
-                } disabled:opacity-60`}
-              >
-                <Check size={16} />
-                Approve
-              </button>
-              <button
-                onClick={() => onStatusChange(submission.id, 'Declined')}
-                disabled={updatingStatusId === submission.id || submission.status === 'Declined'}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  submission.status === 'Declined'
-                    ? 'bg-red-500 text-white ring-2 ring-red-300 shadow-md cursor-default'
-                    : 'bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100 hover:ring-red-300'
-                } disabled:opacity-60`}
-              >
-                <X size={16} />
-                Decline
-              </button>
-            </div>
+              <X size={28} />
+            </button>
           </div>
 
-          <InfoCard title="Submission Info">
-            <InfoItem 
-              label="Date Submitted" 
-              value={submission.created_at ? new Date(submission.created_at).toLocaleString() : "N/A"} 
-            />
-            <InfoItem 
-              label="Campus" 
-              value={submission.campus || "N/A"} 
-            />
-          </InfoCard>
-
-          <InfoCard title="Uploaded Portfolio Files">
-            {submission.portfolio_files && submission.portfolio_files.length > 0 ? (
-              <ul className="space-y-3 pl-2">
-                {submission.portfolio_files.map((file) => (
-                  <li key={file.key}>
-                    <a
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-900 hover:underline"
-                    >
-                      <ExternalLink size={14} />
-                      <span className="truncate">{file.label || "Unnamed File"}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="italic text-gray-500 text-sm">
-                No portfolio files were uploaded with this submission.
+          {/* Single Column Modal Body */}
+          <div className="flex-1 p-8 overflow-y-auto space-y-6">
+            <div className="flex flex-col items-center text-center mb-6">
+              <img
+                className="h-32 w-32 rounded-full object-cover bg-gray-200 flex-shrink-0 shadow-md mb-4"
+                src={submission.photo_url || "/assets/default-avatar.png"}
+                alt="Applicant Photo"
+                onError={(e) => { e.currentTarget.src = "/assets/default-avatar.png"; }}
+              />
+              <h3 className="text-2xl font-bold text-gray-900">
+                {submission.full_name || "N/A"}
+              </h3>
+              <p className="text-lg text-gray-600">
+                {submission.degree_program || "N/A"}
               </p>
-            )}
-          </InfoCard>
-          
-          <InfoCard title="Internal Data">
-            <InfoItem label="Submission ID" value={submission.id} />
-            <InfoItem label="User ID" value={submission.user_id} />
-          </InfoCard>
+              {/* Current Status Badge */}
+              <div
+                className={`mt-2 text-sm font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${STATUS_COLORS[submission.status]
+                  }`}
+              >
+                {updatingStatusId === submission.id
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : STATUS_ICONS[submission.status]
+                }
+                {submission.status}
+              </div>
 
-          <section>
-            <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Applicant Signature</h3>
-            <div className="border rounded-lg p-2 bg-gray-100 max-w-md mx-auto">
-              {submission.signature ? (
-                <img
-                  src={submission.signature}
-                  alt="Applicant Signature"
-                  className="w-full h-auto object-contain"
-                />
+              {/* Approve / Decline Buttons */}
+              <div className="mt-4 flex items-center gap-2 w-full max-w-xs">
+                <button
+                  onClick={() => onStatusChange(submission.id, 'Approved')}
+                  disabled={updatingStatusId === submission.id || submission.status === 'Approved'}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${submission.status === 'Approved'
+                    ? 'bg-green-500 text-white ring-2 ring-green-300 shadow-md cursor-default'
+                    : 'bg-green-50 text-green-700 ring-1 ring-green-200 hover:bg-green-100 hover:ring-green-300'
+                    } disabled:opacity-60`}
+                >
+                  <Check size={16} />
+                  Approve
+                </button>
+                <button
+                  onClick={() => onStatusChange(submission.id, 'Declined')}
+                  disabled={updatingStatusId === submission.id || submission.status === 'Declined'}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${submission.status === 'Declined'
+                    ? 'bg-red-500 text-white ring-2 ring-red-300 shadow-md cursor-default'
+                    : 'bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100 hover:ring-red-300'
+                    } disabled:opacity-60`}
+                >
+                  <X size={16} />
+                  Decline
+                </button>
+              </div>
+            </div>
+
+            <InfoCard title="Submission Info">
+              <InfoItem
+                label="Date Submitted"
+                value={submission.created_at ? new Date(submission.created_at).toLocaleString() : "N/A"}
+              />
+              <InfoItem
+                label="Campus"
+                value={submission.campus || "N/A"}
+              />
+            </InfoCard>
+
+            <InfoCard title="Uploaded Portfolio Files">
+              {submission.portfolio_files && submission.portfolio_files.length > 0 ? (
+                <ul className="space-y-3 pl-2">
+                  {submission.portfolio_files.map((file) => (
+                    <li key={file.key}>
+                      <a
+                        href={file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-900 hover:underline"
+                      >
+                        <ExternalLink size={14} />
+                        <span className="truncate">{file.label || "Unnamed File"}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                <p className="italic text-gray-500 text-sm text-center p-4">
-                  No signature provided.
+                <p className="italic text-gray-500 text-sm">
+                  No portfolio files were uploaded with this submission.
                 </p>
               )}
-            </div>
-          </section>
-        </div>
+            </InfoCard>
 
-        {/* Modal Footer */}
-        <div className="p-4 border-t border-gray-200 bg-gray-100 text-right sticky bottom-0 rounded-b-2xl z-10">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
-          >
-            Close
-          </button>
+            <InfoCard title="Internal Data">
+              <InfoItem label="Submission ID" value={submission.id} />
+              <InfoItem label="User ID" value={submission.user_id} />
+            </InfoCard>
+
+            <section>
+              <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Applicant Signature</h3>
+              <div className="border rounded-lg p-2 bg-gray-100 max-w-md mx-auto">
+                {submission.signature ? (
+                  <img
+                    src={submission.signature}
+                    alt="Applicant Signature"
+                    className="w-full h-auto object-contain"
+                  />
+                ) : (
+                  <p className="italic text-gray-500 text-sm text-center p-4">
+                    No signature provided.
+                  </p>
+                )}
+              </div>
+            </section>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="p-4 border-t border-gray-200 bg-gray-100 text-right sticky bottom-0 rounded-b-2xl z-10">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 
 // --- Helper Components for Modal (unchanged) ---
@@ -662,10 +664,10 @@ const InfoCard: FC<{ title: string; children: ReactNode }> = ({ title, children 
   </div>
 );
 
-const InfoItem: FC<{ label: string; value?: ReactNode; children?: ReactNode }> = ({ 
-  label, 
-  value, 
-  children, 
+const InfoItem: FC<{ label: string; value?: ReactNode; children?: ReactNode }> = ({
+  label,
+  value,
+  children,
 }) => (
   <div className="text-sm">
     <p className="font-medium text-gray-500 mb-0.5">{label}</p>

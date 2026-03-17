@@ -8,6 +8,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DataPrivacyConsent from "./undertaking";
 import FileUploader from "./FileUploader";
+import Modal from "@/components/ui/Modal";
+import { useModal } from "@/components/ui/useModal";
 
 // --- FormField Helper ---
 const FormField = ({ icon, children, className }: { icon: React.ReactNode; children: React.ReactNode; className?: string }) => (
@@ -65,6 +67,7 @@ export default function ApplicationForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [hasConsented, setHasConsented] = useState(false);
   const router = useRouter();
+  const { modalProps, showAlert } = useModal();
 
   // Set name from session
   useEffect(() => {
@@ -147,10 +150,10 @@ export default function ApplicationForm() {
     setSubmitError(null);
     setFileErrors({});
 
-    if (!supabaseUserId) { alert("User profile is not loaded."); setIsSubmitting(false); return; }
+    if (!supabaseUserId) { await showAlert("User profile is not loaded.", "Error"); setIsSubmitting(false); return; }
     const signature = signaturePadRef.current?.getSignature();
     if (!signature) { setSignatureError("Please provide your signature."); setIsSubmitting(false); return; }
-    if (!formData.photo && !appPhotoUrl) { alert("Please upload a 1x1 photo."); setIsSubmitting(false); return; }
+    if (!formData.photo && !appPhotoUrl) { await showAlert("Please upload a 1x1 photo.", "Photo Required"); setIsSubmitting(false); return; }
 
     try {
       type UploadJob = { categoryKey: string; categoryLabel: string; file: File; storagePath: string };
@@ -205,7 +208,7 @@ export default function ApplicationForm() {
     } catch (error) {
       const errMsg = (error as Error).message;
       setSubmitError(`Submission failed: ${errMsg}`);
-      alert(`Submission failed: ${errMsg}`);
+      await showAlert(`Submission failed: ${errMsg}`, "Submission Error", "danger");
     } finally {
       setIsSubmitting(false);
     }
@@ -297,7 +300,7 @@ export default function ApplicationForm() {
                   ) : appPhotoUrl ? (
                     <img src={appPhotoUrl} alt="Photo" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-[10px] text-gray-400 text-center leading-tight">1 x 1<br/>Picture</span>
+                    <span className="text-[10px] text-gray-400 text-center leading-tight">1 x 1<br />Picture</span>
                   )}
                 </div>
               </div>
@@ -476,6 +479,7 @@ export default function ApplicationForm() {
           </form>
         </div>
       </div>
+      <Modal {...modalProps} />
     </div>
   );
 }

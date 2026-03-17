@@ -15,6 +15,8 @@ import LifelongLearningForm from "./j";
 import PortfolioForm from "./portfolio";
 import { useRouter } from 'next/navigation';
 import DataPrivacyConsent from './undertaking';
+import Modal from "@/components/ui/Modal";
+import { useModal } from "@/components/ui/useModal";
 
 
 const getTodayDateISO = () => {
@@ -166,6 +168,7 @@ export default function ApplicationFormPage() {
     const [hasExistingApplication, setHasExistingApplication] = useState(false);
     const [checkingExisting, setCheckingExisting] = useState(true);
     const router = useRouter();
+    const { modalProps, showAlert, showConfirm } = useModal();
 
     // Check if user already submitted an application
     useEffect(() => {
@@ -334,8 +337,12 @@ export default function ApplicationFormPage() {
     const [isDeletingApp, setIsDeletingApp] = useState(false);
 
     const startNewApplication = async () => {
-        const confirmed = window.confirm(
-            "Are you sure you want to make another application? The current application will be deleted."
+        const confirmed = await showConfirm(
+            "The current application will be deleted.",
+            "Make a New Application?",
+            "danger",
+            "Yes, Delete & Continue",
+            "Cancel"
         );
         if (!confirmed) return;
 
@@ -399,13 +406,13 @@ export default function ApplicationFormPage() {
         // Capture signature BEFORE setIsSubmitting unmounts the canvas
         const signatureDataUrl = signaturePadRef.current?.toDataURL('image/png');
         if (!signatureDataUrl) {
-            alert('Signature is missing. Please draw your signature.');
+            await showAlert('Signature is missing. Please draw your signature.', 'Signature Required');
             return;
         }
         setIsSubmitting(true);
 
         if (!session?.user?.email) {
-            alert("You must be logged in to submit.");
+            await showAlert("You must be logged in to submit.", "Not Logged In");
             setIsSubmitting(false);
             return;
         }
@@ -523,7 +530,7 @@ export default function ApplicationFormPage() {
             nextStep();
 
         } catch (error: any) {
-            alert(`Submission failed: ${error.message}`);
+            await showAlert(`Submission failed: ${error.message}`, 'Submission Error', 'danger');
         } finally {
             setIsSubmitting(false);
         }
@@ -626,6 +633,7 @@ export default function ApplicationFormPage() {
                 />
             )}
 
+            <Modal {...modalProps} />
         </div>
     );
 }

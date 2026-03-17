@@ -13,6 +13,8 @@ import DashboardHome from "./DashboardHome";
 import EmailManagement from "./emailmanagement";
 import PortfolioSubmissions from "./portfoliosubmissions";
 import SupportTicket from "./supportticket";
+import Modal from "@/components/ui/Modal";
+import { useModal } from "@/components/ui/useModal";
 
 // Define a type for your GoogleUser
 export interface GoogleUser {
@@ -49,8 +51,8 @@ const tabs: { [key in TabName]: { title: string; component: ComponentType<any> |
   UserLogins: { title: "User Login History", component: UserLoginsManage },
   AdminLogins: { title: "Admin Login History", component: UserManage },
   AdminManagement: { title: "Admin Management", component: AdminManagement },
-  EmailManagement: { title: "Email Management", component: EmailManagement }, 
-  SupportTicket: {title: "Support Ticket", component: SupportTicket }
+  EmailManagement: { title: "Email Management", component: EmailManagement },
+  SupportTicket: { title: "Support Ticket", component: SupportTicket }
 };
 
 // Define the shape of an admin's profile
@@ -69,6 +71,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<TabName>("Home");
   const [recordFocusRequest, setRecordFocusRequest] = useState<RecordFocusRequest | null>(null);
 
+  const { modalProps, showAlert, showConfirm } = useModal();
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Function to fetch the currently logged-in admin's profile
@@ -128,9 +131,9 @@ export default function DashboardPage() {
 
   // Function to handle user logout
   async function handleLogout() {
-    const isConfirmed = window.confirm("Are you sure you want to log out?");
+    const isConfirmed = await showConfirm("Are you sure you want to log out?", "Log Out", "confirm", "Log Out", "Cancel");
     if (!isConfirmed) {
-      return; // Stop logout if user clicks "Cancel"
+      return;
     }
 
     console.log("[DashboardPage] handleLogout: Attempting sign out...");
@@ -139,7 +142,7 @@ export default function DashboardPage() {
     setLoading(false);
     if (error) {
       console.error("[DashboardPage] handleLogout: Error signing out:", error.message);
-      alert(`Logout failed: ${error.message}`);
+      await showAlert(`Logout failed: ${error.message}`, "Logout Failed", "danger");
     } else {
       console.log("[DashboardPage] handleLogout: Sign out successful. Redirect should occur via listener.");
       setCurrentUser(null);
@@ -170,15 +173,15 @@ export default function DashboardPage() {
       return null;
     });
   };
-  
+
   // Inactivity Logout Effect
   useEffect(() => {
     const twentyMinutes = 20 * 60 * 1000;
 
-    const logoutInactiveUser = () => {
+    const logoutInactiveUser = async () => {
       if (currentUser) {
         console.log("[DashboardPage] Inactivity timer elapsed. Logging out...");
-        alert("You have been logged out due to 20 minutes of inactivity.");
+        await showAlert("You have been logged out due to 20 minutes of inactivity.", "Session Expired");
         handleLogout();
       }
     };
@@ -308,11 +311,10 @@ export default function DashboardPage() {
       )}
 
       <div
-        className={`flex min-h-screen font-sans ${
-          currentUser.requires_password_change
-            ? "filter blur-sm pointer-events-none"
-            : ""
-        }`}
+        className={`flex min-h-screen font-sans ${currentUser.requires_password_change
+          ? "filter blur-sm pointer-events-none"
+          : ""
+          }`}
       >
         {/* Sidebar */}
         <aside className="w-64 bg-white border-r border-gray-200 p-5 flex flex-col shrink-0 h-screen sticky top-0">
@@ -331,17 +333,16 @@ export default function DashboardPage() {
                   <button
                     key={key}
                     onClick={() => setActiveTab(key)}
-                    className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${
-                      activeTab === key
-                        ? "bg-yellow-400 text-black shadow-sm font-semibold"
-                        : "text-gray-600 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
-                    }`}
+                    className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${activeTab === key
+                      ? "bg-yellow-400 text-black shadow-sm font-semibold"
+                      : "text-gray-600 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                      }`}
                   >
                     {key === "AdminLogins"
                       ? "Admin Logins"
                       : key === "UserLogins"
-                      ? "User Logins"
-                      : tab.title}
+                        ? "User Logins"
+                        : tab.title}
                   </button>
                 );
               })}
@@ -377,6 +378,7 @@ export default function DashboardPage() {
           )}
         </main>
       </div>
+      <Modal {...modalProps} />
     </>
   );
 }
