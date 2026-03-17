@@ -123,6 +123,10 @@ export default function ApplicationForm() {
   // Get photo URL from application data
   const appPhotoUrl = appData?.photo_url || null;
 
+  // Pre-filled portfolio files from appform step 7
+  const appPortfolioFiles: { title: string; url: string; fileName?: string }[] =
+    Array.isArray(appData?.portfolio) ? appData.portfolio : [];
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -369,8 +373,24 @@ export default function ApplicationForm() {
                       <li>- <b>ABET Program Criteria</b></li>
                     </ul>
                   </div>
-                  <div className="px-3 py-3 flex items-start">
-                    <FileUploader label="Credentials" multiple onFilesChange={(f) => handleFilesChange("eteeapForm", f)} error={fileErrors["eteeapForm"]} />
+                  <div className="px-3 py-3 flex flex-col gap-2">
+                    {/* Pre-filled files from appform step 7 */}
+                    {appPortfolioFiles.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs font-semibold text-green-700 mb-1">✓ From Application Form:</p>
+                        <ul className="space-y-1">
+                          {appPortfolioFiles.map((f, i) => (
+                            <li key={i}>
+                              <a href={f.url} target="_blank" rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate">
+                                📎 {f.title || f.fileName || `File ${i + 1}`}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <FileUploader label="Additional Credentials" multiple onFilesChange={(f) => handleFilesChange("eteeapForm", f)} error={fileErrors["eteeapForm"]} />
                   </div>
                 </div>
 
@@ -402,7 +422,17 @@ export default function ApplicationForm() {
                     <p className="font-bold">Statement of Ownership/Authenticity</p>
                     <p className="italic text-xs text-gray-600">(provide a letter stating ownership/authenticity of the documents submitted)</p>
                   </div>
-                  <div className="px-3 py-3 flex items-start">
+                  <div className="px-3 py-3 flex flex-col gap-2">
+                    {/* Pre-filled from appform portfolio if title matches */}
+                    {appPortfolioFiles.filter(f =>
+                      f.title?.toLowerCase().includes("ownership") ||
+                      f.title?.toLowerCase().includes("authenticity")
+                    ).map((f, i) => (
+                      <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                        ✓ {f.title || f.fileName}
+                      </a>
+                    ))}
                     <FileUploader label="Authenticity" multiple onFilesChange={(f) => handleFilesChange("authenticity", f)} error={fileErrors["authenticity"]} />
                   </div>
                 </div>

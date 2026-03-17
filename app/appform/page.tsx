@@ -10,8 +10,8 @@ import InitialForm from "./a";
 import PersonalInformationForm from "./b";
 import PrioritiesGoalsForm from "./c-h";
 import BackgroundAchievementsForm from "./d";
-import CreativeWorksForm from "./i";
-import LifelongLearningForm from "./j";
+import LifelongLearningForm from "./i";
+import SelfReportForm from "./j";
 import PortfolioForm from "./portfolio";
 import { useRouter } from 'next/navigation';
 import DataPrivacyConsent from './undertaking';
@@ -38,14 +38,14 @@ function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: numb
                         const isCompleted = step.number < currentStep;
                         return (
                             <div key={step.number} className="flex items-start">
-                                <div className="flex flex-col items-center text-center w-16 sm:w-20">
-                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm sm:text-lg font-bold transition-colors duration-300 ${isActive ? "bg-yellow-500 text-white" : isCompleted ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}>
+                                <div className="flex flex-col items-center text-center w-14">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors duration-300 ${isActive ? "bg-yellow-500 text-white" : isCompleted ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}>
                                         {isCompleted ? "✔" : step.number}
                                     </div>
-                                    <p className={`mt-1 text-[10px] sm:text-xs font-semibold w-16 sm:w-20 ${isActive ? "text-yellow-600" : "text-gray-500"}`}>{step.title}</p>
+                                    <p className={`mt-1 text-[9px] font-semibold w-14 leading-tight ${isActive ? "text-yellow-600" : "text-gray-500"}`}>{step.title}</p>
                                 </div>
                                 {index < steps.length - 1 && (
-                                    <div className={`w-8 sm:w-16 border-t-2 self-start mt-4 sm:mt-5 transition-colors duration-300 ${isCompleted ? "border-green-500" : "border-gray-200"}`}></div>
+                                    <div className={`w-5 border-t-2 self-start mt-4 transition-colors duration-300 ${isCompleted ? "border-green-500" : "border-gray-200"}`}></div>
                                 )}
                             </div>
                         );
@@ -176,23 +176,31 @@ export default function ApplicationFormPage() {
 
         const checkExisting = async () => {
             if (session?.user?.email) {
+                const email = session.user.email;
+
+                // Try to get the user's UUID from the users table
                 const { data: userData } = await supabase
                     .from('users')
                     .select('id')
-                    .eq('email', session.user.email)
+                    .eq('email', email)
                     .single();
 
-                if (userData?.id) {
-                    const { data: existingApp } = await supabase
-                        .from('applications')
-                        .select('application_id')
-                        .eq('user_id', userData.id)
-                        .limit(1)
-                        .single();
+                // Build query: match by user_id OR by email_address column
+                let query = supabase
+                    .from('applications')
+                    .select('application_id')
+                    .limit(1);
 
-                    if (existingApp) {
-                        setHasExistingApplication(true);
-                    }
+                if (userData?.id) {
+                    query = query.or(`user_id.eq.${userData.id},email_address.eq.${email}`);
+                } else {
+                    query = query.eq('email_address', email);
+                }
+
+                const { data: existingApp } = await query.single();
+
+                if (existingApp) {
+                    setHasExistingApplication(true);
                 }
             }
             setCheckingExisting(false);
@@ -206,7 +214,7 @@ export default function ApplicationFormPage() {
             name: "",
             fullAddress: "",
             mobile: "",
-            email: "",
+            email: session?.user?.email || "",
             birthday: "",
             birthplace: "",
             age: null as number | null,
@@ -235,12 +243,26 @@ export default function ApplicationFormPage() {
         professional_development: { memberships: [], projects: [], research: [] },
         creativeWorks: [{ title: "", institution: "", dates: "" }],
         lifelongLearning: { hobbies: "", skills: "", workActivities: "", volunteer: "", travels: "" },
+        selfAssessment: { jobLearning: "", teamworkLearning: "", selfLearning: "", workBenefits: "", essay: "" },
         portfolio: [] as any[],
         portfolioFiles: [] as any[],
         portfolio_metadata: [] as any[]
     };
 
     const [formData, setFormData] = useState(defaultFormData);
+
+    // Auto-fill email once session is available
+    useEffect(() => {
+        if (session?.user?.email) {
+            setFormData(prev => ({
+                ...prev,
+                personalInfo: {
+                    ...prev.personalInfo,
+                    email: prev.personalInfo.email || session.user!.email!,
+                },
+            }));
+        }
+    }, [session]);
 
     const stepTitles = [
         "Initial Info",
@@ -389,6 +411,7 @@ export default function ApplicationFormPage() {
     const handleGoalsChange = createFormUpdater('goals');
     const handleCreativeWorksChange = createFormUpdater('creativeWorks');
     const handleLearningChange = createFormUpdater('lifelongLearning');
+    const handleSelfAssessmentChange = createFormUpdater('selfAssessment');
 
     // Consent handlers
     const handleConsentAgree = () => {
@@ -491,7 +514,7 @@ export default function ApplicationFormPage() {
                 folder_link: formData.initial.folderLink,
                 full_address: formData.personalInfo.fullAddress,
                 mobile_number: formData.personalInfo.mobile,
-                email_address: formData.personalInfo.email || session?.user?.email,
+                email_address: session?.user?.email || formData.personalInfo.email,
                 age: formData.personalInfo.age,
                 birth_date: formData.personalInfo.birthday,
                 birth_place: formData.personalInfo.birthplace,
@@ -516,6 +539,7 @@ export default function ApplicationFormPage() {
                 professional_development: formData.professional_development,
                 photo_url: photoUrl.publicUrl,
                 signature_url: sigUrl.publicUrl,
+                portfolio: uploadedPortfolioMetadata,
             }
 
             const { error: insertError } = await supabase
@@ -559,9 +583,9 @@ export default function ApplicationFormPage() {
             case 4:
                 return (<BackgroundAchievementsForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />);
             case 5:
-                return (<CreativeWorksForm formData={formData.creativeWorks} setFormData={handleCreativeWorksChange} nextStep={nextStep} prevStep={prevStep} />);
-            case 6:
                 return (<LifelongLearningForm formData={formData.lifelongLearning} setFormData={handleLearningChange} nextStep={nextStep} prevStep={prevStep} />);
+            case 6:
+                return (<SelfReportForm formData={formData.selfAssessment} setFormData={handleSelfAssessmentChange} nextStep={nextStep} prevStep={prevStep} />);
             case 7:
                 return (
                     <PortfolioForm
