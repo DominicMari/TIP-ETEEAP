@@ -172,41 +172,31 @@ export default function ApplicationFormPage() {
 
     // Check if user already submitted an application
     useEffect(() => {
-        if (sessionStatus === 'loading') return; // wait for session to resolve
+        if (sessionStatus === 'loading') return;
+
+        // Not logged in — redirect to home, no need to check DB
+        if (sessionStatus === 'unauthenticated') {
+            router.replace('/');
+            return;
+        }
 
         const checkExisting = async () => {
-            if (session?.user?.email) {
-                const email = session.user.email;
-
-                // Try to get the user's UUID from the users table
-                const { data: userData } = await supabase
-                    .from('users')
-                    .select('id')
-                    .eq('email', email)
-                    .single();
-
-                // Build query: match by user_id OR by email_address column
-                let query = supabase
-                    .from('applications')
-                    .select('application_id')
-                    .limit(1);
-
-                if (userData?.id) {
-                    query = query.or(`user_id.eq.${userData.id},email_address.eq.${email}`);
-                } else {
-                    query = query.eq('email_address', email);
+            try {
+                const res = await fetch(`/api/applicants?email=${encodeURIComponent(session!.user!.email!)}`);
+                if (res.ok) {
+                    const { applications } = await res.json();
+                    if (applications?.length > 0) {
+                        setHasExistingApplication(true);
+                    }
                 }
-
-                const { data: existingApp } = await query.single();
-
-                if (existingApp) {
-                    setHasExistingApplication(true);
-                }
+            } catch {
+                // fail open — let them proceed, submit will catch it
+            } finally {
+                setCheckingExisting(false);
             }
-            setCheckingExisting(false);
         };
         checkExisting();
-    }, [session, sessionStatus]);
+    }, [session, sessionStatus, router]);
 
     const defaultFormData = {
         initial: { name: "", degree: "", campus: "", date: getTodayDateISO(), folderLink: "", photo: null as File | null },
@@ -441,6 +431,17 @@ export default function ApplicationFormPage() {
         }
 
         try {
+            // 0. Pre-submit duplicate check
+            const dupCheck = await fetch(`/api/applicants?email=${encodeURIComponent(session.user.email)}`);
+            if (dupCheck.ok) {
+                const { applications: existing } = await dupCheck.json();
+                if (existing?.length > 0) {
+                    setHasExistingApplication(true);
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
             // 1. User Lookup
             const { data: userData, error: userError } = await supabase
                 .from('users')
