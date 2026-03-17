@@ -627,7 +627,7 @@ export default function AdminManagement({ currentUser }: AdminManagementProps) {
         </div>
       )}
 
-    </div> // End root div
+    </div>
     <Modal {...modalProps} />
   );
 }
