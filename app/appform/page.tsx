@@ -55,20 +55,21 @@ function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: numb
 }
 
 // --- Success Screen Component ---
-// ✅ 5. UPDATED SuccessScreen with new buttons
-function SuccessScreen({ onEdit }: { onEdit: () => void }) {
+function SuccessScreen({ onEdit, isDeleting }: { onEdit: () => void; isDeleting: boolean }) {
     return (
         <div className="bg-white shadow-lg rounded-2xl w-full max-w-3xl p-12 text-center flex flex-col items-center">
             <div className="text-6xl mb-4">🎉</div>
             <h1 className="text-3xl font-bold text-black mb-4">Application Submitted!</h1>
             <p className="text-gray-600 mb-8">Thank you for completing the form. We have received your application and will review it shortly.</p>
-            
+
             <div className="flex items-center gap-4 mt-4 flex-wrap justify-center">
                 <button
                     type="button"
                     onClick={onEdit}
-                    className="bg-gray-200 text-black font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors"
+                    disabled={isDeleting}
+                    className="bg-gray-200 text-black font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
                 >
+                    {isDeleting && <Loader2 size={16} className="animate-spin" />}
                     Make a New Application
                 </button>
                 <Link
@@ -157,66 +158,68 @@ function FinalReviewStep({ nextStep, prevStep, signaturePadRef, isSubmitting }: 
 
 // --- Main Page Component ---
 export default function ApplicationFormPage() {
-    const { data: session } = useSession();
+    const { data: session, status: sessionStatus } = useSession();
     const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const signaturePadRef = useRef<SignatureCanvas>(null);
-   const [hasConsented, setHasConsented] = useState(false); 
+    const [hasConsented, setHasConsented] = useState(false);
     const [hasExistingApplication, setHasExistingApplication] = useState(false);
     const [checkingExisting, setCheckingExisting] = useState(true);
     const router = useRouter();
 
     // Check if user already submitted an application
     useEffect(() => {
-      const checkExisting = async () => {
-        if (session?.user?.email) {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', session.user.email)
-            .single();
+        if (sessionStatus === 'loading') return; // wait for session to resolve
 
-          if (userData?.id) {
-            const { data: existingApp } = await supabase
-              .from('applications')
-              .select('application_id')
-              .eq('user_id', userData.id)
-              .limit(1)
-              .single();
+        const checkExisting = async () => {
+            if (session?.user?.email) {
+                const { data: userData } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('email', session.user.email)
+                    .single();
 
-            if (existingApp) {
-              setHasExistingApplication(true);
+                if (userData?.id) {
+                    const { data: existingApp } = await supabase
+                        .from('applications')
+                        .select('application_id')
+                        .eq('user_id', userData.id)
+                        .limit(1)
+                        .single();
+
+                    if (existingApp) {
+                        setHasExistingApplication(true);
+                    }
+                }
             }
-          }
-        }
-        setCheckingExisting(false);
-      };
-      checkExisting();
-    }, [session]);
+            setCheckingExisting(false);
+        };
+        checkExisting();
+    }, [session, sessionStatus]);
 
     const defaultFormData = {
         initial: { name: "", degree: "", campus: "", date: getTodayDateISO(), folderLink: "", photo: null as File | null },
-       personalInfo: {
-        name: "",
-        fullAddress: "",
-        mobile: "",
-        email: "",
-        birthday: "",
-        birthplace: "",
-        age: null as number | null,
-        gender: "",
-        nationality: "",
-        religion: "",
-        civilStatus: "",
-        language: "",
-        isOverseas: false,
-        overseasDetails: "",
-        cityAddress: "",
-        permanentAddress: "",
-        emergencyContactName: "",
-        emergencyRelationship: "",
-        emergencyAddress: "",
-        emergencyContactNumber: "",
+        personalInfo: {
+            name: "",
+            fullAddress: "",
+            mobile: "",
+            email: "",
+            birthday: "",
+            birthplace: "",
+            age: null as number | null,
+            gender: "",
+            nationality: "",
+            religion: "",
+            civilStatus: "",
+            language: "",
+            isOverseas: false,
+            overseasDetails: "",
+            cityAddress: "",
+            permanentAddress: "",
+            emergencyContactName: "",
+            emergencyRelationship: "",
+            emergencyAddress: "",
+            emergencyContactNumber: "",
         },
         goals: { degrees: [""], statement: "" },
         education: { tertiary: [], secondary: [], elementary: [], technical: [] },
@@ -233,7 +236,7 @@ export default function ApplicationFormPage() {
         portfolioFiles: [] as any[],
         portfolio_metadata: [] as any[]
     };
-    
+
     const [formData, setFormData] = useState(defaultFormData);
 
     const stepTitles = [
@@ -264,7 +267,7 @@ export default function ApplicationFormPage() {
 
             if (savedData) {
                 const parsedData = JSON.parse(savedData);
-                
+
                 setFormData(prev => {
                     const newState = JSON.parse(JSON.stringify(prev));
                     (Object.keys(prev) as Array<keyof typeof prev>).forEach(key => {
@@ -327,13 +330,42 @@ export default function ApplicationFormPage() {
     const nextStep = () => setCurrentStep((prev) => prev + 1);
     const prevStep = () => setCurrentStep((prev) => prev - 1);
 
-    // ✅ 7. ADDED: Handler to reset form
-    const startNewApplication = () => {
-        setFormData(defaultFormData); // Reset state
-        setCurrentStep(1); // Go to step 1
+    // Handler to reset form — confirms, deletes existing app, then resets
+    const [isDeletingApp, setIsDeletingApp] = useState(false);
+
+    const startNewApplication = async () => {
+        const confirmed = window.confirm(
+            "Are you sure you want to make another application? The current application will be deleted."
+        );
+        if (!confirmed) return;
+
+        setIsDeletingApp(true);
+        try {
+            if (session?.user?.email) {
+                const { data: userData } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('email', session.user.email)
+                    .single();
+
+                if (userData?.id) {
+                    await supabase
+                        .from('applications')
+                        .delete()
+                        .eq('user_id', userData.id);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to delete existing application:', err);
+        } finally {
+            setIsDeletingApp(false);
+        }
+
+        setFormData(defaultFormData);
+        setCurrentStep(1);
+        setHasExistingApplication(false);
         localStorage.removeItem('applicationFormData');
         localStorage.removeItem('applicationFormStep');
-        // We keep the consent
     };
 
     const createFormUpdater = (key: keyof typeof formData) => {
@@ -363,139 +395,139 @@ export default function ApplicationFormPage() {
     };
 
     // The handleSubmit function
-   const handleSubmit = async () => {
-    // Capture signature BEFORE setIsSubmitting unmounts the canvas
-    const signatureDataUrl = signaturePadRef.current?.toDataURL('image/png');
-    if (!signatureDataUrl) {
-        alert('Signature is missing. Please draw your signature.');
-        return;
-    }
-    setIsSubmitting(true);
+    const handleSubmit = async () => {
+        // Capture signature BEFORE setIsSubmitting unmounts the canvas
+        const signatureDataUrl = signaturePadRef.current?.toDataURL('image/png');
+        if (!signatureDataUrl) {
+            alert('Signature is missing. Please draw your signature.');
+            return;
+        }
+        setIsSubmitting(true);
 
-    if (!session?.user?.email) {
-        alert("You must be logged in to submit.");
-        setIsSubmitting(false);
-        return;
-    }
+        if (!session?.user?.email) {
+            alert("You must be logged in to submit.");
+            setIsSubmitting(false);
+            return;
+        }
 
-    try {
-        // 1. User Lookup
-        const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', session.user.email)
-            .single();
+        try {
+            // 1. User Lookup
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('id')
+                .eq('email', session.user.email)
+                .single();
 
-        if (userError || !userData?.id) throw new Error("User not found in database.");
-        const supabaseUserId = userData.id;
+            if (userError || !userData?.id) throw new Error("User not found in database.");
+            const supabaseUserId = userData.id;
 
-        // 2. Upload 1x1 Photo
-        const photoFile = formData.initial.photo;
-        if (!photoFile) throw new Error("1x1 Photo is missing from Step 1.");
-        
-        const photoPath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
-        const { error: photoUploadError } = await supabase.storage.from('application_files').upload(photoPath, photoFile);
-        if (photoUploadError) throw new Error(`Photo upload failed: ${photoUploadError.message}`);
-        const { data: photoUrl } = supabase.storage.from('application_files').getPublicUrl(photoPath);
+            // 2. Upload 1x1 Photo
+            const photoFile = formData.initial.photo;
+            if (!photoFile) throw new Error("1x1 Photo is missing from Step 1.");
 
-        // 3. Upload Signature
-        const sigBlob = await (await fetch(signatureDataUrl)).blob();
-        const sigPath = `${supabaseUserId}/signature_${Date.now()}.png`;
-        const { error: sigUploadError } = await supabase.storage.from('application_files').upload(sigPath, sigBlob);
-        if (sigUploadError) throw new Error(`Signature upload failed: ${sigUploadError.message}`);
-        const { data: sigUrl } = supabase.storage.from('application_files').getPublicUrl(sigPath);
+            const photoPath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
+            const { error: photoUploadError } = await supabase.storage.from('application_files').upload(photoPath, photoFile);
+            if (photoUploadError) throw new Error(`Photo upload failed: ${photoUploadError.message}`);
+            const { data: photoUrl } = supabase.storage.from('application_files').getPublicUrl(photoPath);
 
-        // 4. NEW: Upload Portfolio Documents
-        const uploadedPortfolioMetadata = [];
+            // 3. Upload Signature
+            const sigBlob = await (await fetch(signatureDataUrl)).blob();
+            const sigPath = `${supabaseUserId}/signature_${Date.now()}.png`;
+            const { error: sigUploadError } = await supabase.storage.from('application_files').upload(sigPath, sigBlob);
+            if (sigUploadError) throw new Error(`Signature upload failed: ${sigUploadError.message}`);
+            const { data: sigUrl } = supabase.storage.from('application_files').getPublicUrl(sigPath);
 
-        if (formData.portfolioFiles && formData.portfolioFiles.length > 0) {
-            for (let i = 0; i < formData.portfolioFiles.length; i++) {
-                const file = formData.portfolioFiles[i];
-                
-                // This was likely the line causing the "does not exist" error
-                const meta = formData.portfolio_metadata?.[i] || { title: `File ${i + 1}` }; 
+            // 4. NEW: Upload Portfolio Documents
+            const uploadedPortfolioMetadata = [];
 
-                if (file) {
-                    const filePath = `${supabaseUserId}/portfolio/${Date.now()}_${file.name}`;
-                    const { error: uploadErr } = await supabase.storage
-                        .from('portfolio_files') 
-                        .upload(filePath, file);
+            if (formData.portfolioFiles && formData.portfolioFiles.length > 0) {
+                for (let i = 0; i < formData.portfolioFiles.length; i++) {
+                    const file = formData.portfolioFiles[i];
 
-                    if (uploadErr) {
-                        console.error(`Error uploading:`, uploadErr);
-                        continue; // Skip this file if it fails
+                    // This was likely the line causing the "does not exist" error
+                    const meta = formData.portfolio_metadata?.[i] || { title: `File ${i + 1}` };
+
+                    if (file) {
+                        const filePath = `${supabaseUserId}/portfolio/${Date.now()}_${file.name}`;
+                        const { error: uploadErr } = await supabase.storage
+                            .from('portfolio_files')
+                            .upload(filePath, file);
+
+                        if (uploadErr) {
+                            console.error(`Error uploading:`, uploadErr);
+                            continue; // Skip this file if it fails
+                        }
+
+                        const { data: publicUrl } = supabase.storage
+                            .from('portfolio_files')
+                            .getPublicUrl(filePath);
+
+                        uploadedPortfolioMetadata.push({
+                            title: meta.title, // Use the title from metadata
+                            url: publicUrl.publicUrl,
+                            storagePath: filePath,
+                            fileSize: file.size,
+                            fileType: file.type
+                        });
                     }
-
-                    const { data: publicUrl } = supabase.storage
-                        .from('portfolio_files')
-                        .getPublicUrl(filePath);
-
-                    uploadedPortfolioMetadata.push({
-                        title: meta.title, // Use the title from metadata
-                        url: publicUrl.publicUrl,
-                        storagePath: filePath,
-                        fileSize: file.size,
-                        fileType: file.type
-                    });
                 }
             }
+
+            // 5. Insert Final Payload
+            const insertPayload = {
+                user_id: supabaseUserId,
+                education_background: formData.education,
+                applicant_name: formData.initial.name,
+                degree_applied_for: formData.initial.degree,
+                campus: formData.initial.campus,
+                application_date: formData.initial.date,
+                folder_link: formData.initial.folderLink,
+                full_address: formData.personalInfo.fullAddress,
+                mobile_number: formData.personalInfo.mobile,
+                email_address: formData.personalInfo.email || session?.user?.email,
+                age: formData.personalInfo.age,
+                birth_date: formData.personalInfo.birthday,
+                birth_place: formData.personalInfo.birthplace,
+                gender: formData.personalInfo.gender,
+                nationality: formData.personalInfo.nationality,
+                religion: formData.personalInfo.religion,
+                civil_status: formData.personalInfo.civilStatus,
+                language_spoken: formData.personalInfo.language,
+                is_overseas: formData.personalInfo.isOverseas || false,
+                overseas_details: formData.personalInfo.overseasDetails,
+                city_address: formData.personalInfo.cityAddress,
+                permanent_address: formData.personalInfo.permanentAddress,
+                emergency_contact_name: formData.personalInfo.emergencyContactName,
+                emergency_relationship: formData.personalInfo.emergencyRelationship,
+                emergency_address: formData.personalInfo.emergencyAddress,
+                emergency_contact_number: formData.personalInfo.emergencyContactNumber,
+                goal_statement: formData.goals.statement,
+                non_formal_education: formData.non_formal_education,
+                work_experiences: formData.work_experience,
+                lifelong_learning: formData.lifelongLearning,
+                creative_works: formData.creativeWorks,
+                professional_development: formData.professional_development,
+                photo_url: photoUrl.publicUrl,
+                signature_url: sigUrl.publicUrl,
+            }
+
+            const { error: insertError } = await supabase
+                .from('applications')
+                .insert(insertPayload);
+
+            if (insertError) throw insertError;
+
+            // Clear local storage and move to success
+            localStorage.removeItem('applicationFormData');
+            localStorage.removeItem('applicationFormStep');
+            nextStep();
+
+        } catch (error: any) {
+            alert(`Submission failed: ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
         }
-
-        // 5. Insert Final Payload
-        const insertPayload = {
-            user_id: supabaseUserId,
-            education_background: formData.education,
-            applicant_name: formData.initial.name,
-            degree_applied_for: formData.initial.degree,
-            campus: formData.initial.campus,
-            application_date: formData.initial.date,
-            folder_link: formData.initial.folderLink,
-            full_address: formData.personalInfo.fullAddress,
-            mobile_number: formData.personalInfo.mobile,
-            email_address: formData.personalInfo.email || session?.user?.email,
-            age: formData.personalInfo.age,
-            birth_date: formData.personalInfo.birthday,
-            birth_place: formData.personalInfo.birthplace,
-            gender: formData.personalInfo.gender,
-            nationality: formData.personalInfo.nationality,
-            religion: formData.personalInfo.religion,
-            civil_status: formData.personalInfo.civilStatus,
-            language_spoken: formData.personalInfo.language,
-            is_overseas: formData.personalInfo.isOverseas || false,
-            overseas_details: formData.personalInfo.overseasDetails,
-            city_address: formData.personalInfo.cityAddress,
-            permanent_address: formData.personalInfo.permanentAddress,
-            emergency_contact_name: formData.personalInfo.emergencyContactName,
-            emergency_relationship: formData.personalInfo.emergencyRelationship,
-            emergency_address: formData.personalInfo.emergencyAddress,
-            emergency_contact_number: formData.personalInfo.emergencyContactNumber,
-            goal_statement: formData.goals.statement,
-            non_formal_education: formData.non_formal_education,
-            work_experiences: formData.work_experience,
-            lifelong_learning: formData.lifelongLearning,
-            creative_works: formData.creativeWorks,
-            professional_development: formData.professional_development,
-            photo_url: photoUrl.publicUrl,
-            signature_url: sigUrl.publicUrl,
-        }
-
-        const { error: insertError } = await supabase
-            .from('applications')
-            .insert(insertPayload);
-
-        if (insertError) throw insertError;
-
-        // Clear local storage and move to success
-        localStorage.removeItem('applicationFormData');
-        localStorage.removeItem('applicationFormStep');
-        nextStep();
-
-    } catch (error: any) {
-        alert(`Submission failed: ${error.message}`);
-    } finally {
-        setIsSubmitting(false);
-    }
-};
+    };
 
     // --- Render Logic ---
     const renderStep = () => {
@@ -511,32 +543,32 @@ export default function ApplicationFormPage() {
 
         switch (currentStep) {
             case 1:
-                return ( <InitialForm formData={formData.initial} setFormData={handleInitialChange} nextStep={nextStep} /> );
+                return (<InitialForm formData={formData.initial} setFormData={handleInitialChange} nextStep={nextStep} />);
             case 2:
-                return ( <PersonalInformationForm formData={formData.personalInfo} setFormData={handlePersonalChange} nextStep={nextStep} prevStep={prevStep} /> );
+                return (<PersonalInformationForm formData={formData.personalInfo} setFormData={handlePersonalChange} nextStep={nextStep} prevStep={prevStep} />);
             case 3:
-               case 3:
-            return ( <PrioritiesGoalsForm formData={formData.goals} setFormData={handleGoalsChange} nextStep={nextStep} prevStep={prevStep} isOverseas={formData.personalInfo.isOverseas} /> );
+            case 3:
+                return (<PrioritiesGoalsForm formData={formData.goals} setFormData={handleGoalsChange} nextStep={nextStep} prevStep={prevStep} isOverseas={formData.personalInfo.isOverseas} />);
             case 4:
-                return ( <BackgroundAchievementsForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} /> );
+                return (<BackgroundAchievementsForm formData={formData} setFormData={setFormData} nextStep={nextStep} prevStep={prevStep} />);
             case 5:
-                return ( <CreativeWorksForm formData={formData.creativeWorks} setFormData={handleCreativeWorksChange} nextStep={nextStep} prevStep={prevStep} /> );
+                return (<CreativeWorksForm formData={formData.creativeWorks} setFormData={handleCreativeWorksChange} nextStep={nextStep} prevStep={prevStep} />);
             case 6:
-                return ( <LifelongLearningForm formData={formData.lifelongLearning} setFormData={handleLearningChange} nextStep={nextStep} prevStep={prevStep} /> );
+                return (<LifelongLearningForm formData={formData.lifelongLearning} setFormData={handleLearningChange} nextStep={nextStep} prevStep={prevStep} />);
             case 7:
-                return ( 
-                    <PortfolioForm 
-                        formData={formData} 
-                        setFormData={(newData: any) => setFormData(prev => ({ ...prev, ...newData }))} 
-                        nextStep={nextStep} 
-                        prevStep={prevStep} 
-                    /> 
+                return (
+                    <PortfolioForm
+                        formData={formData}
+                        setFormData={(newData: any) => setFormData(prev => ({ ...prev, ...newData }))}
+                        nextStep={nextStep}
+                        prevStep={prevStep}
+                    />
                 );
             case 8:
-                return ( <FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} /> );
+                return (<FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} />);
             // ✅ 9. Pass the new reset handler to the SuccessScreen
             case 9:
-                return <SuccessScreen onEdit={startNewApplication} />;
+                return <SuccessScreen onEdit={startNewApplication} isDeleting={isDeletingApp} />;
             default:
                 return <div>Form complete or invalid step.</div>;
         }
@@ -573,8 +605,8 @@ export default function ApplicationFormPage() {
                 <>
                     {currentStep <= totalSteps && ( // 8 <= 8
                         <div className="w-full max-w-5xl mb-4">
-                            <Link 
-                                href="/" 
+                            <Link
+                                href="/"
                                 className="flex items-center text-sm text-gray-600 hover:text-black font-semibold transition-colors"
                             >
                                 <ArrowLeft size={16} className="mr-1" />
@@ -586,14 +618,14 @@ export default function ApplicationFormPage() {
                     <Pagination currentStep={currentStep} totalSteps={totalSteps} stepTitles={stepTitles} />
                     {renderStep()}
                 </>
-                ) : (
+            ) : (
                 // --- If they have NOT consented, show the modal ---
                 <DataPrivacyConsent
                     onAgree={handleConsentAgree}
                     onDisagree={handleConsentDisagree}
                 />
             )}
-            
+
         </div>
     );
 }
