@@ -3,12 +3,12 @@ import { createPortal } from 'react-dom';
 import { openPrintPreview } from "@/components/admin/printTemplate";
 import { useEffect, useState, FC, ReactNode, useMemo, useRef } from 'react';
 import supabase from '../../../lib/supabase/client'; // Adjust path if needed
-import { 
-  Loader2, 
-  Check, 
-  X, 
-  Clock, 
-  AlertCircle, 
+import {
+  Loader2,
+  Check,
+  X,
+  Clock,
+  AlertCircle,
   Search,
   ChevronDown,
   MoreHorizontal,
@@ -312,10 +312,11 @@ export default function ApplicantsManage({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [remarksModal, setRemarksModal] = useState<{ applicationId: string; newStatus: string; currentRemarks: string } | null>(null);
   const [remarksText, setRemarksText] = useState('');
-  
+
   // 🔽 --- NEW: State for search and filtering ---
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [dateSort, setDateSort] = useState<'desc' | 'asc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -367,8 +368,8 @@ export default function ApplicantsManage({
   // Memoized filtering logic
   const filteredApplicants = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
-    
-    return applicants.filter(app => {
+
+    const filtered = applicants.filter(app => {
       const statusMatch = statusFilter === 'All' || (app.status || 'Submitted') === statusFilter;
       const searchMatch = (
         app.applicant_name?.toLowerCase().includes(lowerSearchTerm) ||
@@ -377,7 +378,15 @@ export default function ApplicantsManage({
       );
       return statusMatch && searchMatch;
     });
-  }, [applicants, searchTerm, statusFilter]);
+
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateSort === 'asc' ? dateA - dateB : dateB - dateA;
+    });
+
+    return filtered;
+  }, [applicants, searchTerm, statusFilter, dateSort]);
 
   // Memoized pagination logic
   const paginatedApplicants = useMemo(() => {
@@ -476,8 +485,7 @@ export default function ApplicantsManage({
 
   const handleDelete = async (applicationId: string, applicantName: string | null) => {
     const confirmed = window.confirm(
-      `Are you sure you want to permanently delete the application for '${
-        applicantName || 'this applicant'
+      `Are you sure you want to permanently delete the application for '${applicantName || 'this applicant'
       }'? This action cannot be undone.`
     );
 
@@ -515,19 +523,19 @@ export default function ApplicantsManage({
   }
 
   const ErrorAlert = () => error ? (
-     <div className='p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200 flex items-center gap-2'>
-       <AlertCircle className='w-5 h-5 flex-shrink-0' />
-       <span><span className='font-medium'>Error:</span> {error}</span>
-     </div>
+    <div className='p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200 flex items-center gap-2'>
+      <AlertCircle className='w-5 h-5 flex-shrink-0' />
+      <span><span className='font-medium'>Error:</span> {error}</span>
+    </div>
   ) : null;
 
   return (
     <div className='relative min-h-screen'>
-      
+
       {/* 1. ADD print:hidden TO YOUR MAIN UI WRAPPER */}
       <div className='space-y-6 print:hidden'>
         <ErrorAlert />
-        
+
         <PageHeader
           title='Applicant Management'
           applicantCount={filteredApplicants.length}
@@ -536,109 +544,109 @@ export default function ApplicantsManage({
           onSearchChange={(e) => setSearchTerm(e.target.value)}
           statusFilter={statusFilter}
           onStatusChange={(e) => setStatusFilter(e.target.value)}
+          dateSort={dateSort}
+          onDateSortChange={(v) => { setDateSort(v); setCurrentPage(1); }}
         />
 
-      {/* --- Main Table --- */}
-      <div className='overflow-x-auto border border-gray-200 rounded-lg shadow-sm'>
-        <table className='min-w-full bg-white divide-y divide-gray-200'>
-          <thead className='bg-gray-50'>
-            <tr>
-              <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Applicant</th>
-              <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Degree Applied For</th>
-              <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Campus</th>
-              <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Date Submitted</th>
-              <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Status</th>
-              <th className='px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider'>Actions</th>
-            </tr>
-          </thead>
-          <tbody className='divide-y divide-gray-200'>
-            {filteredApplicants.length === 0 ? (
+        {/* --- Main Table --- */}
+        <div className='overflow-x-auto border border-gray-200 rounded-lg shadow-sm'>
+          <table className='min-w-full bg-white divide-y divide-gray-200'>
+            <thead className='bg-gray-50'>
               <tr>
-                <td colSpan={6} className='p-6 text-center text-gray-500'>
-                  No applications found
-                  {searchTerm && ' matching your search.'}
-                  {statusFilter !== 'All' && ` with status '${statusFilter}'.`}
-                </td>
+                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Applicant</th>
+                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Degree Applied For</th>
+                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Campus</th>
+                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Date Submitted</th>
+                <th className='px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider'>Status</th>
+                <th className='px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider'>Actions</th>
               </tr>
-            ) : (
-              paginatedApplicants.map((app) => (
-                <tr key={app.application_id} className='text-black hover:bg-gray-50 transition-colors duration-150'>
-                  <td className='px-6 py-4 whitespace-nowrap'>
-                    <div className='flex items-center'>
-                      <div className='flex-shrink-0 h-10 w-10'>
-                        <img
-                          className='h-10 w-10 rounded-full object-cover bg-gray-200'
-                          src={app.photo_url || '/assets/default-avatar.png'}
-                          alt='Applicant Photo'
-                          onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
-                        />
-                      </div>
-                      <div className='ml-4'>
-                        <div className='text-sm font-medium text-gray-900'>{app.applicant_name || 'N/A'}</div>
-                        <div className='text-xs text-gray-500'>{app.email_address || ''}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.degree_applied_for || 'N/A'}</td>
-                  <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.campus || 'N/A'}</td>
-                  <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>
-                    {formatDate(app.application_date || app.created_at)}
-                  </td>
-                  <td className='px-6 py-4 whitespace-nowrap min-w-[200px]'>
-                    {/* Progress Bar Container */}
-                    <div className="flex flex-col gap-2">
-                      
-                      {/* Percentage Text & Bar */}
-                      <div className="w-full">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="font-medium text-gray-500">Progress</span>
-                          <span className="font-bold text-gray-700">
-                            {Math.round(getCompletionPercentage(app))}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                          <div 
-                            className={`h-2.5 rounded-full transition-all duration-500 ${
-                              getCompletionPercentage(app) >= 100 ? 'bg-green-500' : 
-                              getCompletionPercentage(app) >= 50 ? 'bg-yellow-400' : 'bg-red-400'
-                            }`} 
-                            style={{ width: `${getCompletionPercentage(app)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-
-                      {/* Status Badge - Click to view details */}
-                      <div className='flex items-center gap-2 mt-1'>
-                        {(updatingStatusId === app.application_id || deletingId === app.application_id) && <Loader2 className='h-3 w-3 animate-spin text-gray-400'/>}
-                        <button
-                          onClick={() => handleViewDetails(app)}
-                          className={`text-[10px] font-bold uppercase rounded-md px-2 py-0.5 ring-1 ring-inset cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${
-                            STATUS_COLORS[app.status || 'Submitted']
-                          }`}
-                        >
-                          {STATUS_ICONS[app.status || 'Submitted']}
-                          {app.status || 'Submitted'}
-                        </button>
-                      </div>
-                    </div>
-                  </td>
-                  <td className='px-6 py-4 text-sm font-medium text-center'>
-                    <ActionsMenu
-                      applicant={app}
-                      onView={handleViewDetails}
-                      onDelete={handleDelete}
-                      isDeleting={deletingId === app.application_id}
-                      isUpdating={updatingStatusId === app.application_id}
-                    />
+            </thead>
+            <tbody className='divide-y divide-gray-200'>
+              {filteredApplicants.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className='p-6 text-center text-gray-500'>
+                    No applications found
+                    {searchTerm && ' matching your search.'}
+                    {statusFilter !== 'All' && ` with status '${statusFilter}'.`}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                paginatedApplicants.map((app) => (
+                  <tr key={app.application_id} className='text-black hover:bg-gray-50 transition-colors duration-150'>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <div className='flex items-center'>
+                        <div className='flex-shrink-0 h-10 w-10'>
+                          <img
+                            className='h-10 w-10 rounded-full object-cover bg-gray-200'
+                            src={app.photo_url || '/assets/default-avatar.png'}
+                            alt='Applicant Photo'
+                            onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
+                          />
+                        </div>
+                        <div className='ml-4'>
+                          <div className='text-sm font-medium text-gray-900'>{app.applicant_name || 'N/A'}</div>
+                          <div className='text-xs text-gray-500'>{app.email_address || ''}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.degree_applied_for || 'N/A'}</td>
+                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>{app.campus || 'N/A'}</td>
+                    <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-700'>
+                      {formatDate(app.application_date || app.created_at)}
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap min-w-[200px]'>
+                      {/* Progress Bar Container */}
+                      <div className="flex flex-col gap-2">
 
-      <PaginationControls
+                        {/* Percentage Text & Bar */}
+                        <div className="w-full">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="font-medium text-gray-500">Progress</span>
+                            <span className="font-bold text-gray-700">
+                              {Math.round(getCompletionPercentage(app))}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div
+                              className={`h-2.5 rounded-full transition-all duration-500 ${getCompletionPercentage(app) >= 100 ? 'bg-green-500' :
+                                getCompletionPercentage(app) >= 50 ? 'bg-yellow-400' : 'bg-red-400'
+                                }`}
+                              style={{ width: `${getCompletionPercentage(app)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+
+                        {/* Status Badge - Click to view details */}
+                        <div className='flex items-center gap-2 mt-1'>
+                          {(updatingStatusId === app.application_id || deletingId === app.application_id) && <Loader2 className='h-3 w-3 animate-spin text-gray-400' />}
+                          <button
+                            onClick={() => handleViewDetails(app)}
+                            className={`text-[10px] font-bold uppercase rounded-md px-2 py-0.5 ring-1 ring-inset cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1 ${STATUS_COLORS[app.status || 'Submitted']
+                              }`}
+                          >
+                            {STATUS_ICONS[app.status || 'Submitted']}
+                            {app.status || 'Submitted'}
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                    <td className='px-6 py-4 text-sm font-medium text-center'>
+                      <ActionsMenu
+                        applicant={app}
+                        onView={handleViewDetails}
+                        onDelete={handleDelete}
+                        isDeleting={deletingId === app.application_id}
+                        isUpdating={updatingStatusId === app.application_id}
+                      />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <PaginationControls
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
@@ -712,6 +720,8 @@ const PageHeader: FC<{
   onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   statusFilter: string;
   onStatusChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  dateSort: 'asc' | 'desc';
+  onDateSortChange: (v: 'asc' | 'desc') => void;
 }> = ({
   title,
   applicantCount,
@@ -720,69 +730,81 @@ const PageHeader: FC<{
   onSearchChange,
   statusFilter,
   onStatusChange,
+  dateSort,
+  onDateSortChange,
 }) => (
-  <div className='flex flex-col md:flex-row justify-between items-center gap-4'>
-    <div className='flex items-center gap-3'>
-      <h1 className='text-3xl font-bold text-gray-900'>{title}</h1>
-      <span className='px-3 py-1 text-sm font-semibold text-blue-800 bg-blue-100 rounded-full'>
-        {applicantCount} / {totalApplicants}
-      </span>
-    </div>
-    <div className='flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto'>
-      {/* Search Bar */}
-      <div className='relative w-full md:w-64'>
-        <input
-          type='text'
-          placeholder='Search name, email...'
-          value={searchTerm}
-          onChange={onSearchChange}
-          className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-black"
-        />
-        <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400' />
+    <div className='flex flex-col md:flex-row justify-between items-center gap-4'>
+      <div className='flex items-center gap-3'>
+        <h1 className='text-3xl font-bold text-gray-900'>{title}</h1>
+        <span className='px-3 py-1 text-sm font-semibold text-blue-800 bg-blue-100 rounded-full'>
+          {applicantCount} / {totalApplicants}
+        </span>
       </div>
-      {/* Status Filter */}
-      <div className='relative w-full md:w-auto'>
-        <select
-          value={statusFilter}
-          onChange={onStatusChange}
-          className={`w-full appearance-none pl-4 pr-10 py-2 text-sm font-semibold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 ${
-            STATUS_COLORS[statusFilter]
-          }`}
-        >
-          {STATUS_OPTIONS.map(status => (
-            <option key={status} value={status}>{status}</option>
-          ))}
-        </select>
-        <ChevronDown className='absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none' />
+      <div className='flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto'>
+        {/* Search Bar */}
+        <div className='relative w-full md:w-64'>
+          <input
+            type='text'
+            placeholder='Search name, email...'
+            value={searchTerm}
+            onChange={onSearchChange}
+            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-black"
+          />
+          <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400' />
+        </div>
+        {/* Status Filter */}
+        <div className='relative w-full md:w-auto'>
+          <select
+            value={statusFilter}
+            onChange={onStatusChange}
+            className={`w-full appearance-none pl-4 pr-10 py-2 text-sm font-semibold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 ${STATUS_COLORS[statusFilter]}`}
+          >
+            {STATUS_OPTIONS.map(status => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+          <ChevronDown className='absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none' />
+        </div>
+        {/* Date Sort */}
+        <div className='relative w-full md:w-auto'>
+          <select
+            value={dateSort}
+            onChange={(e) => onDateSortChange(e.target.value as 'asc' | 'desc')}
+            className='w-full appearance-none pl-4 pr-10 py-2 text-sm font-semibold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-gray-700'
+          >
+            <option value='desc'>Date: Newest First</option>
+            <option value='asc'>Date: Oldest First</option>
+          </select>
+          <ChevronDown className='absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none' />
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 
 
 const formatDate = (dateString: string | null | undefined, includeTime = false): string => {
-    if (!dateString) {
-      return 'N/A';
-    }
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return dateString;
-      }
-      const options: Intl.DateTimeFormatOptions = {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      };
-      if (includeTime) {
-        options.hour = '2-digit';
-        options.minute = '2-digit';
-      }
-      return new Intl.DateTimeFormat('en-US', options).format(date);
-    } catch (e) {
+  if (!dateString) {
+    return 'N/A';
+  }
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
       return dateString;
     }
-  };
+    const options: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    };
+    if (includeTime) {
+      options.hour = '2-digit';
+      options.minute = '2-digit';
+    }
+    return new Intl.DateTimeFormat('en-US', options).format(date);
+  } catch (e) {
+    return dateString;
+  }
+};
 
 // 🔽 --- IMPROVED: View Details Modal ---
 const ViewApplicantModal: FC<{
@@ -796,202 +818,199 @@ const ViewApplicantModal: FC<{
   onStatusChange,
   updatingStatusId,
 }) => {
-  const handlePrint = () => {
-    openPrintPreview(applicant);
-  };
+    const handlePrint = () => {
+      openPrintPreview(applicant);
+    };
 
-  return createPortal(
-    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm'>
-      <div className='bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col text-black'>
-        {/* Modal Header */}
-        <div className='flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10'>
-          <h2 className='text-2xl font-bold text-gray-800'>
-            Applicant Details
-          </h2>
-          <button
-            onClick={onClose}
-            className='text-gray-400 hover:text-gray-700'
-            aria-label='Close modal'
-          >
-            <X size={28} />
-          </button>
-        </div>
+    return createPortal(
+      <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm'>
+        <div className='bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col text-black'>
+          {/* Modal Header */}
+          <div className='flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10'>
+            <h2 className='text-2xl font-bold text-gray-800'>
+              Applicant Details
+            </h2>
+            <button
+              onClick={onClose}
+              className='text-gray-400 hover:text-gray-700'
+              aria-label='Close modal'
+            >
+              <X size={28} />
+            </button>
+          </div>
 
-        {/* Two-Column Modal Body */}
-        <div className='flex-1 flex overflow-hidden'>
-          
-          {/* Left Column (Info) */}
-          <div className='w-1/3 max-w-sm border-r border-gray-200 p-6 overflow-y-auto space-y-6 bg-gray-50'>
-            {/* Applicant Bio */}
-            <div className='flex flex-col items-center text-center'>
-              <img
-                className='h-32 w-32 rounded-full object-cover bg-gray-200 flex-shrink-0 shadow-md mb-4'
-                src={applicant.photo_url || '/assets/default-avatar.png'}
-                alt='Applicant Photo'
-                onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
-              />
-              <h3 className='text-2xl font-bold text-gray-900'>
-                {applicant.applicant_name || 'N/A'}
-              </h3>
-              <p className='text-lg text-gray-600'>
-                {applicant.degree_applied_for || 'N/A'}
-              </p>
-              <p className='text-sm text-gray-500'>{applicant.campus} Campus</p>
-              {/* Current Status Badge */}
-              <div
-                className={`mt-2 text-sm font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${
-                  STATUS_COLORS[applicant.status || 'Submitted']
-                }`}
-              >
-                {updatingStatusId === applicant.application_id
-                  ? <Loader2 className='h-4 w-4 animate-spin' />
-                  : STATUS_ICONS[applicant.status || 'Submitted']
-                }
-                {applicant.status || 'Submitted'}
-              </div>
+          {/* Two-Column Modal Body */}
+          <div className='flex-1 flex overflow-hidden'>
 
-              {/* Proceed to Competency Process */}
-              <div className='mt-4 flex items-center gap-2 w-full'>
-                <button
-                  onClick={() => onStatusChange(applicant.application_id, 'Competency Process')}
-                  disabled={
-                    updatingStatusId === applicant.application_id ||
-                    applicant.status === 'Competency Process' ||
-                    applicant.status === 'Enrolled' ||
-                    applicant.status === 'Graduated'
+            {/* Left Column (Info) */}
+            <div className='w-1/3 max-w-sm border-r border-gray-200 p-6 overflow-y-auto space-y-6 bg-gray-50'>
+              {/* Applicant Bio */}
+              <div className='flex flex-col items-center text-center'>
+                <img
+                  className='h-32 w-32 rounded-full object-cover bg-gray-200 flex-shrink-0 shadow-md mb-4'
+                  src={applicant.photo_url || '/assets/default-avatar.png'}
+                  alt='Applicant Photo'
+                  onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
+                />
+                <h3 className='text-2xl font-bold text-gray-900'>
+                  {applicant.applicant_name || 'N/A'}
+                </h3>
+                <p className='text-lg text-gray-600'>
+                  {applicant.degree_applied_for || 'N/A'}
+                </p>
+                <p className='text-sm text-gray-500'>{applicant.campus} Campus</p>
+                {/* Current Status Badge */}
+                <div
+                  className={`mt-2 text-sm font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${STATUS_COLORS[applicant.status || 'Submitted']
+                    }`}
+                >
+                  {updatingStatusId === applicant.application_id
+                    ? <Loader2 className='h-4 w-4 animate-spin' />
+                    : STATUS_ICONS[applicant.status || 'Submitted']
                   }
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    applicant.status === 'Competency Process' ||
-                    applicant.status === 'Enrolled' ||
-                    applicant.status === 'Graduated'
+                  {applicant.status || 'Submitted'}
+                </div>
+
+                {/* Proceed to Competency Process */}
+                <div className='mt-4 flex items-center gap-2 w-full'>
+                  <button
+                    onClick={() => onStatusChange(applicant.application_id, 'Competency Process')}
+                    disabled={
+                      updatingStatusId === applicant.application_id ||
+                      applicant.status === 'Competency Process' ||
+                      applicant.status === 'Enrolled' ||
+                      applicant.status === 'Graduated'
+                    }
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${applicant.status === 'Competency Process' ||
+                      applicant.status === 'Enrolled' ||
+                      applicant.status === 'Graduated'
                       ? 'bg-blue-500 text-white ring-2 ring-blue-300 shadow-md cursor-default'
                       : 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100 hover:ring-blue-300'
-                  } disabled:opacity-60`}
-                >
-                  <TrendingUp size={16} />
-                  Proceed to Competency Process
-                </button>
+                      } disabled:opacity-60`}
+                  >
+                    <TrendingUp size={16} />
+                    Proceed to Competency Process
+                  </button>
+                </div>
               </div>
+
+              <InfoCard title='Applicant Information'>
+                <InfoItem label='Birthday' value={formatDate(applicant.birth_date)} />
+                <InfoItem label='Birthplace' value={applicant.birth_place} />
+                <InfoItem label='Age' value={applicant.age != null ? String(applicant.age) : 'N/A'} />
+                <InfoItem label='Gender' value={applicant.gender} />
+                <InfoItem label='Civil Status' value={applicant.civil_status} />
+                <InfoItem label='Nationality' value={applicant.nationality} />
+                <InfoItem label='Religion' value={applicant.religion} />
+                <InfoItem label='Language Spoken' value={applicant.language_spoken} />
+              </InfoCard>
+
+              <InfoCard title='Emergency Contact'>
+                <InfoItem label='Contact Name' value={applicant.emergency_contact_name} />
+                <InfoItem label='Address' value={applicant.emergency_address} />
+                <InfoItem label='Relationship' value={applicant.emergency_relationship} />
+                <InfoItem label='Contact Number' value={applicant.emergency_contact_number} />
+              </InfoCard>
+
+              <InfoCard title='Contact Information'>
+                <InfoItem label='Email'>
+                  <a href={`mailto:${applicant.email_address}`} className='text-blue-600 hover:underline break-all'>
+                    {applicant.email_address || 'N/A'}
+                  </a>
+                </InfoItem>
+                <InfoItem label='Mobile Number' value={applicant.mobile_number} />
+                <InfoItem label='City Address' value={applicant.city_address} />
+                <InfoItem label='Permanent Address' value={applicant.permanent_address} />
+              </InfoCard>
+
+              <InfoCard title='Application Info'>
+                <InfoItem
+                  label='Date Submitted'
+                  value={formatDate(applicant.application_date || applicant.created_at, true)}
+                />
+                <InfoItem
+                  label='Last Updated'
+                  value={formatDate(applicant.updated_at, true)}
+                />
+                <InfoItem label='Portfolio/Folder Link'>
+                  <a
+                    href={applicant.folder_link || '#'}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className={`break-all ${applicant.folder_link
+                      ? 'text-blue-600 hover:underline'
+                      : 'text-black pointer-events-none'
+                      }`}
+                  >
+                    {applicant.folder_link || 'N/A'}
+                  </a>
+                </InfoItem>
+              </InfoCard>
+
+              <InfoCard title='Internal Data'>
+                <InfoItem label='Application ID' value={applicant.application_id} />
+                <InfoItem label='User ID' value={applicant.user_id} />
+              </InfoCard>
+
+              {applicant.admin_remarks && (
+                <InfoCard title='Admin Remarks'>
+                  <p className='text-sm text-gray-700 whitespace-pre-wrap'>{applicant.admin_remarks}</p>
+                </InfoCard>
+              )}
             </div>
 
-            <InfoCard title='Applicant Information'>
-              <InfoItem label='Birthday' value={formatDate(applicant.birth_date)} />
-              <InfoItem label='Birthplace' value={applicant.birth_place} />
-              <InfoItem label='Age' value={applicant.age != null ? String(applicant.age) : 'N/A'} />
-              <InfoItem label='Gender' value={applicant.gender} />
-              <InfoItem label='Civil Status' value={applicant.civil_status} />
-              <InfoItem label='Nationality' value={applicant.nationality} />
-              <InfoItem label='Religion' value={applicant.religion} />
-              <InfoItem label='Language Spoken' value={applicant.language_spoken} />
-            </InfoCard>
-
-            <InfoCard title='Emergency Contact'>
-              <InfoItem label='Contact Name' value={applicant.emergency_contact_name} />
-              <InfoItem label='Address' value={applicant.emergency_address} />
-              <InfoItem label='Relationship' value={applicant.emergency_relationship} />
-              <InfoItem label='Contact Number' value={applicant.emergency_contact_number} />
-            </InfoCard>
-
-            <InfoCard title='Contact Information'>
-              <InfoItem label='Email'>
-                <a href={`mailto:${applicant.email_address}`} className='text-blue-600 hover:underline break-all'>
-                  {applicant.email_address || 'N/A'}
-                </a>
-              </InfoItem>
-              <InfoItem label='Mobile Number' value={applicant.mobile_number} />
-              <InfoItem label='City Address' value={applicant.city_address} />
-              <InfoItem label='Permanent Address' value={applicant.permanent_address} />
-            </InfoCard>
-
-            <InfoCard title='Application Info'>
-              <InfoItem 
-                label='Date Submitted' 
-                value={formatDate(applicant.application_date || applicant.created_at, true)} 
-              />
-              <InfoItem 
-                label='Last Updated' 
-                value={formatDate(applicant.updated_at, true)}
-              />
-                  <InfoItem label='Portfolio/Folder Link'>
-                    <a
-                      href={applicant.folder_link || '#'}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className={`break-all ${
-                        applicant.folder_link
-                          ? 'text-blue-600 hover:underline'
-                          : 'text-black pointer-events-none'
-                      }`}
-                    >
-                      {applicant.folder_link || 'N/A'}
-                    </a>
-                  </InfoItem>
-            </InfoCard>
-
-            <InfoCard title='Internal Data'>
-              <InfoItem label='Application ID' value={applicant.application_id} />
-              <InfoItem label='User ID' value={applicant.user_id} />
-            </InfoCard>
-
-            {applicant.admin_remarks && (
-              <InfoCard title='Admin Remarks'>
-                <p className='text-sm text-gray-700 whitespace-pre-wrap'>{applicant.admin_remarks}</p>
-              </InfoCard>
-            )}
-          </div>
-          
-          {/* Right Column (Content) */}
-          <div className='flex-1 p-8 overflow-y-auto'>
-            <CollapsibleSection title="Goal Statement" isOpenDefault={true}>
-              <GoalStatement data={applicant.goal_statement} />
-            </CollapsibleSection>
-            <CollapsibleSection title="Education Background">
+            {/* Right Column (Content) */}
+            <div className='flex-1 p-8 overflow-y-auto'>
+              <CollapsibleSection title="Goal Statement" isOpenDefault={true}>
+                <GoalStatement data={applicant.goal_statement} />
+              </CollapsibleSection>
+              <CollapsibleSection title="Education Background">
                 <EducationBackground data={applicant.education_background} />
-            </CollapsibleSection>
-            <CollapsibleSection title="Work Experiences">
+              </CollapsibleSection>
+              <CollapsibleSection title="Work Experiences">
                 <WorkExperiences data={applicant.work_experiences} />
-            </CollapsibleSection>
-            <CollapsibleSection title="Professional Development">
+              </CollapsibleSection>
+              <CollapsibleSection title="Professional Development">
                 <ProfessionalDevelopment data={applicant.professional_development} />
-            </CollapsibleSection>
-            <GenericList data={applicant.non_formal_education} title="Non-Formal Education" />
-            <CollapsibleSection title="Certifications"><Certifications data={applicant.certifications} /></CollapsibleSection>
-            <GenericList data={applicant.publications} title="Publications" />
-            <GenericList data={applicant.inventions} title="Inventions" />
-            <GenericList data={applicant.recognitions} title="Recognitions" />
-            <CollapsibleSection title="Lifelong Learning">
-              <AssessmentList data={applicant.lifelong_learning} />
-            </CollapsibleSection>
-            <CollapsibleSection title="Creative Works">
-              <CreativeWorks data={applicant.creative_works} />
-            </CollapsibleSection>
-            <CollapsibleSection title="Applicant Signature">
-              <Signature data={applicant.signature_url} />
-            </CollapsibleSection>
+              </CollapsibleSection>
+              <GenericList data={applicant.non_formal_education} title="Non-Formal Education" />
+              <CollapsibleSection title="Certifications"><Certifications data={applicant.certifications} /></CollapsibleSection>
+              <GenericList data={applicant.publications} title="Publications" />
+              <GenericList data={applicant.inventions} title="Inventions" />
+              <GenericList data={applicant.recognitions} title="Recognitions" />
+              <CollapsibleSection title="Lifelong Learning">
+                <AssessmentList data={applicant.lifelong_learning} />
+              </CollapsibleSection>
+              <CollapsibleSection title="Creative Works">
+                <CreativeWorks data={applicant.creative_works} />
+              </CollapsibleSection>
+              <CollapsibleSection title="Applicant Signature">
+                <Signature data={applicant.signature_url} />
+              </CollapsibleSection>
+            </div>
           </div>
-        </div>
 
-        {/* Modal Footer */}
-        <div className="p-4 border-t flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-lg font-medium text-gray-700 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handlePrint}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print
-          </button>
-        </div>
+          {/* Modal Footer */}
+          <div className="p-4 border-t flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-lg font-medium text-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handlePrint}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
+              Print
+            </button>
+          </div>
 
+        </div>
       </div>
-    </div>
-  , document.body);
-};
+      , document.body);
+  };
 
 // ---  NEW: Helper Components for Modal ---
 
@@ -1006,10 +1025,10 @@ const InfoCard: FC<{ title: string; children: ReactNode }> = ({ title, children 
 );
 
 // Simple Key-Value item for left sidebar
-const InfoItem: FC<{ label: string; value?: ReactNode; children?: ReactNode }> = ({ 
-  label, 
-  value, 
-  children, 
+const InfoItem: FC<{ label: string; value?: ReactNode; children?: ReactNode }> = ({
+  label,
+  value,
+  children,
 }) => (
   <div className='text-sm'>
     <p className='font-medium text-gray-500 mb-0.5'>{label}</p>
@@ -1029,7 +1048,7 @@ const GoalStatement: FC<{ data: any }> = ({ data }) => {
   let content = data;
   if (!content) return null;
   // Try to parse if it's a stringified JSON (e.g., from old data)
-  try { content = typeof data === 'string' ? JSON.parse(data) : data; } catch (e) {}
+  try { content = typeof data === 'string' ? JSON.parse(data) : data; } catch (e) { }
 
   return (
     <div className='prose prose-base max-w-none text-gray-800'>
@@ -1050,8 +1069,8 @@ const GoalStatement: FC<{ data: any }> = ({ data }) => {
 const AssessmentList: FC<{ data: any }> = ({ data }) => {
   let items = data;
   if (!items) return null;
-  try { items = JSON.parse(data); } catch (e) {}
-  
+  try { items = JSON.parse(data); } catch (e) { }
+
   const entries = Object.entries(items);
 
   if (typeof items !== 'object' || items === null || entries.length === 0) {
@@ -1066,14 +1085,14 @@ const AssessmentList: FC<{ data: any }> = ({ data }) => {
   };
 
   return (
-      <dl className='space-y-3'>
-        {entries.map(([key, value]) => (
-          <div key={key} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
-            <dt className='text-sm font-semibold text-gray-600 capitalize'>{formatKey(key)}</dt>
-            <dd className='text-base text-gray-800 mt-1'>{String(value)}</dd>
-          </div>
-        ))}
-      </dl>
+    <dl className='space-y-3'>
+      {entries.map(([key, value]) => (
+        <div key={key} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
+          <dt className='text-sm font-semibold text-gray-600 capitalize'>{formatKey(key)}</dt>
+          <dd className='text-base text-gray-800 mt-1'>{String(value)}</dd>
+        </div>
+      ))}
+    </dl>
   );
 };
 
@@ -1082,24 +1101,24 @@ const AssessmentList: FC<{ data: any }> = ({ data }) => {
 const CreativeWorks: FC<{ data: any }> = ({ data }) => {
   let works = data;
   if (!works) return null;
-  try { works = JSON.parse(data); } catch (e) {}
-  
+  try { works = JSON.parse(data); } catch (e) { }
+
   if (!Array.isArray(works) || works.length === 0) {
     return null;
   }
 
   return (
-      <div className='space-y-3'>
-        {works.map((work, index) => (
-          <div key={index} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
-            <p className='text-base font-bold text-gray-800'>
-              {work.title || `Work #${index + 1}`}
-            </p>
-            {work.link && <p className='text-sm text-blue-600'>{work.link}</p>}
-            <p className='text-sm text-gray-700 mt-1'>{work.description}</p>
-          </div>
-        ))}
-      </div>
+    <div className='space-y-3'>
+      {works.map((work, index) => (
+        <div key={index} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
+          <p className='text-base font-bold text-gray-800'>
+            {work.title || `Work #${index + 1}`}
+          </p>
+          {work.link && <p className='text-sm text-blue-600'>{work.link}</p>}
+          <p className='text-sm text-gray-700 mt-1'>{work.description}</p>
+        </div>
+      ))}
+    </div>
   );
 };
 
@@ -1108,13 +1127,13 @@ const Signature: FC<{ data: string | null }> = ({ data }) => {
   if (!data) return null;
 
   return (
-      <div className='border rounded-lg p-2 bg-gray-100 max-w-md'>
-        <img
-          src={data}
-          alt='Applicant Signature'
-          className='w-full h-auto object-contain'
-        />
-      </div>
+    <div className='border rounded-lg p-2 bg-gray-100 max-w-md'>
+      <img
+        src={data}
+        alt='Applicant Signature'
+        className='w-full h-auto object-contain'
+      />
+    </div>
   );
 };
 
@@ -1166,9 +1185,8 @@ const CollapsibleSection: FC<{ title: string; children: ReactNode; isOpenDefault
       >
         <span>{title}</span>
         <ChevronDown
-          className={`w-6 h-6 text-gray-500 transition-transform duration-200 ${
-            isOpen ? "transform rotate-180" : ""
-          }`}
+          className={`w-6 h-6 text-gray-500 transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""
+            }`}
         />
       </button>
       {isOpen && <div className="p-4 bg-white">{children || <p className="italic text-gray-500 text-sm">No data available for this section.</p>}</div>}
@@ -1196,7 +1214,7 @@ const GenericList: FC<{ data: any[] | string; title?: string }> = ({ data, title
   }
 
   const hasData = parsedData && parsedData.length > 0;
-  
+
   const content = (
     hasData ? (
       <div className="space-y-3">
@@ -1377,34 +1395,34 @@ const ActionsMenu: FC<{
         <MoreHorizontal size={18} />
       </button>
       {isOpen && (
-  <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10 border">
+        <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10 border">
 
-    <button
-      onClick={() => {
-        onView(applicant);
-        setIsOpen(false);
-      }}
-      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-    >
-      <Eye size={16} />
-      View Details
-    </button>
+          <button
+            onClick={() => {
+              onView(applicant);
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+          >
+            <Eye size={16} />
+            View Details
+          </button>
 
-    <div className="border-t border-gray-100 my-1"></div>
+          <div className="border-t border-gray-100 my-1"></div>
 
-    <button
-      onClick={() => {
-        onDelete(applicant.application_id, applicant.applicant_name);
-        setIsOpen(false);
-      }}
-      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-    >
-      <Trash2 size={16} />
-      Delete Application
-    </button>
+          <button
+            onClick={() => {
+              onDelete(applicant.application_id, applicant.applicant_name);
+              setIsOpen(false);
+            }}
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+          >
+            <Trash2 size={16} />
+            Delete Application
+          </button>
 
-  </div>
-)}
+        </div>
+      )}
 
     </div>
   );
