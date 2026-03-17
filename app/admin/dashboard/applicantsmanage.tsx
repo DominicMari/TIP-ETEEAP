@@ -153,49 +153,69 @@ interface Applicant {
 
 // --- Constants ---
 
-// Helper to check if a field has valid data (parsing JSON if needed)
-const hasData = (data: any): boolean => {
-  if (!data) return false;
+const parseField = (data: any): any => {
+  if (data === null || data === undefined) return null;
+  if (typeof data !== 'string') return data;
+
+  const trimmed = data.trim();
+  if (!trimmed) return '';
+
   try {
-    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-    // If it's an array, check if it has items
-    if (Array.isArray(parsed)) return parsed.length > 0;
-    // If it's an object, check if it has keys
-    if (typeof parsed === 'object') return Object.keys(parsed).length > 0;
-    // If string, check length
-    return String(parsed).trim().length > 0;
-  } catch (e) {
-    return false;
+    return JSON.parse(trimmed);
+  } catch {
+    return trimmed;
   }
+};
+
+const hasMeaningfulValue = (value: any): boolean => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (typeof value === 'number' || typeof value === 'boolean') return true;
+  if (Array.isArray(value)) return value.some(hasMeaningfulValue);
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, any>).some(hasMeaningfulValue);
+  }
+  return false;
+};
+
+// Treat empty arrays/structured objects as answered to support explicit None/N/A selections.
+const isSectionAnswered = (data: any): boolean => {
+  const parsed = parseField(data);
+  if (parsed === null || parsed === undefined) return false;
+  if (Array.isArray(parsed)) return true;
+  if (typeof parsed === 'object') return Object.keys(parsed).length > 0;
+  if (typeof parsed === 'string') return parsed.trim().length > 0;
+  return true;
 };
 
 // Calculate percentage based on 8 steps
 const getCompletionPercentage = (app: Applicant): number => {
   let completedSteps = 0;
+  const workData = parseField(app.work_experiences);
 
   // Step 1: Degree Applied / Priorities (Usually Step 1)
-  if (app.degree_applied_for || hasData(app.degree_priorities)) completedSteps++;
+  if ((app.degree_applied_for || '').trim() || hasMeaningfulValue(parseField(app.degree_priorities))) completedSteps++;
 
   // Step 2: Education Background
-  if (hasData(app.education_background)) completedSteps++;
+  if (isSectionAnswered(app.education_background)) completedSteps++;
 
   // Step 3: Work Experience
-  if (hasData(app.work_experiences)) completedSteps++;
+  if (hasMeaningfulValue(workData)) completedSteps++;
 
   // Step 4: Professional Development (Seminars/Trainings)
-  if (hasData(app.professional_development)) completedSteps++;
+  if (isSectionAnswered(app.professional_development)) completedSteps++;
 
   // Step 5: Certifications or Non-Formal Education
-  if (hasData(app.certifications) || hasData(app.non_formal_education)) completedSteps++;
+  if (isSectionAnswered(app.certifications) || isSectionAnswered(app.non_formal_education)) completedSteps++;
 
   // Step 6: Recognitions, Publications, or Inventions
-  if (hasData(app.recognitions) || hasData(app.publications) || hasData(app.inventions)) completedSteps++;
+  if (isSectionAnswered(app.recognitions) || isSectionAnswered(app.publications) || isSectionAnswered(app.inventions)) completedSteps++;
 
   // Step 7: Creative Works / Portfolio
-  if (hasData(app.creative_works)) completedSteps++;
+  if (isSectionAnswered(app.creative_works)) completedSteps++;
 
   // Step 8: Goal Statement or Self-Assessment (Essay parts)
-  if (hasData(app.goal_statement) || hasData(app.self_assessment)) completedSteps++;
+  if (hasMeaningfulValue(parseField(app.goal_statement)) || hasMeaningfulValue(parseField(app.self_assessment))) completedSteps++;
 
   return (completedSteps / 8) * 100;
 };
@@ -1046,7 +1066,9 @@ const InfoItem: FC<{ label: string; value?: ReactNode; children?: ReactNode }> =
 // Renders Goal Statement
 const GoalStatement: FC<{ data: any }> = ({ data }) => {
   let content = data;
-  if (!content) return null;
+  if (!content) {
+    return <p className='italic text-gray-500 text-sm'>No information provided.</p>;
+  }
   // Try to parse if it's a stringified JSON (e.g., from old data)
   try { content = typeof data === 'string' ? JSON.parse(data) : data; } catch (e) { }
 
@@ -1069,12 +1091,12 @@ const GoalStatement: FC<{ data: any }> = ({ data }) => {
 const AssessmentList: FC<{ data: any }> = ({ data }) => {
   let items = data;
   if (!items) return null;
-  try { items = JSON.parse(data); } catch (e) { }
-
+  try { items = JSON.parse(data); } catch (e) {}
+  
   const entries = Object.entries(items);
 
   if (typeof items !== 'object' || items === null || entries.length === 0) {
-    return null; // Don't render if no data
+    return <p className='italic text-gray-500 text-sm'>No information provided.</p>;
   }
 
   // Helper to format keys like 'jobLearning' into 'Job Learning'
@@ -1101,30 +1123,32 @@ const AssessmentList: FC<{ data: any }> = ({ data }) => {
 const CreativeWorks: FC<{ data: any }> = ({ data }) => {
   let works = data;
   if (!works) return null;
-  try { works = JSON.parse(data); } catch (e) { }
-
+  try { works = JSON.parse(data); } catch (e) {}
+  
   if (!Array.isArray(works) || works.length === 0) {
     return null;
   }
 
   return (
-    <div className='space-y-3'>
-      {works.map((work, index) => (
-        <div key={index} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
-          <p className='text-base font-bold text-gray-800'>
-            {work.title || `Work #${index + 1}`}
-          </p>
-          {work.link && <p className='text-sm text-blue-600'>{work.link}</p>}
-          <p className='text-sm text-gray-700 mt-1'>{work.description}</p>
-        </div>
-      ))}
-    </div>
+      <div className='space-y-3'>
+        {works.map((work, index) => (
+          <div key={index} className='p-4 bg-white border border-gray-200 rounded-lg shadow-sm'>
+            <p className='text-base font-bold text-gray-800'>
+              {work.title || `Work #${index + 1}`}
+            </p>
+            {work.link && <p className='text-sm text-blue-600'>{work.link}</p>}
+            <p className='text-sm text-gray-700 mt-1'>{work.description}</p>
+          </div>
+        ))}
+      </div>
   );
 };
 
 // Renders Signature
 const Signature: FC<{ data: string | null }> = ({ data }) => {
-  if (!data) return null;
+  if (!data) {
+    return <p className='italic text-gray-500 text-sm'>No information provided.</p>;
+  }
 
   return (
     <div className='border rounded-lg p-2 bg-gray-100 max-w-md'>
@@ -1189,7 +1213,7 @@ const CollapsibleSection: FC<{ title: string; children: ReactNode; isOpenDefault
             }`}
         />
       </button>
-      {isOpen && <div className="p-4 bg-white">{children || <p className="italic text-gray-500 text-sm">No data available for this section.</p>}</div>}
+      {isOpen && <div className="p-4 bg-white">{children || <p className="italic text-gray-500 text-sm">No information provided.</p>}</div>}
     </div>
   );
 };
@@ -1246,12 +1270,12 @@ const GenericList: FC<{ data: any[] | string; title?: string }> = ({ data, title
 
 const EducationBackground: FC<{ data: any }> = ({ data }) => {
   let educationData = data;
-  if (!educationData) return null;
+  if (!educationData) return <p className="italic text-gray-500 text-sm">No information provided.</p>;
   if (typeof educationData === 'string') {
     try {
       educationData = JSON.parse(educationData);
     } catch (e) {
-      return null; // Or some error message
+      return <p className="italic text-gray-500 text-sm">No information provided.</p>;
     }
   }
 
@@ -1267,7 +1291,7 @@ const EducationBackground: FC<{ data: any }> = ({ data }) => {
   const hasContent = sections.some(sec => Array.isArray(sec.data) && sec.data.length > 0);
 
   if (!hasContent) {
-    return null;
+    return <p className="italic text-gray-500 text-sm">No information provided.</p>;
   }
 
   return (
@@ -1286,12 +1310,12 @@ const EducationBackground: FC<{ data: any }> = ({ data }) => {
 
 const WorkExperiences: FC<{ data: any }> = ({ data }) => {
   let workData = data;
-  if (!workData) return null;
+  if (!workData) return <p className="italic text-gray-500 text-sm">No information provided.</p>;
   if (typeof workData === 'string') {
     try {
       workData = JSON.parse(workData);
     } catch (e) {
-      return null;
+      return <p className="italic text-gray-500 text-sm">No information provided.</p>;
     }
   }
 
@@ -1325,12 +1349,12 @@ const WorkExperiences: FC<{ data: any }> = ({ data }) => {
 
 const ProfessionalDevelopment: FC<{ data: any }> = ({ data }) => {
   let devData = data;
-  if (!devData) return null;
+  if (!devData) return <p className="italic text-gray-500 text-sm">No information provided.</p>;
   if (typeof devData === 'string') {
     try {
       devData = JSON.parse(devData);
     } catch (e) {
-      return null;
+      return <p className="italic text-gray-500 text-sm">No information provided.</p>;
     }
   }
 
