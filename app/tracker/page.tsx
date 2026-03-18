@@ -56,8 +56,33 @@ function getStepIndex(status: string | null): number {
   const s = status || "Submitted";
   if (s === "Submitted") return 0;
   if (s === "Pending") return 1;
-  if (s === "Approved" || s === "Declined") return 2;
+  if (s === "Competency Process" || s === "Enrolled" || s === "Graduated" || s === "Approved" || s === "Declined") return 2;
   return 0;
+}
+
+function getStatusLabel(status: string | null): string {
+  switch (status) {
+    case "Submitted": return "Submitted";
+    case "Pending": return "Under Review";
+    case "Competency Process": return "Competency Process";
+    case "Enrolled": return "Enrolled";
+    case "Graduated": return "Graduated";
+    case "Approved": return "Approved";
+    case "Declined": return "Declined";
+    default: return "Submitted";
+  }
+}
+
+function getStatusBadgeClass(status: string | null): string {
+  switch (status) {
+    case "Approved":
+    case "Enrolled":
+    case "Graduated": return "bg-green-100 text-green-700";
+    case "Declined": return "bg-red-100 text-red-700";
+    case "Pending": return "bg-yellow-100 text-yellow-700";
+    case "Competency Process": return "bg-blue-100 text-blue-700";
+    default: return "bg-blue-100 text-blue-700"; // Submitted
+  }
 }
 
 function formatDate(dateString: string | null): string {
@@ -112,24 +137,8 @@ function ProgressTracker({ application }: { application: Application }) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span
-            className={`px-3 py-1.5 text-xs font-bold uppercase rounded-full ${
-              isApproved
-                ? "bg-green-100 text-green-700"
-                : isDeclined
-                ? "bg-red-100 text-red-700"
-                : application.status === "Pending"
-                ? "bg-yellow-100 text-yellow-700"
-                : "bg-blue-100 text-blue-700"
-            }`}
-          >
-            {isApproved
-              ? "Approved"
-              : isDeclined
-              ? "Declined"
-              : application.status === "Pending"
-              ? "Under Review"
-              : "Submitted"}
+          <span className={`px-3 py-1.5 text-xs font-bold uppercase rounded-full ${getStatusBadgeClass(application.status)}`}>
+            {getStatusLabel(application.status)}
           </span>
           {expanded ? (
             <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -148,16 +157,15 @@ function ProgressTracker({ application }: { application: Application }) {
               {/* Connector Line */}
               <div className="absolute top-6 left-0 right-0 h-0.5 bg-gray-200 z-0" />
               <div
-                className={`absolute top-6 left-0 h-0.5 z-0 transition-all duration-700 ${
-                  isDeclined ? "bg-red-400" : "bg-green-400"
-                }`}
+                className={`absolute top-6 left-0 h-0.5 z-0 transition-all duration-700 ${isDeclined ? "bg-red-400" : "bg-green-400"
+                  }`}
                 style={{
                   width:
                     currentStepIdx === 0
                       ? "0%"
                       : currentStepIdx === 1
-                      ? "50%"
-                      : "100%",
+                        ? "50%"
+                        : "100%",
                 }}
               />
 
@@ -180,7 +188,7 @@ function ProgressTracker({ application }: { application: Application }) {
                   circleClasses =
                     "bg-yellow-400 ring-4 ring-yellow-100 animate-pulse";
                   iconColor = "text-white";
-                } else if (isActive && isFinalStep && isApproved) {
+                } else if (isActive && isFinalStep && (isApproved || application.status === "Competency Process" || application.status === "Enrolled" || application.status === "Graduated")) {
                   circleClasses = "bg-green-500 ring-4 ring-green-100";
                   iconColor = "text-white";
                 } else {
@@ -191,9 +199,9 @@ function ProgressTracker({ application }: { application: Application }) {
                 const StepIcon =
                   isFinalStep && isDeclined
                     ? XCircle
-                    : isFinalStep && isApproved
-                    ? CheckCircle2
-                    : step.icon;
+                    : isFinalStep && (isApproved || application.status === "Competency Process" || application.status === "Enrolled" || application.status === "Graduated")
+                      ? CheckCircle2
+                      : step.icon;
 
                 return (
                   <div
@@ -210,28 +218,22 @@ function ProgressTracker({ application }: { application: Application }) {
                       )}
                     </div>
                     <p
-                      className={`mt-3 text-sm font-semibold ${
-                        isActive || isComplete
-                          ? stepIsDeclined
-                            ? "text-red-700"
-                            : "text-gray-900"
-                          : "text-gray-400"
-                      }`}
+                      className={`mt-3 text-sm font-semibold ${isActive || isComplete
+                        ? stepIsDeclined
+                          ? "text-red-700"
+                          : "text-gray-900"
+                        : "text-gray-400"
+                        }`}
                     >
                       {isFinalStep
-                        ? isApproved
-                          ? "Approved"
-                          : isDeclined
-                          ? "Declined"
-                          : "Decision"
+                        ? getStatusLabel(application.status)
                         : step.label}
                     </p>
                     <p
-                      className={`text-xs mt-1 text-center max-w-[140px] ${
-                        isActive || isComplete
-                          ? "text-gray-500"
-                          : "text-gray-300"
-                      }`}
+                      className={`text-xs mt-1 text-center max-w-[140px] ${isActive || isComplete
+                        ? "text-gray-500"
+                        : "text-gray-300"
+                        }`}
                     >
                       {step.description}
                     </p>
@@ -269,44 +271,40 @@ function ProgressTracker({ application }: { application: Application }) {
           {/* Admin Remarks */}
           {application.admin_remarks && (
             <div
-              className={`mt-4 p-4 rounded-xl border ${
-                isDeclined
-                  ? "bg-red-50 border-red-200"
-                  : isApproved
+              className={`mt-4 p-4 rounded-xl border ${isDeclined
+                ? "bg-red-50 border-red-200"
+                : isApproved
                   ? "bg-green-50 border-green-200"
                   : "bg-blue-50 border-blue-200"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2 mb-2">
                 <MessageSquare
-                  className={`w-4 h-4 ${
-                    isDeclined
-                      ? "text-red-500"
-                      : isApproved
+                  className={`w-4 h-4 ${isDeclined
+                    ? "text-red-500"
+                    : isApproved
                       ? "text-green-500"
                       : "text-blue-500"
-                  }`}
+                    }`}
                 />
                 <span
-                  className={`text-sm font-semibold ${
-                    isDeclined
-                      ? "text-red-700"
-                      : isApproved
+                  className={`text-sm font-semibold ${isDeclined
+                    ? "text-red-700"
+                    : isApproved
                       ? "text-green-700"
                       : "text-blue-700"
-                  }`}
+                    }`}
                 >
                   Remarks from Admin
                 </span>
               </div>
               <p
-                className={`text-sm ${
-                  isDeclined
-                    ? "text-red-600"
-                    : isApproved
+                className={`text-sm ${isDeclined
+                  ? "text-red-600"
+                  : isApproved
                     ? "text-green-600"
                     : "text-blue-600"
-                }`}
+                  }`}
               >
                 {application.admin_remarks}
               </p>
@@ -336,7 +334,7 @@ export default function ApplicationTrackerPage() {
     setError(null);
     try {
       const response = await fetch(`/api/applicants?email=${encodeURIComponent(email)}`);
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to fetch applications");

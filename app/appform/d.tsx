@@ -151,7 +151,7 @@ function FormalEducationSection({ education, onChange, onAdd, onRemove, errors,
                     </div>
                   </div>
                 </div>
-                <FileUploadRow fileName={entry.fileName} onFileChange={(n) => onChange(key, idx, "fileName" as any, n)} />
+                <FileUploadRow fileName={entry.fileName} onFileChange={(n, f) => { onChange(key, idx, "fileName" as any, n); if (f !== undefined) onChange(key, idx, "fileObject" as any, f as any); }} />
                 <div className="flex justify-end gap-2 mt-3">
                   {idx > 0 && <button type="button" onClick={() => onRemove(key, idx)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm"><Minus size={16} /> Remove</button>}
                   {idx === 0 && <button type="button" onClick={onNone} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold">None</button>}
@@ -492,22 +492,23 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
   );
 
   /* --- None states --- */
-  const [hasNoTertiary, setHasNoTertiary] = useState(false);
-  const [hasNoSecondary, setHasNoSecondary] = useState(false);
-  const [hasNoElementary, setHasNoElementary] = useState(false);
-  const [hasNoTechnical, setHasNoTechnical] = useState(false);
-  const [hasNoNonFormal, setHasNoNonFormal] = useState(false);
-  const [hasNoCert, setHasNoCert] = useState(false);
-  const [hasNoPub, setHasNoPub] = useState(false);
-  const [hasNoInv, setHasNoInv] = useState(false);
-  const [hasNoEmp, setHasNoEmp] = useState(false);
-  const [hasNoCon, setHasNoCon] = useState(false);
-  const [hasNoSE, setHasNoSE] = useState(false);
-  const [hasNoRec, setHasNoRec] = useState(false);
-  const [hasNoMem, setHasNoMem] = useState(false);
-  const [hasNoProj, setHasNoProj] = useState(false);
-  const [hasNoRes, setHasNoRes] = useState(false);
-  const [hasNoCW, setHasNoCW] = useState(false);
+  const ns = formData._noneStates || {};
+  const [hasNoTertiary, setHasNoTertiary] = useState(ns.hasNoTertiary ?? false);
+  const [hasNoSecondary, setHasNoSecondary] = useState(ns.hasNoSecondary ?? false);
+  const [hasNoElementary, setHasNoElementary] = useState(ns.hasNoElementary ?? false);
+  const [hasNoTechnical, setHasNoTechnical] = useState(ns.hasNoTechnical ?? false);
+  const [hasNoNonFormal, setHasNoNonFormal] = useState(ns.hasNoNonFormal ?? false);
+  const [hasNoCert, setHasNoCert] = useState(ns.hasNoCert ?? false);
+  const [hasNoPub, setHasNoPub] = useState(ns.hasNoPub ?? false);
+  const [hasNoInv, setHasNoInv] = useState(ns.hasNoInv ?? false);
+  const [hasNoEmp, setHasNoEmp] = useState(ns.hasNoEmp ?? false);
+  const [hasNoCon, setHasNoCon] = useState(ns.hasNoCon ?? false);
+  const [hasNoSE, setHasNoSE] = useState(ns.hasNoSE ?? false);
+  const [hasNoRec, setHasNoRec] = useState(ns.hasNoRec ?? false);
+  const [hasNoMem, setHasNoMem] = useState(ns.hasNoMem ?? false);
+  const [hasNoProj, setHasNoProj] = useState(ns.hasNoProj ?? false);
+  const [hasNoRes, setHasNoRes] = useState(ns.hasNoRes ?? false);
+  const [hasNoCW, setHasNoCW] = useState(ns.hasNoCW ?? false);
 
   const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
   const [eduErrors, setEduErrors] = useState<ValidationErrors>({});
@@ -635,6 +636,12 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
     recognitions: hasNoRec ? [] : recognitions,
     professional_development: { memberships: hasNoMem ? [] : memberships, projects: hasNoProj ? [] : projects, research: hasNoRes ? [] : research },
     creative_works: hasNoCW ? [] : creativeWorks,
+    _noneStates: {
+      hasNoTertiary, hasNoSecondary, hasNoElementary, hasNoTechnical,
+      hasNoNonFormal, hasNoCert, hasNoPub, hasNoInv,
+      hasNoEmp, hasNoCon, hasNoSE, hasNoRec,
+      hasNoMem, hasNoProj, hasNoRes, hasNoCW,
+    },
   });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -675,29 +682,29 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
         {/* C */}
         <AccordionItem title="C. Educational Background" defaultOpen hasError={hasEErr}>
           <FormalEducationSection education={education} onChange={handleEduChange} onAdd={addEdu} onRemove={removeEdu} errors={eduErrors.education}
-            hasNoTertiary={hasNoTertiary} onNoneTertiary={() => setHasNoTertiary(p => !p)}
-            hasNoSecondary={hasNoSecondary} onNoneSecondary={() => setHasNoSecondary(p => !p)}
-            hasNoElementary={hasNoElementary} onNoneElementary={() => setHasNoElementary(p => !p)}
-            hasNoTechnical={hasNoTechnical} onNoneTechnical={() => setHasNoTechnical(p => !p)}
+            hasNoTertiary={hasNoTertiary} onNoneTertiary={() => setHasNoTertiary((p: boolean) => !p)}
+            hasNoSecondary={hasNoSecondary} onNoneSecondary={() => setHasNoSecondary((p: boolean) => !p)}
+            hasNoElementary={hasNoElementary} onNoneElementary={() => setHasNoElementary((p: boolean) => !p)}
+            hasNoTechnical={hasNoTechnical} onNoneTechnical={() => setHasNoTechnical((p: boolean) => !p)}
           />
           <hr className="my-6" />
           <h4 className="font-semibold text-black mb-2">Non-Formal Education <span className="text-gray-400 font-normal text-sm">(Optional)</span></h4>
-          <NonFormalSection nonFormal={nonFormal} isNone={hasNoNonFormal} onNone={() => setHasNoNonFormal(p => !p)} onChange={nfH.onChange as any} onAdd={() => nfH.onAdd({ title: "", sponsor: "", venue: "", startDate: "", endDate: "" })} onRemove={nfH.onRemove} />
+          <NonFormalSection nonFormal={nonFormal} isNone={hasNoNonFormal} onNone={() => setHasNoNonFormal((p: boolean) => !p)} onChange={nfH.onChange as any} onAdd={() => nfH.onAdd({ title: "", sponsor: "", venue: "", startDate: "", endDate: "" })} onRemove={nfH.onRemove} />
         </AccordionItem>
 
         {/* D */}
         <AccordionItem title="D. Certifications" hasError={hasDErr}>
           <SectionError message={sectionErrors["D"]} />
-          <CertificationSection certifications={certifications} isNone={hasNoCert} onNone={() => setHasNoCert(p => !p)} onChange={certH.onChange as any} onAdd={() => certH.onAdd({ title: "", certifyingBodyName: "", certifyingBodyAddress: "", dateCertified: "", rating: "" })} onRemove={certH.onRemove} />
+          <CertificationSection certifications={certifications} isNone={hasNoCert} onNone={() => setHasNoCert((p: boolean) => !p)} onChange={certH.onChange as any} onAdd={() => certH.onAdd({ title: "", certifyingBodyName: "", certifyingBodyAddress: "", dateCertified: "", rating: "" })} onRemove={certH.onRemove} />
         </AccordionItem>
 
         {/* E */}
         <AccordionItem title="E. Inventions and Publications" hasError={hasEsErr}>
           <SectionError message={sectionErrors["E-pub"]} />
-          <PublicationSection publications={publications} isNone={hasNoPub} onNone={() => setHasNoPub(p => !p)} onChange={pubH.onChange as any} onAdd={() => pubH.onAdd({ title: "", circulation: "", level: "", yearPublished: "", yearPresented: "" })} onRemove={pubH.onRemove} />
+          <PublicationSection publications={publications} isNone={hasNoPub} onNone={() => setHasNoPub((p: boolean) => !p)} onChange={pubH.onChange as any} onAdd={() => pubH.onAdd({ title: "", circulation: "", level: "", yearPublished: "", yearPresented: "" })} onRemove={pubH.onRemove} />
           <hr className="my-6" />
           <SectionError message={sectionErrors["E-inv"]} />
-          <InventionSection inventions={inventions} isNone={hasNoInv} onNone={() => setHasNoInv(p => !p)} onChange={invH.onChange as any} onAdd={() => invH.onAdd({ title: "", agency: "", applicationDate: "", level: "", yearPublished: "" })} onRemove={invH.onRemove} />
+          <InventionSection inventions={inventions} isNone={hasNoInv} onNone={() => setHasNoInv((p: boolean) => !p)} onChange={invH.onChange as any} onAdd={() => invH.onAdd({ title: "", agency: "", applicationDate: "", level: "", yearPublished: "" })} onRemove={invH.onRemove} />
         </AccordionItem>
 
         {/* F */}
@@ -706,25 +713,25 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
           <WorkExperienceSection work={work}
             onEmploymentChange={handleEmpChange} onConsultancyChange={handleConChange} onSelfEmploymentChange={handleSEChange}
             onAdd={addWork_} onRemove={removeWork_}
-            noneEmp={hasNoEmp} onNoneEmp={() => setHasNoEmp(p => !p)}
-            noneCon={hasNoCon} onNoneCon={() => setHasNoCon(p => !p)}
-            noneSE={hasNoSE} onNoneSE={() => setHasNoSE(p => !p)}
+            noneEmp={hasNoEmp} onNoneEmp={() => setHasNoEmp((p: boolean) => !p)}
+            noneCon={hasNoCon} onNoneCon={() => setHasNoCon((p: boolean) => !p)}
+            noneSE={hasNoSE} onNoneSE={() => setHasNoSE((p: boolean) => !p)}
           />
         </AccordionItem>
 
         {/* G */}
         <AccordionItem title="G. Recognitions" hasError={hasGErr}>
           <SectionError message={sectionErrors["G"]} />
-          <RecognitionSection recognitions={recognitions} isNone={hasNoRec} onNone={() => setHasNoRec(p => !p)} onChange={recH.onChange as any} onAdd={() => recH.onAdd({ title: "", awardingBodyName: "", awardingBodyAddress: "", startDate: "", endDate: "" })} onRemove={recH.onRemove} />
+          <RecognitionSection recognitions={recognitions} isNone={hasNoRec} onNone={() => setHasNoRec((p: boolean) => !p)} onChange={recH.onChange as any} onAdd={() => recH.onAdd({ title: "", awardingBodyName: "", awardingBodyAddress: "", startDate: "", endDate: "" })} onRemove={recH.onRemove} />
         </AccordionItem>
 
         {/* H */}
         <AccordionItem title="H. Professional Development Activities" hasError={hasHErr}>
           <SectionError message={sectionErrors["H-mem"] || sectionErrors["H-proj"] || sectionErrors["H-res"]} />
           <ProfessionalDevelopmentSection memberships={memberships} projects={projects} research={research}
-            noneMem={hasNoMem} onNoneMem={() => setHasNoMem(p => !p)}
-            noneProj={hasNoProj} onNoneProj={() => setHasNoProj(p => !p)}
-            noneRes={hasNoRes} onNoneRes={() => setHasNoRes(p => !p)}
+            noneMem={hasNoMem} onNoneMem={() => setHasNoMem((p: boolean) => !p)}
+            noneProj={hasNoProj} onNoneProj={() => setHasNoProj((p: boolean) => !p)}
+            noneRes={hasNoRes} onNoneRes={() => setHasNoRes((p: boolean) => !p)}
             onChange={handlePDChange} onAdd={addPD} onRemove={removePD}
           />
         </AccordionItem>
@@ -732,7 +739,7 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
         {/* I */}
         <AccordionItem title="I. Creative Works and Special Accomplishments" hasError={hasIErr}>
           <SectionError message={sectionErrors["I"]} />
-          <CreativeWorksSection works={creativeWorks} isNone={hasNoCW} onNone={() => setHasNoCW(p => !p)}
+          <CreativeWorksSection works={creativeWorks} isNone={hasNoCW} onNone={() => setHasNoCW((p: boolean) => !p)}
             onChange={cwH.onChange as any}
             onAdd={() => cwH.onAdd({ title: "", institutionName: "", institutionAddress: "", startDate: "", endDate: "" })}
             onRemove={(i) => { setCreativeWorks(prev => { const u = prev.filter((_, x) => x !== i); return u; }); }}

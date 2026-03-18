@@ -59,40 +59,34 @@ function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: numb
 // --- Success Screen Component ---
 function SuccessScreen({ onEdit, onGoToPortfolio, isDeleting }: { onEdit: () => void; onGoToPortfolio: () => void; isDeleting: boolean }) {
     return (
-        <div className="bg-white shadow-lg rounded-2xl w-full max-w-3xl p-12 text-center flex flex-col items-center">
+        <div className="bg-white shadow-lg rounded-2xl w-full max-w-md p-10 text-center flex flex-col items-center">
             <div className="text-6xl mb-4">🎉</div>
             <h1 className="text-3xl font-bold text-black mb-4">Application Submitted!</h1>
             <p className="text-gray-600 mb-8">Thank you for completing the form. We have received your application and will review it shortly.</p>
 
-            <div className="flex items-center gap-4 mt-4 flex-wrap justify-center">
+            <div className="flex flex-col gap-3 w-full">
+                <Link href="/tracker" className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors text-center">
+                    Track Application
+                </Link>
+                <Link href="/" className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors text-center">
+                    Back to Home
+                </Link>
+                <button
+                    type="button"
+                    onClick={onGoToPortfolio}
+                    className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors"
+                >
+                    Go to Portfolio Form
+                </button>
                 <button
                     type="button"
                     onClick={onEdit}
                     disabled={isDeleting}
-                    className="bg-gray-200 text-black font-semibold py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     {isDeleting && <Loader2 size={16} className="animate-spin" />}
                     Make a New Application
                 </button>
-                <button
-                    type="button"
-                    onClick={onGoToPortfolio}
-                    className="bg-green-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-green-700 transition-colors"
-                >
-                    Go to Portfolio Form
-                </button>
-                <Link
-                    href="/tracker"
-                    className="bg-slate-700 text-white font-semibold py-2 px-6 rounded-lg hover:bg-slate-800 transition-colors"
-                >
-                    Track Application
-                </Link>
-                <Link
-                    href="/"
-                    className="bg-yellow-500 text-white font-semibold py-2 px-6 rounded-lg hover:bg-yellow-600 transition-colors"
-                >
-                    Back to Homepage
-                </Link>
             </div>
         </div>
     );
@@ -174,7 +168,9 @@ export default function ApplicationFormPage() {
     const [hasConsented, setHasConsented] = useState(false);
     const [hasExistingApplication, setHasExistingApplication] = useState(false);
     const [checkingExisting, setCheckingExisting] = useState(true);
-    const [isEditMode, setIsEditMode] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(() => {
+        try { return sessionStorage.getItem('appform_editMode') === 'true'; } catch { return false; }
+    });
     const router = useRouter();
     const { modalProps, showAlert, showConfirm } = useModal();
 
@@ -194,7 +190,9 @@ export default function ApplicationFormPage() {
                 if (res.ok) {
                     const { applications } = await res.json();
                     if (applications?.length > 0) {
-                        setHasExistingApplication(true);
+                        // Don't interrupt if user is actively editing
+                        const editing = sessionStorage.getItem('appform_editMode') === 'true';
+                        if (!editing) setHasExistingApplication(true);
                     }
                 }
             } catch {
@@ -244,7 +242,8 @@ export default function ApplicationFormPage() {
         selfAssessment: { jobLearning: "", teamworkLearning: "", selfLearning: "", workBenefits: "", essay: "" },
         portfolio: [] as any[],
         portfolioFiles: [] as any[],
-        portfolio_metadata: [] as any[]
+        portfolio_metadata: [] as any[],
+        _noneStates: {} as Record<string, boolean>,
     };
 
     const [formData, setFormData] = useState(defaultFormData);
@@ -389,6 +388,7 @@ export default function ApplicationFormPage() {
         setCurrentStep(1);
         setHasExistingApplication(false);
         setIsEditMode(false);
+        sessionStorage.removeItem('appform_editMode');
         localStorage.removeItem('applicationFormData');
         localStorage.removeItem('applicationFormStep');
     };
@@ -408,9 +408,9 @@ export default function ApplicationFormPage() {
             let goalStatement = { statement: "", plan: "", completion: "" };
             try { goalStatement = JSON.parse(d.goal_statement || "{}"); } catch { }
 
-            // Parse lifelong_learning — extract _selfAssessment
+            // Parse lifelong_learning — extract _selfAssessment and _noneStates
             const ll = d.lifelong_learning || {};
-            const { _selfAssessment, ...lifelongLearning } = ll;
+            const { _selfAssessment, _noneStates, ...lifelongLearning } = ll;
 
             setFormData(prev => ({
                 ...prev,
@@ -460,6 +460,7 @@ export default function ApplicationFormPage() {
                 recognitions: d.recognitions || [],
                 professional_development: d.professional_development || { memberships: [], projects: [], research: [] },
                 creative_works: d.creative_works || [],
+                _noneStates: _noneStates || {},
                 lifelongLearning: {
                     hobbies: lifelongLearning.hobbies || "",
                     skills: lifelongLearning.skills || "",
@@ -471,6 +472,7 @@ export default function ApplicationFormPage() {
             }));
 
             setIsEditMode(true);
+            sessionStorage.setItem('appform_editMode', 'true');
             setHasExistingApplication(false);
             setCurrentStep(1);
             setHasConsented(true);
@@ -525,14 +527,16 @@ export default function ApplicationFormPage() {
         }
 
         try {
-            // 0. Pre-submit duplicate check
-            const dupCheck = await fetch(`/api/applicants?email=${encodeURIComponent(session.user.email)}`);
-            if (dupCheck.ok) {
-                const { applications: existing } = await dupCheck.json();
-                if (existing?.length > 0) {
-                    setHasExistingApplication(true);
-                    setIsSubmitting(false);
-                    return;
+            // 0. Pre-submit duplicate check (skip in edit mode)
+            if (!isEditMode) {
+                const dupCheck = await fetch(`/api/applicants?email=${encodeURIComponent(session.user.email)}`);
+                if (dupCheck.ok) {
+                    const { applications: existing } = await dupCheck.json();
+                    if (existing?.length > 0) {
+                        setHasExistingApplication(true);
+                        setIsSubmitting(false);
+                        return;
+                    }
                 }
             }
 
@@ -546,21 +550,27 @@ export default function ApplicationFormPage() {
             if (userError || !userData?.id) throw new Error("User not found in database.");
             const supabaseUserId = userData.id;
 
-            // 2. Upload 1x1 Photo
+            // 2. Upload 1x1 Photo (skip if editing and no new photo selected)
             const photoFile = formData.initial.photo;
-            if (!photoFile) throw new Error("1x1 Photo is missing from Step 1.");
+            let photoUrlStr = "";
 
-            const photoPath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
-            const { error: photoUploadError } = await supabase.storage.from('application_files').upload(photoPath, photoFile);
-            if (photoUploadError) throw new Error(`Photo upload failed: ${photoUploadError.message}`);
-            const { data: photoUrl } = supabase.storage.from('application_files').getPublicUrl(photoPath);
+            if (photoFile) {
+                const photoPath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
+                const { error: photoUploadError } = await supabase.storage.from('application_files').upload(photoPath, photoFile);
+                if (photoUploadError) throw new Error(`Photo upload failed: ${photoUploadError.message}`);
+                const { data: photoUrlData } = supabase.storage.from('application_files').getPublicUrl(photoPath);
+                photoUrlStr = photoUrlData.publicUrl;
+            } else if (!isEditMode) {
+                throw new Error("1x1 Photo is missing from Step 1.");
+            }
 
             // 3. Upload Signature
             const sigBlob = await (await fetch(signatureDataUrl)).blob();
             const sigPath = `${supabaseUserId}/signature_${Date.now()}.png`;
             const { error: sigUploadError } = await supabase.storage.from('application_files').upload(sigPath, sigBlob);
             if (sigUploadError) throw new Error(`Signature upload failed: ${sigUploadError.message}`);
-            const { data: sigUrl } = supabase.storage.from('application_files').getPublicUrl(sigPath);
+            const { data: sigUrlData } = supabase.storage.from('application_files').getPublicUrl(sigPath);
+            const sigUrlStr = sigUrlData.publicUrl;
 
             // 4. Upload credential files from sections C–I
             // Collect all entries with a fileObject, upload, replace with fileUrl
@@ -654,9 +664,8 @@ export default function ApplicationFormPage() {
                 }
             }
 
-            // 5. Insert Final Payload
-            const insertPayload = {
-                user_id: supabaseUserId,
+            // 5. Build payload
+            const basePayload = {
                 education_background: uploadedEducation,
                 applicant_name: formData.initial.name,
                 degree_applied_for: formData.initial.degree,
@@ -697,22 +706,24 @@ export default function ApplicationFormPage() {
                 lifelong_learning: {
                     ...formData.lifelongLearning,
                     _selfAssessment: formData.selfAssessment,
+                    _noneStates: (formData as any)._noneStates || {},
                 },
                 creative_works: uploadedCreative,
                 professional_development: uploadedPD,
-                photo_url: photoUrl.publicUrl,
-                signature_url: sigUrl.publicUrl,
+                signature_url: sigUrlStr,
                 portfolio: uploadedPortfolioMetadata,
-            }
+                ...(photoUrlStr ? { photo_url: photoUrlStr } : {}),
+            };
 
             if (isEditMode) {
                 const res = await fetch('/api/my-application', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: session!.user!.email!, payload: insertPayload }),
+                    body: JSON.stringify({ email: session!.user!.email!, payload: basePayload }),
                 });
                 if (!res.ok) { const { error } = await res.json(); throw new Error(error || "Update failed"); }
             } else {
+                const insertPayload = { user_id: supabaseUserId, ...basePayload };
                 const { error: insertError } = await supabase.from('applications').insert(insertPayload);
                 if (insertError) throw insertError;
             }
@@ -720,6 +731,8 @@ export default function ApplicationFormPage() {
             // Clear local storage and move to success
             localStorage.removeItem('applicationFormData');
             localStorage.removeItem('applicationFormStep');
+            setIsEditMode(false);
+            sessionStorage.removeItem('appform_editMode');
             nextStep();
 
         } catch (error: any) {
@@ -778,7 +791,7 @@ export default function ApplicationFormPage() {
     return (
         <div className="min-h-screen flex flex-col justify-center items-center bg-gray-100 p-6 font-sans">
             {hasExistingApplication ? (
-                <div className="bg-white p-10 rounded-2xl shadow-2xl text-center flex flex-col items-center max-w-md">
+                <div className="bg-white p-10 rounded-2xl shadow-2xl text-center flex flex-col items-center max-w-md w-full">
                     <div className="bg-yellow-100 text-yellow-600 p-4 rounded-full mb-4">
                         <AlertCircle size={40} />
                     </div>
@@ -786,30 +799,30 @@ export default function ApplicationFormPage() {
                     <p className="text-gray-600 mb-6">
                         You have already submitted an application. Only one application per account is allowed.
                     </p>
-                    <div className="flex flex-wrap gap-3 justify-center">
-                        <Link href="/tracker" className="px-6 py-3 bg-slate-700 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors">
+                    <div className="flex flex-col gap-3 w-full">
+                        <Link href="/tracker" className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors text-center">
                             Track Application
                         </Link>
-                        <Link href="/" className="px-6 py-3 bg-yellow-500 text-gray-900 font-bold rounded-lg hover:bg-yellow-400 transition-colors">
+                        <Link href="/" className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors text-center">
                             Back to Home
                         </Link>
                         <button
                             type="button"
                             onClick={startEditApplication}
                             disabled={isLoadingEdit}
-                            className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isLoadingEdit && <Loader2 size={16} className="animate-spin" />}
                             Edit Application
                         </button>
-                        <Link href="/portform" className="px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors">
+                        <Link href="/portform" className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors text-center">
                             Go to Portfolio Form
                         </Link>
                         <button
                             type="button"
                             onClick={startNewApplication}
                             disabled={isDeletingApp}
-                            className="px-6 py-3 bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isDeletingApp && <Loader2 size={16} className="animate-spin" />}
                             Make a New Application

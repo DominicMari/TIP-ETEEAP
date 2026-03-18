@@ -77,8 +77,8 @@ const programMap: Record<string, string> = {
   "BS Business Administration Major in Human Resources Management": "BA-HRM",
   "BS Business Administration Major in Marketing Management": "BA-MM",
 };
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const PROGRAM_COLORS = ["#1D4ED8","#10B981","#EF4444","#F4C300","#8B5CF6","#F59E0B","#06B6D4","#EC4899","#6B7280"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const PROGRAM_COLORS = ["#1D4ED8", "#10B981", "#EF4444", "#F4C300", "#8B5CF6", "#F59E0B", "#06B6D4", "#EC4899", "#6B7280"];
 
 const APPLICATION_SEARCH_STATUSES: SearchStatusFilter[] = [
   "All",
@@ -221,7 +221,8 @@ export default function DashboardHome({
       return {
         total: src.length,
         competency: src.filter(a => normalizeApplicationStatus(a.status) === "Competency Process").length,
-        pending: src.filter(a => { const s = normalizeApplicationStatus(a.status); return s === "Pending" || s === "Submitted"; }).length,
+        submitted: src.filter(a => normalizeApplicationStatus(a.status) === "Submitted").length,
+        pending: src.filter(a => normalizeApplicationStatus(a.status) === "Pending").length,
         enrolled: src.filter(a => normalizeApplicationStatus(a.status) === "Enrolled").length,
         graduated: src.filter(a => normalizeApplicationStatus(a.status) === "Graduated").length,
       };
@@ -229,10 +230,11 @@ export default function DashboardHome({
     const src = allPortfolioSubmissions.filter(matchesYear);
     return {
       total: src.length,
-      competency: src.filter(a => a.status === "Approved").length,
-      pending: src.filter(a => a.status === "Pending" || a.status === "Submitted").length,
-      enrolled: 0,
-      graduated: 0,
+      competency: src.filter(a => a.status === "Competency Process").length,
+      submitted: src.filter(a => a.status === "Submitted").length,
+      pending: src.filter(a => a.status === "Pending").length,
+      enrolled: src.filter(a => a.status === "Enrolled").length,
+      graduated: src.filter(a => a.status === "Graduated").length,
     };
   }, [allApplicants, allPortfolioSubmissions, dataType, selectedYear]);
 
@@ -539,12 +541,12 @@ export default function DashboardHome({
       return (
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={timeSeriesData} margin={{ top: 10, right: 20, left: -5, bottom: 0 }}>
-            <defs><linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#F4C300" stopOpacity={0.65}/><stop offset="95%" stopColor="#F4C300" stopOpacity={0}/></linearGradient></defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false}/>
+            <defs><linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#F4C300" stopOpacity={0.65} /><stop offset="95%" stopColor="#F4C300" stopOpacity={0} /></linearGradient></defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
             <XAxis dataKey="date" fontSize={11} tick={{ fill: "#6B7280" }} stroke="#D1D5DB" axisLine={false} tickLine={false} />
-            <YAxis fontSize={11} tick={{ fill: "#6B7280" }} stroke="#D1D5DB" axisLine={false} tickLine={false} allowDecimals={false}/>
+            <YAxis fontSize={11} tick={{ fill: "#6B7280" }} stroke="#D1D5DB" axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "0.5rem" }} />
-            <Area type="monotone" dataKey="count" stroke="#F4C300" fillOpacity={1} fill="url(#colorCount)" name="Submissions" strokeWidth={2}/>
+            <Area type="monotone" dataKey="count" stroke="#F4C300" fillOpacity={1} fill="url(#colorCount)" name="Submissions" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
       );
@@ -573,7 +575,7 @@ export default function DashboardHome({
             <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="45%" innerRadius={55} outerRadius={80} paddingAngle={3} labelLine={false} label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`} fontSize={11}>
               {statusData.map(entry => (<Cell key={`cell-${entry.name}`} fill={STATUS_COLORS[entry.name] || STATUS_COLORS["Submitted"]} className="outline-none focus:outline-none" stroke="none" />))}
             </Pie>
-            <Legend iconType="circle" wrapperStyle={{ fontSize: "12px", paddingTop: "6px" }}/><Tooltip />
+            <Legend iconType="circle" wrapperStyle={{ fontSize: "12px", paddingTop: "6px" }} /><Tooltip />
           </PieChart>
         </ResponsiveContainer>
       );
@@ -585,7 +587,7 @@ export default function DashboardHome({
             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
             <XAxis dataKey="name" tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: "#6B7280" }} fontSize={11} stroke="#D1D5DB" axisLine={false} tickLine={false} allowDecimals={false} />
-            <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "0.5rem" }}/>
+            <Tooltip contentStyle={{ backgroundColor: "white", border: "1px solid #E5E7EB", borderRadius: "0.5rem" }} />
             <Legend iconType="circle" wrapperStyle={{ fontSize: "12px", paddingTop: "6px" }} />
             <Bar dataKey="applied" name="Applied" fill="#1D4ED8" stackId="pipeline" radius={[0, 0, 4, 4]} />
             <Bar dataKey="competencies" name="Competency" fill="#F59E0B" stackId="pipeline" radius={[0, 0, 0, 0]} />
@@ -635,10 +637,15 @@ export default function DashboardHome({
       {/* ═══ ROW 1: Stat Cards ═══ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title={dataType === "applicants" ? "Total Applications" : "Total Submissions"} value={currentStats.total} icon={<Users size={20} />} />
-        <StatCard title={dataType === "applicants" ? "Competency Process" : "Approved"} value={currentStats.competency} icon={<CheckCircle size={20} />} />
-        <StatCard title="Pending / Submitted" value={currentStats.pending} icon={<Clock size={20} />} />
-        <StatCard title={dataType === "applicants" ? "Enrolled" : "Declined"} value={currentStats.enrolled} icon={<XCircle size={20} />} />
-        <StatCard title={dataType === "applicants" ? "Graduated" : "Completed"} value={currentStats.graduated} icon={<GraduationCap size={20} />} />
+        <StatCard title={dataType === "applicants" ? "Competency Process" : "Competency Process"} value={currentStats.competency} icon={<CheckCircle size={20} />} />
+        <StatCard title="Submitted" value={currentStats.submitted} icon={<Clock size={20} />} />
+        <StatCard title="Pending" value={currentStats.pending} icon={<Clock size={20} />} />
+        <StatCard title={dataType === "applicants" ? "Enrolled" : "Enrolled"} value={currentStats.enrolled} icon={<XCircle size={20} />} />
+        <StatCard title={dataType === "applicants" ? "Graduated" : "Graduated"} value={currentStats.graduated} icon={<GraduationCap size={20} />} />
+      </div>
+
+      {/* ═══ ROW 1b: User / Admin Stats (2 columns) ═══ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard title="Total Unique Users" value={totalUsers} icon={<LogIn size={20} />} />
         <StatCard title="Total Unique Admins" value={totalAdmins} icon={<ShieldUser size={20} />} />
       </div>

@@ -900,26 +900,22 @@ const ViewApplicantModal: FC<{
                   {applicant.status || 'Submitted'}
                 </div>
 
-                {/* Proceed to Competency Process */}
-                <div className='mt-4 flex items-center gap-2 w-full'>
-                  <button
-                    onClick={() => onStatusChange(applicant.application_id, 'Competency Process')}
-                    disabled={
-                      updatingStatusId === applicant.application_id ||
-                      applicant.status === 'Competency Process' ||
-                      applicant.status === 'Enrolled' ||
-                      applicant.status === 'Graduated'
-                    }
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${applicant.status === 'Competency Process' ||
-                      applicant.status === 'Enrolled' ||
-                      applicant.status === 'Graduated'
-                      ? 'bg-blue-500 text-white ring-2 ring-blue-300 shadow-md cursor-default'
-                      : 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100 hover:ring-blue-300'
-                      } disabled:opacity-60`}
-                  >
-                    <TrendingUp size={16} />
-                    Proceed to Competency Process
-                  </button>
+                {/* Status Selector */}
+                <div className="mt-4 flex flex-wrap gap-2 w-full">
+                  {["Submitted", "Pending", "Competency Process", "Enrolled", "Graduated"].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => onStatusChange(applicant.application_id, s)}
+                      disabled={updatingStatusId === applicant.application_id || applicant.status === s}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${applicant.status === s
+                          ? `${STATUS_COLORS[s]} border-transparent shadow-sm`
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                        } disabled:opacity-60 disabled:cursor-default`}
+                    >
+                      {applicant.status === s && <Check size={13} />}
+                      {s}
+                    </button>
+                  ))}
                 </div>
               </div>
 

@@ -74,46 +74,66 @@ function AppformCredentials({ appData }: { appData: Record<string, any> }) {
   const profDev = appData.professional_development || {};
   const creative: any[] = appData.creative_works || [];
 
-  // Flatten all entries that have a fileUrl
-  const allEntries: { section: string; label: string; url?: string }[] = [];
+  // Build ordered sections matching C–I
+  type Entry = { label: string; url?: string };
+  type Section = { title: string; entries: Entry[] };
+  const sections: Section[] = [];
 
-  const addEntries = (section: string, list: any[], labelFn: (e: any) => string) =>
-    list.forEach(e => allEntries.push({ section, label: labelFn(e), url: e.fileUrl }));
+  const toEntries = (list: any[], labelFn: (e: any) => string): Entry[] =>
+    list.map(e => ({ label: labelFn(e), url: e.fileUrl }));
 
-  const eduLevels = [
-    { key: "tertiary", label: "Tertiary" }, { key: "secondary", label: "Secondary" },
-    { key: "elementary", label: "Elementary" }, { key: "technical", label: "Technical" },
+  // C. Educational Background — merge all levels
+  const eduEntries: Entry[] = [
+    ...toEntries(edu.tertiary || [], e => `Tertiary: ${e.schoolName}${e.degreeProgram ? ` — ${e.degreeProgram}` : ""} (${e.yearGraduated || ""})`),
+    ...toEntries(edu.secondary || [], e => `Secondary: ${e.schoolName} (${e.yearGraduated || ""})`),
+    ...toEntries(edu.elementary || [], e => `Elementary: ${e.schoolName} (${e.yearGraduated || ""})`),
+    ...toEntries(edu.technical || [], e => `Technical: ${e.schoolName} (${e.yearGraduated || ""})`),
+    ...toEntries(nonFormal, e => `Non-Formal: ${e.title}${e.sponsor ? ` — ${e.sponsor}` : ""}`),
   ];
-  eduLevels.forEach(({ key, label }) =>
-    addEntries(`C. Formal Education (${label})`, edu[key] || [],
-      e => `${e.schoolName}${e.degreeProgram ? ` — ${e.degreeProgram}` : ""} (${e.yearGraduated || ""})`));
+  if (eduEntries.some(e => e.url)) sections.push({ title: "C. Educational Background", entries: eduEntries.filter(e => e.url) });
 
-  addEntries("D. Non-Formal Education", nonFormal, e => `${e.title}${e.sponsor ? ` — ${e.sponsor}` : ""}`);
-  addEntries("E. Certifications", certs, e => `${e.title} — ${e.certifyingBodyName || ""}`);
-  addEntries("F. Publications", pubs, e => `${e.title} (${e.yearPublished || ""})`);
-  addEntries("F. Inventions", invs, e => `${e.title} — ${e.agency || ""}`);
-  addEntries("G. Employment", work.employment || [], e => `${e.company} — ${e.designation}`);
-  addEntries("G. Consultancy", work.consultancy || [], e => `${e.consultancy} — ${e.companyName || ""}`);
-  addEntries("G. Self-Employment", work.selfEmployment || [], e => `${e.company} — ${e.designation}`);
-  addEntries("H. Recognitions", recs, e => `${e.title} — ${e.awardingBodyName || ""}`);
-  addEntries("I. Memberships", profDev.memberships || [], e => `${e.organization} — ${e.designation}`);
-  addEntries("I. Projects", profDev.projects || [], e => `${e.title} — ${e.designation}`);
-  addEntries("I. Research", profDev.research || [], e => `${e.title} — ${e.institution}`);
-  addEntries("Creative Works", creative, e => `${e.title} — ${e.institutionName || ""}`);
+  // D. Certifications
+  const certEntries = toEntries(certs, e => `${e.title} — ${e.certifyingBodyName || ""}`).filter(e => e.url);
+  if (certEntries.length) sections.push({ title: "D. Certifications", entries: certEntries });
 
-  // Only show entries that have a fileUrl
-  const withFiles = allEntries.filter(e => e.url);
-  if (withFiles.length === 0) return null;
+  // E. Inventions and Publications
+  const epEntries = [
+    ...toEntries(pubs, e => `Publication: ${e.title} (${e.yearPublished || ""})`),
+    ...toEntries(invs, e => `Invention: ${e.title} — ${e.agency || ""}`),
+  ].filter(e => e.url);
+  if (epEntries.length) sections.push({ title: "E. Inventions and Publications", entries: epEntries });
 
-  // Group by section
-  const grouped: Record<string, typeof withFiles> = {};
-  withFiles.forEach(e => { if (!grouped[e.section]) grouped[e.section] = []; grouped[e.section].push(e); });
+  // F. Work Experience
+  const workEntries = [
+    ...toEntries(work.employment || [], e => `Employment: ${e.company} — ${e.designation}`),
+    ...toEntries(work.consultancy || [], e => `Consultancy: ${e.consultancy} — ${e.companyName || ""}`),
+    ...toEntries(work.selfEmployment || [], e => `Self-Employment: ${e.company} — ${e.designation}`),
+  ].filter(e => e.url);
+  if (workEntries.length) sections.push({ title: "F. Work Experience", entries: workEntries });
+
+  // G. Recognitions
+  const recEntries = toEntries(recs, e => `${e.title} — ${e.awardingBodyName || ""}`).filter(e => e.url);
+  if (recEntries.length) sections.push({ title: "G. Recognitions", entries: recEntries });
+
+  // H. Professional Development Activities
+  const pdEntries = [
+    ...toEntries(profDev.memberships || [], e => `Membership: ${e.organization} — ${e.designation}`),
+    ...toEntries(profDev.projects || [], e => `Project: ${e.title} — ${e.designation}`),
+    ...toEntries(profDev.research || [], e => `Research: ${e.title} — ${e.institution}`),
+  ].filter(e => e.url);
+  if (pdEntries.length) sections.push({ title: "H. Professional Development Activities", entries: pdEntries });
+
+  // I. Creative Works and Special Accomplishments
+  const cwEntries = toEntries(creative, e => `${e.title} — ${e.institutionName || ""}`).filter(e => e.url);
+  if (cwEntries.length) sections.push({ title: "I. Creative Works and Special Accomplishments", entries: cwEntries });
+
+  if (sections.length === 0) return null;
 
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs mb-1">
       <p className="text-xs font-semibold text-blue-700 mb-2">📋 Uploaded Files from Application (Steps C–I)</p>
-      {Object.entries(grouped).map(([section, entries]) => (
-        <CredSection key={section} title={section}>
+      {sections.map(({ title, entries }) => (
+        <CredSection key={title} title={title}>
           {entries.map((e, i) => <CredLink key={i} label={e.label} url={e.url} />)}
         </CredSection>
       ))}
