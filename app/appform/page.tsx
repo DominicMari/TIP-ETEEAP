@@ -57,7 +57,7 @@ function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: numb
 }
 
 // --- Success Screen Component ---
-function SuccessScreen({ onEdit, isDeleting }: { onEdit: () => void; isDeleting: boolean }) {
+function SuccessScreen({ onEdit, onGoToPortfolio, isDeleting }: { onEdit: () => void; onGoToPortfolio: () => void; isDeleting: boolean }) {
     return (
         <div className="bg-white shadow-lg rounded-2xl w-full max-w-3xl p-12 text-center flex flex-col items-center">
             <div className="text-6xl mb-4">🎉</div>
@@ -74,6 +74,13 @@ function SuccessScreen({ onEdit, isDeleting }: { onEdit: () => void; isDeleting:
                     {isDeleting && <Loader2 size={16} className="animate-spin" />}
                     Make a New Application
                 </button>
+                <button
+                    type="button"
+                    onClick={onGoToPortfolio}
+                    className="bg-green-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                    Go to Portfolio Form
+                </button>
                 <Link
                     href="/tracker"
                     className="bg-slate-700 text-white font-semibold py-2 px-6 rounded-lg hover:bg-slate-800 transition-colors"
@@ -81,7 +88,7 @@ function SuccessScreen({ onEdit, isDeleting }: { onEdit: () => void; isDeleting:
                     Track Application
                 </Link>
                 <Link
-                    href="/" // Link to homepage
+                    href="/"
                     className="bg-yellow-500 text-white font-semibold py-2 px-6 rounded-lg hover:bg-yellow-600 transition-colors"
                 >
                     Back to Homepage
@@ -167,6 +174,7 @@ export default function ApplicationFormPage() {
     const [hasConsented, setHasConsented] = useState(false);
     const [hasExistingApplication, setHasExistingApplication] = useState(false);
     const [checkingExisting, setCheckingExisting] = useState(true);
+    const [isEditMode, setIsEditMode] = useState(false);
     const router = useRouter();
     const { modalProps, showAlert, showConfirm } = useModal();
 
@@ -222,7 +230,7 @@ export default function ApplicationFormPage() {
             emergencyAddress: "",
             emergencyContactNumber: "",
         },
-        goals: { degrees: [""], statement: "" },
+        goals: { degrees: [""], statement: "", plan: "", overseas: "", completion: "" },
         education: { tertiary: [], secondary: [], elementary: [], technical: [] },
         non_formal_education: [] as any[],
         certifications: [] as any[],
@@ -310,7 +318,7 @@ export default function ApplicationFormPage() {
                     if (!Array.isArray(newState.publications)) newState.publications = [];
                     if (!Array.isArray(newState.inventions)) newState.inventions = [];
                     if (!Array.isArray(newState.recognitions)) newState.recognitions = [];
-                    if (!Array.isArray(newState.creativeWorks)) newState.creativeWorks = [{ title: "", institution: "", dates: "" }];
+                    if (!Array.isArray(newState.creativeWorks) && !Array.isArray(newState.creative_works)) newState.creativeWorks = [{ title: "", institution: "", dates: "" }];
 
                     return newState;
                 });
@@ -361,17 +369,14 @@ export default function ApplicationFormPage() {
         setIsDeletingApp(true);
         try {
             if (session?.user?.email) {
-                const { data: userData } = await supabase
-                    .from('users')
-                    .select('id')
-                    .eq('email', session.user.email)
-                    .single();
-
-                if (userData?.id) {
-                    await supabase
-                        .from('applications')
-                        .delete()
-                        .eq('user_id', userData.id);
+                const res = await fetch('/api/delete-application', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: session.user.email }),
+                });
+                if (!res.ok) {
+                    const { error } = await res.json();
+                    console.error('Failed to delete application:', error);
                 }
             }
         } catch (err) {
@@ -383,8 +388,97 @@ export default function ApplicationFormPage() {
         setFormData(defaultFormData);
         setCurrentStep(1);
         setHasExistingApplication(false);
+        setIsEditMode(false);
         localStorage.removeItem('applicationFormData');
         localStorage.removeItem('applicationFormStep');
+    };
+
+    const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+
+    const startEditApplication = async () => {
+        if (!session?.user?.email) return;
+        setIsLoadingEdit(true);
+        try {
+            const res = await fetch(`/api/my-application?email=${encodeURIComponent(session.user.email)}`);
+            const json = await res.json();
+            const d = json.application;
+            if (!d) { await showAlert("Could not load application data.", "Error"); return; }
+
+            // Parse goal_statement JSON
+            let goalStatement = { statement: "", plan: "", completion: "" };
+            try { goalStatement = JSON.parse(d.goal_statement || "{}"); } catch { }
+
+            // Parse lifelong_learning — extract _selfAssessment
+            const ll = d.lifelong_learning || {};
+            const { _selfAssessment, ...lifelongLearning } = ll;
+
+            setFormData(prev => ({
+                ...prev,
+                initial: {
+                    name: d.applicant_name || "",
+                    degree: d.degree_applied_for || "",
+                    campus: d.campus || "",
+                    date: d.application_date || getTodayDateISO(),
+                    folderLink: d.folder_link || "",
+                    photo: null,
+                },
+                personalInfo: {
+                    ...prev.personalInfo,
+                    fullAddress: d.full_address || "",
+                    mobile: d.mobile_number || "",
+                    email: d.email_address || "",
+                    birthday: d.birth_date || "",
+                    birthplace: d.birth_place || "",
+                    age: d.age || null,
+                    gender: d.gender || "",
+                    nationality: d.nationality || "",
+                    religion: d.religion || "",
+                    civilStatus: d.civil_status || "",
+                    language: d.language_spoken || "",
+                    isOverseas: d.is_overseas || false,
+                    overseasDetails: d.overseas_details || "",
+                    cityAddress: d.city_address || "",
+                    permanentAddress: d.permanent_address || "",
+                    emergencyContactName: d.emergency_contact_name || "",
+                    emergencyRelationship: d.emergency_relationship || "",
+                    emergencyAddress: d.emergency_address || "",
+                    emergencyContactNumber: d.emergency_contact_number || "",
+                },
+                goals: {
+                    degrees: d.degree_priorities || [""],
+                    statement: goalStatement.statement || "",
+                    plan: goalStatement.plan || "",
+                    overseas: d.overseas_details || "",
+                    completion: goalStatement.completion || "",
+                },
+                education: d.education_background || { tertiary: [], secondary: [], elementary: [], technical: [] },
+                non_formal_education: d.non_formal_education || [],
+                certifications: d.certifications || [],
+                publications: d.publications || [],
+                inventions: d.inventions || [],
+                work_experience: d.work_experiences || { employment: [], consultancy: [], selfEmployment: [] },
+                recognitions: d.recognitions || [],
+                professional_development: d.professional_development || { memberships: [], projects: [], research: [] },
+                creative_works: d.creative_works || [],
+                lifelongLearning: {
+                    hobbies: lifelongLearning.hobbies || "",
+                    skills: lifelongLearning.skills || "",
+                    workActivities: lifelongLearning.workActivities || "",
+                    volunteer: lifelongLearning.volunteer || "",
+                    travels: lifelongLearning.travels || "",
+                },
+                selfAssessment: _selfAssessment || { jobLearning: "", teamworkLearning: "", selfLearning: "", workBenefits: "", essay: "" },
+            }));
+
+            setIsEditMode(true);
+            setHasExistingApplication(false);
+            setCurrentStep(1);
+            setHasConsented(true);
+        } catch (err) {
+            await showAlert("Failed to load application for editing.", "Error");
+        } finally {
+            setIsLoadingEdit(false);
+        }
     };
 
     const createFormUpdater = (key: keyof typeof formData) => {
@@ -468,7 +562,63 @@ export default function ApplicationFormPage() {
             if (sigUploadError) throw new Error(`Signature upload failed: ${sigUploadError.message}`);
             const { data: sigUrl } = supabase.storage.from('application_files').getPublicUrl(sigPath);
 
-            // 4. NEW: Upload Portfolio Documents
+            // 4. Upload credential files from sections C–I
+            // Collect all entries with a fileObject, upload, replace with fileUrl
+            const uploadCredentialFiles = async (entries: any[], section: string) => {
+                const updated = await Promise.all(entries.map(async (entry) => {
+                    if (!entry.fileObject) return entry;
+                    const filePath = `${supabaseUserId}/credentials/${section}_${Date.now()}_${entry.fileObject.name}`;
+                    const { error } = await supabase.storage.from('application_files').upload(filePath, entry.fileObject);
+                    if (error) { console.warn(`Credential file upload failed (${section}):`, error.message); return entry; }
+                    const { data: urlData } = supabase.storage.from('application_files').getPublicUrl(filePath);
+                    const { fileObject: _removed, ...rest } = entry;
+                    return { ...rest, fileUrl: urlData.publicUrl };
+                }));
+                return updated;
+            };
+
+            const uploadCredentialWorkFiles = async (workExp: any) => ({
+                employment: await uploadCredentialFiles(workExp.employment || [], 'employment'),
+                consultancy: await uploadCredentialFiles(workExp.consultancy || [], 'consultancy'),
+                selfEmployment: await uploadCredentialFiles(workExp.selfEmployment || [], 'selfEmployment'),
+            });
+
+            const uploadCredentialEduFiles = async (edu: any) => ({
+                tertiary: await uploadCredentialFiles(edu.tertiary || [], 'edu_tertiary'),
+                secondary: await uploadCredentialFiles(edu.secondary || [], 'edu_secondary'),
+                elementary: await uploadCredentialFiles(edu.elementary || [], 'edu_elementary'),
+                technical: await uploadCredentialFiles(edu.technical || [], 'edu_technical'),
+            });
+
+            const uploadCredentialPDFiles = async (pd: any) => ({
+                memberships: await uploadCredentialFiles(pd.memberships || [], 'pd_memberships'),
+                projects: await uploadCredentialFiles(pd.projects || [], 'pd_projects'),
+                research: await uploadCredentialFiles(pd.research || [], 'pd_research'),
+            });
+
+            const [
+                uploadedEducation,
+                uploadedNonFormal,
+                uploadedCerts,
+                uploadedPubs,
+                uploadedInvs,
+                uploadedWork,
+                uploadedRecs,
+                uploadedPD,
+                uploadedCreative,
+            ] = await Promise.all([
+                uploadCredentialEduFiles(formData.education),
+                uploadCredentialFiles(formData.non_formal_education || [], 'non_formal'),
+                uploadCredentialFiles(formData.certifications || [], 'certifications'),
+                uploadCredentialFiles(formData.publications || [], 'publications'),
+                uploadCredentialFiles(formData.inventions || [], 'inventions'),
+                uploadCredentialWorkFiles(formData.work_experience),
+                uploadCredentialFiles(formData.recognitions || [], 'recognitions'),
+                uploadCredentialPDFiles(formData.professional_development || {}),
+                uploadCredentialFiles((formData as any).creative_works || formData.creativeWorks || [], 'creative_works'),
+            ]);
+
+            // 5. NEW: Upload Portfolio Documents
             const uploadedPortfolioMetadata = [];
 
             if (formData.portfolioFiles && formData.portfolioFiles.length > 0) {
@@ -507,9 +657,10 @@ export default function ApplicationFormPage() {
             // 5. Insert Final Payload
             const insertPayload = {
                 user_id: supabaseUserId,
-                education_background: formData.education,
+                education_background: uploadedEducation,
                 applicant_name: formData.initial.name,
                 degree_applied_for: formData.initial.degree,
+                degree_priorities: formData.goals.degrees,
                 campus: formData.initial.campus,
                 application_date: formData.initial.date,
                 folder_link: formData.initial.folderLink,
@@ -525,29 +676,46 @@ export default function ApplicationFormPage() {
                 civil_status: formData.personalInfo.civilStatus,
                 language_spoken: formData.personalInfo.language,
                 is_overseas: formData.personalInfo.isOverseas || false,
-                overseas_details: formData.personalInfo.overseasDetails,
+                overseas_details: formData.personalInfo.isOverseas ? formData.goals.overseas : formData.personalInfo.overseasDetails,
                 city_address: formData.personalInfo.cityAddress,
                 permanent_address: formData.personalInfo.permanentAddress,
                 emergency_contact_name: formData.personalInfo.emergencyContactName,
                 emergency_relationship: formData.personalInfo.emergencyRelationship,
                 emergency_address: formData.personalInfo.emergencyAddress,
                 emergency_contact_number: formData.personalInfo.emergencyContactNumber,
-                goal_statement: formData.goals.statement,
-                non_formal_education: formData.non_formal_education,
-                work_experiences: formData.work_experience,
-                lifelong_learning: formData.lifelongLearning,
-                creative_works: formData.creativeWorks,
-                professional_development: formData.professional_development,
+                goal_statement: JSON.stringify({
+                    statement: formData.goals.statement,
+                    plan: formData.goals.plan,
+                    completion: formData.goals.completion,
+                }),
+                non_formal_education: uploadedNonFormal,
+                certifications: uploadedCerts,
+                publications: uploadedPubs,
+                inventions: uploadedInvs,
+                work_experiences: uploadedWork,
+                recognitions: uploadedRecs,
+                lifelong_learning: {
+                    ...formData.lifelongLearning,
+                    _selfAssessment: formData.selfAssessment,
+                },
+                creative_works: uploadedCreative,
+                professional_development: uploadedPD,
                 photo_url: photoUrl.publicUrl,
                 signature_url: sigUrl.publicUrl,
                 portfolio: uploadedPortfolioMetadata,
             }
 
-            const { error: insertError } = await supabase
-                .from('applications')
-                .insert(insertPayload);
-
-            if (insertError) throw insertError;
+            if (isEditMode) {
+                const res = await fetch('/api/my-application', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: session!.user!.email!, payload: insertPayload }),
+                });
+                if (!res.ok) { const { error } = await res.json(); throw new Error(error || "Update failed"); }
+            } else {
+                const { error: insertError } = await supabase.from('applications').insert(insertPayload);
+                if (insertError) throw insertError;
+            }
 
             // Clear local storage and move to success
             localStorage.removeItem('applicationFormData');
@@ -600,7 +768,7 @@ export default function ApplicationFormPage() {
                 return (<FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} />);
             // ✅ 9. Pass the new reset handler to the SuccessScreen
             case 9:
-                return <SuccessScreen onEdit={startNewApplication} isDeleting={isDeletingApp} />;
+                return <SuccessScreen onEdit={startNewApplication} onGoToPortfolio={() => router.push('/portform')} isDeleting={isDeletingApp} />;
             default:
                 return <div>Form complete or invalid step.</div>;
         }
@@ -616,15 +784,36 @@ export default function ApplicationFormPage() {
                     </div>
                     <h2 className="text-2xl font-bold text-gray-800 mb-3">Application Already Submitted</h2>
                     <p className="text-gray-600 mb-6">
-                        You have already submitted an application. Only one application per account is allowed. If you need to make changes, please contact an administrator.
+                        You have already submitted an application. Only one application per account is allowed.
                     </p>
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3 justify-center">
                         <Link href="/tracker" className="px-6 py-3 bg-slate-700 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors">
                             Track Application
                         </Link>
                         <Link href="/" className="px-6 py-3 bg-yellow-500 text-gray-900 font-bold rounded-lg hover:bg-yellow-400 transition-colors">
                             Back to Home
                         </Link>
+                        <button
+                            type="button"
+                            onClick={startEditApplication}
+                            disabled={isLoadingEdit}
+                            className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            {isLoadingEdit && <Loader2 size={16} className="animate-spin" />}
+                            Edit Application
+                        </button>
+                        <Link href="/portform" className="px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors">
+                            Go to Portfolio Form
+                        </Link>
+                        <button
+                            type="button"
+                            onClick={startNewApplication}
+                            disabled={isDeletingApp}
+                            className="px-6 py-3 bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            {isDeletingApp && <Loader2 size={16} className="animate-spin" />}
+                            Make a New Application
+                        </button>
                     </div>
                 </div>
             ) : checkingExisting ? (

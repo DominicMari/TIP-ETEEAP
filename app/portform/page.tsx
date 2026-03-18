@@ -41,6 +41,86 @@ const CoverField = ({ label, value, width }: { label: string; value?: string | n
   </div>
 );
 
+// ─── Credential summary from appform Steps C–I ───
+function CredSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-2">
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">{title}</p>
+      <div className="space-y-1">{children}</div>
+    </div>
+  );
+}
+
+function CredLink({ label, url }: { label: string; url?: string }) {
+  if (url) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate">
+        📎 {label}
+      </a>
+    );
+  }
+  return <p className="text-xs text-gray-700 leading-snug">• {label}</p>;
+}
+
+function AppformCredentials({ appData }: { appData: Record<string, any> }) {
+  const edu = appData.education_background || {};
+  const nonFormal: any[] = appData.non_formal_education || [];
+  const certs: any[] = appData.certifications || [];
+  const pubs: any[] = appData.publications || [];
+  const invs: any[] = appData.inventions || [];
+  const work = appData.work_experiences || {};
+  const recs: any[] = appData.recognitions || [];
+  const profDev = appData.professional_development || {};
+  const creative: any[] = appData.creative_works || [];
+
+  // Flatten all entries that have a fileUrl
+  const allEntries: { section: string; label: string; url?: string }[] = [];
+
+  const addEntries = (section: string, list: any[], labelFn: (e: any) => string) =>
+    list.forEach(e => allEntries.push({ section, label: labelFn(e), url: e.fileUrl }));
+
+  const eduLevels = [
+    { key: "tertiary", label: "Tertiary" }, { key: "secondary", label: "Secondary" },
+    { key: "elementary", label: "Elementary" }, { key: "technical", label: "Technical" },
+  ];
+  eduLevels.forEach(({ key, label }) =>
+    addEntries(`C. Formal Education (${label})`, edu[key] || [],
+      e => `${e.schoolName}${e.degreeProgram ? ` — ${e.degreeProgram}` : ""} (${e.yearGraduated || ""})`));
+
+  addEntries("D. Non-Formal Education", nonFormal, e => `${e.title}${e.sponsor ? ` — ${e.sponsor}` : ""}`);
+  addEntries("E. Certifications", certs, e => `${e.title} — ${e.certifyingBodyName || ""}`);
+  addEntries("F. Publications", pubs, e => `${e.title} (${e.yearPublished || ""})`);
+  addEntries("F. Inventions", invs, e => `${e.title} — ${e.agency || ""}`);
+  addEntries("G. Employment", work.employment || [], e => `${e.company} — ${e.designation}`);
+  addEntries("G. Consultancy", work.consultancy || [], e => `${e.consultancy} — ${e.companyName || ""}`);
+  addEntries("G. Self-Employment", work.selfEmployment || [], e => `${e.company} — ${e.designation}`);
+  addEntries("H. Recognitions", recs, e => `${e.title} — ${e.awardingBodyName || ""}`);
+  addEntries("I. Memberships", profDev.memberships || [], e => `${e.organization} — ${e.designation}`);
+  addEntries("I. Projects", profDev.projects || [], e => `${e.title} — ${e.designation}`);
+  addEntries("I. Research", profDev.research || [], e => `${e.title} — ${e.institution}`);
+  addEntries("Creative Works", creative, e => `${e.title} — ${e.institutionName || ""}`);
+
+  // Only show entries that have a fileUrl
+  const withFiles = allEntries.filter(e => e.url);
+  if (withFiles.length === 0) return null;
+
+  // Group by section
+  const grouped: Record<string, typeof withFiles> = {};
+  withFiles.forEach(e => { if (!grouped[e.section]) grouped[e.section] = []; grouped[e.section].push(e); });
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs mb-1">
+      <p className="text-xs font-semibold text-blue-700 mb-2">📋 Uploaded Files from Application (Steps C–I)</p>
+      {Object.entries(grouped).map(([section, entries]) => (
+        <CredSection key={section} title={section}>
+          {entries.map((e, i) => <CredLink key={i} label={e.label} url={e.url} />)}
+        </CredSection>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Component ───
 export default function ApplicationForm() {
   const { data: session, status } = useSession();
@@ -54,7 +134,7 @@ export default function ApplicationForm() {
 
   // Application data from Supabase (for cover sheet)
   const [appData, setAppData] = useState<Record<string, any> | null>(null);
-  const [appLoading, setAppLoading] = useState(true);
+  const [appLoading, setAppLoading] = useState(false);
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [signatureError, setSignatureError] = useState("");
@@ -91,23 +171,15 @@ export default function ApplicationForm() {
 
   // Fetch application data for cover sheet
   useEffect(() => {
+    if (!session?.user?.email) return;
     const fetchAppData = async () => {
-      if (!supabaseUserId) return;
       setAppLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("applications")
-          .select("*")
-          .eq("user_id", supabaseUserId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (error) {
-          console.warn("[PortForm] No application found:", error.message);
-        } else if (data) {
+        const res = await fetch(`/api/my-application?email=${encodeURIComponent(session.user!.email!)}`);
+        const json = await res.json();
+        const data = json.application;
+        if (data) {
           setAppData(data);
-          // Auto-fill form fields from application
           if (data.applicant_name) setFormData((prev) => ({ ...prev, name: data.applicant_name }));
           if (data.degree_applied_for) setFormData((prev) => ({ ...prev, degree: data.degree_applied_for }));
           if (data.campus) setFormData((prev) => ({ ...prev, campus: data.campus }));
@@ -118,7 +190,7 @@ export default function ApplicationForm() {
       setAppLoading(false);
     };
     fetchAppData();
-  }, [supabaseUserId]);
+  }, [session]);
 
   // Get photo URL from application data
   const appPhotoUrl = appData?.photo_url || null;
@@ -291,6 +363,11 @@ export default function ApplicationForm() {
             {/* Top Header Fields + Photo */}
             <div className="flex gap-4 items-start">
               <div className="flex-1 space-y-2">
+                {appLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-400 py-1">
+                    <Loader2 size={12} className="animate-spin" /> Loading application data...
+                  </div>
+                ) : null}
                 <CoverField label="Name of the Applicant:" value={appData?.applicant_name || formData.name} />
                 <CoverField label="Degree Applied For:" value={appData?.degree_applied_for || formData.degree} />
                 <CoverField label="Campus:" value={appData?.campus || formData.campus} />
@@ -374,22 +451,8 @@ export default function ApplicationForm() {
                     </ul>
                   </div>
                   <div className="px-3 py-3 flex flex-col gap-2">
-                    {/* Pre-filled files from appform step 7 */}
-                    {appPortfolioFiles.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-xs font-semibold text-green-700 mb-1">✓ From Application Form:</p>
-                        <ul className="space-y-1">
-                          {appPortfolioFiles.map((f, i) => (
-                            <li key={i}>
-                              <a href={f.url} target="_blank" rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate">
-                                📎 {f.title || f.fileName || `File ${i + 1}`}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    {/* Appform credential data from Steps C–I */}
+                    {appData && <AppformCredentials appData={appData} />}
                     <FileUploader label="Additional Credentials" multiple onFilesChange={(f) => handleFilesChange("eteeapForm", f)} error={fileErrors["eteeapForm"]} />
                   </div>
                 </div>
@@ -400,7 +463,13 @@ export default function ApplicationForm() {
                     <p className="font-bold">Curriculum Vitae</p>
                     <p className="italic text-xs text-gray-600">(a comprehensive discussion of why you intend to enroll at T.I.P. ETEEAP Unit)</p>
                   </div>
-                  <div className="px-3 py-3 flex items-start">
+                  <div className="px-3 py-3 flex flex-col gap-2">
+                    {appPortfolioFiles.filter(f => f.title === "Curriculum Vitae").map((f, i) => (
+                      <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate">
+                        📎 {f.title}
+                      </a>
+                    ))}
                     <FileUploader label="CV" multiple onFilesChange={(f) => handleFilesChange("cv", f)} error={fileErrors["cv"]} />
                   </div>
                 </div>
@@ -423,16 +492,6 @@ export default function ApplicationForm() {
                     <p className="italic text-xs text-gray-600">(provide a letter stating ownership/authenticity of the documents submitted)</p>
                   </div>
                   <div className="px-3 py-3 flex flex-col gap-2">
-                    {/* Pre-filled from appform portfolio if title matches */}
-                    {appPortfolioFiles.filter(f =>
-                      f.title?.toLowerCase().includes("ownership") ||
-                      f.title?.toLowerCase().includes("authenticity")
-                    ).map((f, i) => (
-                      <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                        ✓ {f.title || f.fileName}
-                      </a>
-                    ))}
                     <FileUploader label="Authenticity" multiple onFilesChange={(f) => handleFilesChange("authenticity", f)} error={fileErrors["authenticity"]} />
                   </div>
                 </div>
@@ -442,7 +501,13 @@ export default function ApplicationForm() {
                   <div className="px-4 py-3 border-r border-gray-300 text-sm">
                     <p className="font-bold">Endorsement Letter from the latest employer</p>
                   </div>
-                  <div className="px-3 py-3 flex items-start">
+                  <div className="px-3 py-3 flex flex-col gap-2">
+                    {appPortfolioFiles.filter(f => f.title === "Endorsement Letter from last/current employer").map((f, i) => (
+                      <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate">
+                        📎 {f.title}
+                      </a>
+                    ))}
                     <FileUploader label="Endorsement" multiple onFilesChange={(f) => handleFilesChange("endorsement", f)} error={fileErrors["endorsement"]} />
                   </div>
                 </div>
@@ -457,7 +522,17 @@ export default function ApplicationForm() {
                       <li>- Marriage Certificate <i>(for married woman)</i></li>
                     </ul>
                   </div>
-                  <div className="px-3 py-3 flex items-start">
+                  <div className="px-3 py-3 flex flex-col gap-2">
+                    {appPortfolioFiles.filter(f =>
+                      f.title === "PSA Birth Certificate" ||
+                      f.title === "Brgy. Clearance/Passport/NBI" ||
+                      f.title === "Marriage Certificate (for married people)"
+                    ).map((f, i) => (
+                      <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate">
+                        📎 {f.title}
+                      </a>
+                    ))}
                     <FileUploader label="Other Docs" multiple onFilesChange={(f) => handleFilesChange("otherDocs", f)} error={fileErrors["otherDocs"]} />
                   </div>
                 </div>
@@ -478,7 +553,13 @@ export default function ApplicationForm() {
                     <p className="font-bold">Other Evidence of capability and knowledge in the field for equivalency and accreditation</p>
                     <p className="italic text-xs text-gray-600">(if any)</p>
                   </div>
-                  <div className="px-3 py-3 flex items-start">
+                  <div className="px-3 py-3 flex flex-col gap-2">
+                    {appPortfolioFiles.filter(f => f.title === "Other evidences").map((f, i) => (
+                      <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate">
+                        📎 {f.title}
+                      </a>
+                    ))}
                     <FileUploader label="Other Evidence" multiple onFilesChange={(f) => handleFilesChange("otherEvidence", f)} error={fileErrors["otherEvidence"]} />
                   </div>
                 </div>

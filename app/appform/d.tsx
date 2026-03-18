@@ -3,7 +3,7 @@ import React, { useState, ReactNode, useRef } from "react";
 import { Plus, Minus, Paperclip, X } from "lucide-react";
 
 /* ---------------- Types ---------------- */
-type WithFile = { fileName?: string };
+type WithFile = { fileName?: string; fileObject?: File };
 type EducationEntry = WithFile & { schoolName: string; schoolAddress: string; degreeProgram?: string; yearGraduated: string; startDate: string; endDate: string };
 type EducationState = { tertiary: EducationEntry[]; secondary: EducationEntry[]; elementary: EducationEntry[]; technical: EducationEntry[] };
 type NonFormalEntry = WithFile & { title: string; sponsor: string; venue: string; startDate: string; endDate: string };
@@ -20,21 +20,21 @@ type ProjectEntry = WithFile & { title: string; designation: string; startDate: 
 type ResearchEntry = WithFile & { title: string; institution: string; startDate: string; endDate: string; description: string };
 type CreativeWork = WithFile & { title: string; institutionName: string; institutionAddress: string; startDate: string; endDate: string };
 
-type FieldErrors = Partial<Record<keyof EducationEntry, string>>;
+type FieldErrors = Partial<Record<keyof EducationEntry, string | File>>;
 type EducationErrors = Partial<Record<keyof EducationState, FieldErrors[]>>;
 type ValidationErrors = { education?: EducationErrors };
 
 /* ---------------- FileUpload row ---------------- */
-function FileUploadRow({ fileName, onFileChange }: { fileName?: string; onFileChange: (name: string) => void }) {
+function FileUploadRow({ fileName, onFileChange }: { fileName?: string; onFileChange: (name: string, file?: File) => void }) {
   const ref = useRef<HTMLInputElement>(null);
   return (
     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
-      <input ref={ref} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFileChange(f.name); }} />
+      <input ref={ref} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFileChange(f.name, f); }} />
       <button type="button" onClick={() => ref.current?.click()} className="flex items-center gap-1 text-xs bg-white border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition-colors">
         <Paperclip size={12} /> Choose file
       </button>
       <span className="text-xs text-gray-500 truncate max-w-xs">{fileName || "No file chosen"}</span>
-      {fileName && <button type="button" onClick={() => onFileChange("")} className="text-gray-400 hover:text-red-400"><X size={12} /></button>}
+      {fileName && <button type="button" onClick={() => onFileChange("", undefined)} className="text-gray-400 hover:text-red-400"><X size={12} /></button>}
     </div>
   );
 }
@@ -176,7 +176,7 @@ type SubSectionProps<T extends WithFile> = {
   onNone: () => void;
   onAdd: () => void;
   onRemove: (i: number) => void;
-  onFileChange: (i: number, name: string) => void;
+  onFileChange: (i: number, name: string, file?: File) => void;
   limit?: number;
   renderFields: (entry: T, idx: number) => ReactNode;
 };
@@ -190,7 +190,7 @@ function SubSection<T extends WithFile>({ label, entries, isNone, onNone, onAdd,
       {!isNone && entries.map((entry, idx) => (
         <div key={idx} className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm mb-4">
           {renderFields(entry, idx)}
-          <FileUploadRow fileName={entry.fileName} onFileChange={(n) => onFileChange(idx, n)} />
+          <FileUploadRow fileName={entry.fileName} onFileChange={(n, f) => onFileChange(idx, n, f)} />
           <div className="flex justify-end gap-2 mt-3">
             {idx > 0 && <button type="button" onClick={() => onRemove(idx)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm"><Minus size={16} /> Remove</button>}
             {idx === 0 && <button type="button" onClick={onNone} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold">None</button>}
@@ -206,10 +206,10 @@ function SubSection<T extends WithFile>({ label, entries, isNone, onNone, onAdd,
 /* ============================================================
    Non-Formal Education
    ============================================================ */
-function NonFormalSection({ nonFormal, isNone, onNone, onChange, onAdd, onRemove }: { nonFormal: NonFormalEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof NonFormalEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
+function NonFormalSection({ nonFormal, isNone, onNone, onChange, onAdd, onRemove }: { nonFormal: NonFormalEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof NonFormalEntry, v: string, file?: File) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <SubSection entries={nonFormal} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
-      onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
+      onFileChange={(i, n, f) => { onChange(i, "fileName" as any, n); if (f !== undefined) onChange(i, "fileObject" as any, f as any); }}
       renderFields={(entry, idx) => (
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Title of Training/Seminar</label><input type="text" value={entry.title} onChange={(e) => onChange(idx, "title", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
@@ -224,10 +224,10 @@ function NonFormalSection({ nonFormal, isNone, onNone, onChange, onAdd, onRemove
 /* ============================================================
    Certifications
    ============================================================ */
-function CertificationSection({ certifications, isNone, onNone, onChange, onAdd, onRemove }: { certifications: CertificationEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof CertificationEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
+function CertificationSection({ certifications, isNone, onNone, onChange, onAdd, onRemove }: { certifications: CertificationEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof CertificationEntry, v: string, file?: File) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <SubSection entries={certifications} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
-      onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
+      onFileChange={(i, n, f) => { onChange(i, "fileName" as any, n); if (f !== undefined) onChange(i, "fileObject" as any, f as any); }}
       renderFields={(entry, idx) => (
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Title of the Certification</label><input type="text" value={entry.title} onChange={(e) => onChange(idx, "title", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
@@ -243,10 +243,10 @@ function CertificationSection({ certifications, isNone, onNone, onChange, onAdd,
 /* ============================================================
    Publications
    ============================================================ */
-function PublicationSection({ publications, isNone, onNone, onChange, onAdd, onRemove }: { publications: PublicationEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof PublicationEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
+function PublicationSection({ publications, isNone, onNone, onChange, onAdd, onRemove }: { publications: PublicationEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof PublicationEntry, v: string, file?: File) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <SubSection label="Publications" entries={publications} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
-      onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
+      onFileChange={(i, n, f) => { onChange(i, "fileName" as any, n); if (f !== undefined) onChange(i, "fileObject" as any, f as any); }}
       renderFields={(entry, idx) => (
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Title of the Publication</label><input type="text" value={entry.title} onChange={(e) => onChange(idx, "title", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
@@ -262,10 +262,10 @@ function PublicationSection({ publications, isNone, onNone, onChange, onAdd, onR
 /* ============================================================
    Inventions
    ============================================================ */
-function InventionSection({ inventions, isNone, onNone, onChange, onAdd, onRemove }: { inventions: InventionEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof InventionEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
+function InventionSection({ inventions, isNone, onNone, onChange, onAdd, onRemove }: { inventions: InventionEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof InventionEntry, v: string, file?: File) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <SubSection label="Inventions" entries={inventions} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
-      onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
+      onFileChange={(i, n, f) => { onChange(i, "fileName" as any, n); if (f !== undefined) onChange(i, "fileObject" as any, f as any); }}
       renderFields={(entry, idx) => (
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Title of the Invention</label><input type="text" value={entry.title} onChange={(e) => onChange(idx, "title", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
@@ -307,7 +307,7 @@ function WorkExperienceSection({ work, onEmploymentChange, onConsultancyChange, 
             <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Inclusive Dates</label><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-gray-500 mb-1">Start</label><input type="month" value={entry.startDate} onChange={(e) => onEmploymentChange(idx, "startDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div><div><label className="block text-xs text-gray-500 mb-1">End</label><input type="month" value={entry.endDate} onChange={(e) => onEmploymentChange(idx, "endDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div></div></div>
             <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Description of Duties</label><textarea value={entry.description} onChange={(e) => onEmploymentChange(idx, "description", e.target.value)} rows={3} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
           </div>
-          <FileUploadRow fileName={entry.fileName} onFileChange={(n) => onEmploymentChange(idx, "fileName" as any, n)} />
+          <FileUploadRow fileName={entry.fileName} onFileChange={(n, f) => { onEmploymentChange(idx, "fileName" as any, n); if (f !== undefined) onEmploymentChange(idx, "fileObject" as any, f as any); }} />
           <div className="flex justify-end gap-2 mt-3">
             {idx > 0 && <button type="button" onClick={() => onRemove("employment", idx)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm"><Minus size={16} /> Remove</button>}
             {idx === 0 && <button type="button" onClick={onNoneEmp} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold">None</button>}
@@ -330,7 +330,7 @@ function WorkExperienceSection({ work, onEmploymentChange, onConsultancyChange, 
             <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Company Address</label><input type="text" value={entry.companyAddress} onChange={(e) => onConsultancyChange(idx, "companyAddress", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
             <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Inclusive Dates</label><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs text-gray-500 mb-1">Start</label><input type="month" value={entry.startDate} onChange={(e) => onConsultancyChange(idx, "startDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div><div><label className="block text-xs text-gray-500 mb-1">End</label><input type="month" value={entry.endDate} onChange={(e) => onConsultancyChange(idx, "endDate", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div></div></div>
           </div>
-          <FileUploadRow fileName={entry.fileName} onFileChange={(n) => onConsultancyChange(idx, "fileName" as any, n)} />
+          <FileUploadRow fileName={entry.fileName} onFileChange={(n, f) => { onConsultancyChange(idx, "fileName" as any, n); if (f !== undefined) onConsultancyChange(idx, "fileObject" as any, f as any); }} />
           <div className="flex justify-end gap-2 mt-3">
             {idx > 0 && <button type="button" onClick={() => onRemove("consultancy", idx)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm"><Minus size={16} /> Remove</button>}
             {idx === 0 && <button type="button" onClick={onNoneCon} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold">None</button>}
@@ -355,7 +355,7 @@ function WorkExperienceSection({ work, onEmploymentChange, onConsultancyChange, 
             <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Reference (Name, Designation, Contact No.)</label><input type="text" value={entry.reference} onChange={(e) => onSelfEmploymentChange(idx, "reference", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
             <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Description of Duties</label><textarea value={entry.description} onChange={(e) => onSelfEmploymentChange(idx, "description", e.target.value)} rows={3} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
           </div>
-          <FileUploadRow fileName={entry.fileName} onFileChange={(n) => onSelfEmploymentChange(idx, "fileName" as any, n)} />
+          <FileUploadRow fileName={entry.fileName} onFileChange={(n, f) => { onSelfEmploymentChange(idx, "fileName" as any, n); if (f !== undefined) onSelfEmploymentChange(idx, "fileObject" as any, f as any); }} />
           <div className="flex justify-end gap-2 mt-3">
             {idx > 0 && <button type="button" onClick={() => onRemove("selfEmployment", idx)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm"><Minus size={16} /> Remove</button>}
             {idx === 0 && <button type="button" onClick={onNoneSE} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold">None</button>}
@@ -370,12 +370,12 @@ function WorkExperienceSection({ work, onEmploymentChange, onConsultancyChange, 
 /* ============================================================
    Recognitions
    ============================================================ */
-function RecognitionSection({ recognitions, isNone, onNone, onChange, onAdd, onRemove }: { recognitions: RecognitionEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof RecognitionEntry, v: string) => void; onAdd: () => void; onRemove: (i: number) => void }) {
+function RecognitionSection({ recognitions, isNone, onNone, onChange, onAdd, onRemove }: { recognitions: RecognitionEntry[]; isNone: boolean; onNone: () => void; onChange: (i: number, f: keyof RecognitionEntry, v: string, file?: File) => void; onAdd: () => void; onRemove: (i: number) => void }) {
   return (
     <div>
       <p className="italic text-sm text-gray-600 mb-3">Describe honors, awards, citations, etc.</p>
       <SubSection entries={recognitions} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
-        onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
+        onFileChange={(i, n, f) => { onChange(i, "fileName" as any, n); if (f !== undefined) onChange(i, "fileObject" as any, f as any); }}
         renderFields={(entry, idx) => (
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Title of the Recognition</label><input type="text" value={entry.title} onChange={(e) => onChange(idx, "title", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
@@ -404,7 +404,7 @@ function ProfessionalDevelopmentSection({ memberships, projects, research, noneM
     <div>
       <SubSection label="Membership in Professional Organizations" entries={memberships} isNone={noneMem} onNone={onNoneMem}
         onAdd={() => onAdd("memberships")} onRemove={(i) => onRemove("memberships", i)}
-        onFileChange={(i, n) => onChange("memberships", i, "fileName", n)}
+        onFileChange={(i, n, f) => { onChange("memberships", i, "fileName", n); if (f !== undefined) onChange("memberships", i, "fileObject", f as any); }}
         renderFields={(entry, idx) => (
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Organization</label><input type="text" value={entry.organization} onChange={(e) => onChange("memberships", idx, "organization", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
@@ -415,7 +415,7 @@ function ProfessionalDevelopmentSection({ memberships, projects, research, noneM
       <hr className="my-6" />
       <SubSection label="Projects Undertaken" entries={projects} isNone={noneProj} onNone={onNoneProj} limit={5}
         onAdd={() => onAdd("projects")} onRemove={(i) => onRemove("projects", i)}
-        onFileChange={(i, n) => onChange("projects", i, "fileName", n)}
+        onFileChange={(i, n, f) => { onChange("projects", i, "fileName", n); if (f !== undefined) onChange("projects", i, "fileObject", f as any); }}
         renderFields={(entry, idx) => (
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Title of Project</label><input type="text" value={entry.title} onChange={(e) => onChange("projects", idx, "title", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
@@ -427,7 +427,7 @@ function ProfessionalDevelopmentSection({ memberships, projects, research, noneM
       <hr className="my-6" />
       <SubSection label="Research Undertaken" entries={research} isNone={noneRes} onNone={onNoneRes} limit={5}
         onAdd={() => onAdd("research")} onRemove={(i) => onRemove("research", i)}
-        onFileChange={(i, n) => onChange("research", i, "fileName", n)}
+        onFileChange={(i, n, f) => { onChange("research", i, "fileName", n); if (f !== undefined) onChange("research", i, "fileObject", f as any); }}
         renderFields={(entry, idx) => (
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Title of Research</label><input type="text" value={entry.title} onChange={(e) => onChange("research", idx, "title", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
@@ -448,7 +448,7 @@ function CreativeWorksSection({ works, isNone, onNone, onChange, onAdd, onRemove
     <div>
       <p className="italic text-sm text-gray-700 mb-4">(Please enumerate the various creative works and special accomplishments you have done in the past...)</p>
       <SubSection entries={works} isNone={isNone} onNone={onNone} onAdd={onAdd} onRemove={onRemove}
-        onFileChange={(i, n) => onChange(i, "fileName" as any, n)}
+        onFileChange={(i, n, f) => { onChange(i, "fileName" as any, n); if (f !== undefined) onChange(i, "fileObject" as any, f as any); }}
         renderFields={(entry, idx) => (
           <div>
             <div className="mb-3"><label className="block text-sm font-semibold text-black mb-1">Title and Brief Description <span className="text-red-500">*</span></label><input type="text" value={entry.title || ""} onChange={(e) => onChange(idx, "title", e.target.value)} className="w-full border border-gray-400 rounded-lg px-3 py-2 text-black bg-white" /></div>
@@ -486,7 +486,10 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
   const [memberships, setMemberships] = useState<MembershipEntry[]>(formData.professional_development?.memberships || []);
   const [projects, setProjects] = useState<ProjectEntry[]>(formData.professional_development?.projects || []);
   const [research, setResearch] = useState<ResearchEntry[]>(formData.professional_development?.research || []);
-  const [creativeWorks, setCreativeWorks] = useState<CreativeWork[]>(formData.creative_works?.length > 0 ? formData.creative_works : []);
+  const [creativeWorks, setCreativeWorks] = useState<CreativeWork[]>(
+    (formData.creative_works?.length > 0 ? formData.creative_works : null) ||
+    (formData.creativeWorks?.length > 0 ? formData.creativeWorks : null) || []
+  );
 
   /* --- None states --- */
   const [hasNoTertiary, setHasNoTertiary] = useState(false);
@@ -541,7 +544,7 @@ export default function BackgroundAchievementsForm({ formData, setFormData, next
   const addWork_ = (t: keyof WorkExperienceState) => setWork(prev => {
     const e: any = t === "employment" ? { company: "", companyAddress: "", designation: "", startDate: "", endDate: "", description: "" }
       : t === "consultancy" ? { consultancy: "", companyName: "", companyAddress: "", startDate: "", endDate: "" }
-      : { company: "", companyAddress: "", designation: "", reference: "", startDate: "", endDate: "", description: "" };
+        : { company: "", companyAddress: "", designation: "", reference: "", startDate: "", endDate: "", description: "" };
     return { ...prev, [t]: [...prev[t], e] };
   });
   const removeWork_ = (t: keyof WorkExperienceState, i: number) => setWork(prev => ({ ...prev, [t]: prev[t].filter((_, x) => x !== i) }));
