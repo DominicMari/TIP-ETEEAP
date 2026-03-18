@@ -24,9 +24,11 @@ import {
   GraduationCap,
   Star,
   Calendar,
+  Printer,
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useModal } from "@/components/ui/useModal";
+import { openPortfolioPrintPreview } from "@/components/admin/printTemplate";
 
 interface PortfolioFile {
   key: string;
@@ -105,11 +107,14 @@ export default function PortfolioSubmissions({
     const fetchSubmissions = async () => {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase
-        .from("portfolio_submissions")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) { setError(error.message); } else { setSubmissions(data || []); }
+      try {
+        const res = await fetch("/api/portfolio-submission?all=true", { cache: "no-store" });
+        const json = await res.json();
+        if (!res.ok) { setError(json.error || "Failed to load submissions"); }
+        else { setSubmissions(json.submissions || []); }
+      } catch (err: any) {
+        setError(err.message || "Unexpected error");
+      }
       setLoading(false);
     };
     fetchSubmissions();
@@ -160,22 +165,33 @@ export default function PortfolioSubmissions({
     setSelectedAppData(null);
     setIsModalOpen(true);
 
-    // Fetch linked application data
+    // Re-fetch the latest submission row via service-role API so portfolio_files is always fresh
+    let latestSubmission: PortfolioSubmission = submission;
+    try {
+      const freshRes = await fetch(`/api/portfolio-submission?id=${submission.id}`, { cache: "no-store" });
+      if (freshRes.ok) {
+        const freshJson = await freshRes.json();
+        if (freshJson.submission) {
+          latestSubmission = freshJson.submission as PortfolioSubmission;
+          setSelectedSubmission(latestSubmission);
+          setSubmissions((prev) => prev.map((s) => (s.id === submission.id ? latestSubmission : s)));
+        }
+      }
+    } catch { /* use original submission */ }
+
+    // Fetch linked application data via service-role API (bypasses RLS)
     setLoadingAppData(true);
     try {
-      const { data: appData, error: appError } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("user_id", submission.user_id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      if (!appError && appData) setSelectedAppData(appData);
+      const res = await fetch(`/api/my-application?user_id=${encodeURIComponent(submission.user_id)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.application) setSelectedAppData(json.application);
+      }
     } catch { /* no app data */ }
     setLoadingAppData(false);
 
     // Auto-change "Submitted" → "Pending"
-    if (submission.status === "Submitted") {
+    if (latestSubmission.status === "Submitted") {
       setUpdatingStatusId(submission.id);
       const { data: updatedData, error: updateError } = await supabase
         .from("portfolio_submissions")
@@ -573,18 +589,50 @@ const ViewSubmissionModal: FC<{
             <p className="text-sm text-gray-400 italic text-center">No credential files uploaded in the application form.</p>
           )}
 
-          {/* Portfolio Files submitted via portform */}
-          <Section icon={<Star size={15} />} title="Portfolio Files Submitted">
-            {submission.portfolio_files && submission.portfolio_files.length > 0 ? (
-              <div className="space-y-1">
-                {submission.portfolio_files.map((f) => (
-                  <FileLink key={f.key} label={f.label || "Unnamed File"} url={f.url} />
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 italic">No portfolio files uploaded.</p>
-            )}
-          </Section>
+          {/* Portfolio Files submitted via portform — always show all categories */}
+          {(() => {
+            const PORT_GROUPS = [
+              { key: "eteeapForm", label: "Accomplished ETEEAP Application Form" },
+              { key: "cv", label: "Curriculum Vitae" },
+              { key: "psychTest", label: "Psychological Test" },
+              { key: "authenticity", label: "Statement of Ownership/Authenticity" },
+              { key: "endorsement", label: "Endorsement Letter" },
+              { key: "otherDocs", label: "Other Documents Required" },
+              { key: "visitation", label: "Workplace Visitation Checklist" },
+              { key: "otherEvidence", label: "Other Evidence" },
+            ];
+            const pf = submission.portfolio_files || [];
+            const grouped = PORT_GROUPS.map((g) => ({
+              ...g,
+              files: pf.filter((f) => f.key === g.key),
+            }));
+
+            return (
+              <Section icon={<Star size={15} />} title="Portfolio Files Submitted">
+                <div className="space-y-3">
+                  {grouped.map((g) => (
+                    <div key={g.key}>
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 flex items-center gap-1.5">
+                        {g.files.length > 0
+                          ? <span className="w-2 h-2 rounded-full bg-green-500 inline-block shrink-0" />
+                          : <span className="w-2 h-2 rounded-full bg-gray-300 inline-block shrink-0" />}
+                        {g.label}
+                      </p>
+                      <div className="pl-4 space-y-1 border-l-2 border-gray-200">
+                        {g.files.length > 0 ? (
+                          g.files.map((f, i) => (
+                            <FileLink key={i} label={f.label || f.key} url={f.url} />
+                          ))
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">Not yet uploaded</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            );
+          })()}
 
           {/* Signature */}
           <div>
@@ -600,7 +648,14 @@ const ViewSubmissionModal: FC<{
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50 text-right rounded-b-2xl sticky bottom-0">
+        <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl sticky bottom-0 flex justify-end gap-3">
+          <button
+            onClick={() => openPortfolioPrintPreview(submission, appData)}
+            className="px-5 py-2 bg-slate-700 text-white font-semibold rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2"
+          >
+            <Printer size={15} />
+            Print Portfolio Form
+          </button>
           <button onClick={onClose} className="px-6 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
             Close
           </button>

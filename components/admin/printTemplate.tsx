@@ -1,8 +1,8 @@
-// components/admin/printTemplate.tsx
+﻿// components/admin/printTemplate.tsx
 "use client";
 
 /**
- * TIP-ACAD-E-001 — Application and Preliminary Assessment Form (For Applicant)
+ * TIP-ACAD-E-001 â€” Application and Preliminary Assessment Form (For Applicant)
  * 1-to-1 match with the official PDF (Revision Status/Date: 0/2025 July 04)
  */
 export function generatePrintHTML(data: any): string {
@@ -52,7 +52,7 @@ export function generatePrintHTML(data: any): string {
     const bodyRows = items.length > 0
       ? items.map(item => `<tr>${keys.map(k => {
         if (k === "_level") return `<td style="${td}">${item._level || ""}</td>`;
-        if (k.includes("+")) { const [a, b] = k.split("+"); const va = item[a] || ""; const vb = item[b] || ""; return `<td style="${td}">${va}${va && vb ? " – " : ""}${vb}</td>`; }
+        if (k.includes("+")) { const [a, b] = k.split("+"); const va = item[a] || ""; const vb = item[b] || ""; return `<td style="${td}">${va}${va && vb ? " â€“ " : ""}${vb}</td>`; }
         return `<td style="${td}">${item[k] || ""}</td>`;
       }).join("")}</tr>`).join("")
       : Array(emptyRows).fill(`<tr>${keys.map(() => `<td style="${td}">&nbsp;</td>`).join("")}</tr>`).join("");
@@ -63,7 +63,7 @@ export function generatePrintHTML(data: any): string {
 <html>
 <head>
   <meta charset="UTF-8"/>
-  <title>TIP-ACAD-E-001 — ${data.applicant_name || "Applicant"}</title>
+  <title>TIP-ACAD-E-001 â€” ${data.applicant_name || "Applicant"}</title>
   <style>
     @page { size: A4; margin: 12mm 14mm 12mm 14mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -376,6 +376,298 @@ export function openPrintPreview(data: any): void {
   if (!printWindow) { alert("Please allow pop-ups to use the print feature."); return; }
   printWindow.document.write(generatePrintHTML(data));
   printWindow.document.close();
+}
+
+// â”€â”€â”€ TIP-ACAD-E-002 Portfolio Requirements Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function _portfolioHTML(submission: any, appData: any): string {
+  const fmt = (d: string | null | undefined): string => {
+    if (!d) return "";
+    try { const dt = new Date(d); return isNaN(dt.getTime()) ? d : new Intl.DateTimeFormat("en-PH", { year: "numeric", month: "2-digit", day: "2-digit" }).format(dt); }
+    catch { return d; }
+  };
+
+  const name = appData?.applicant_name || submission?.full_name || "";
+  const degree = appData?.degree_applied_for || submission?.degree_program || "";
+  const campus = appData?.campus || submission?.campus || "";
+  const appDate = fmt(appData?.application_date || appData?.created_at || submission?.created_at);
+  const folderLink = appData?.folder_link || "";
+  const photoUrl = appData?.photo_url || submission?.photo_url || "";
+  const sigUrl = appData?.signature_url || submission?.signature || "";
+  const cityAddr = appData?.city_address || "";
+  const permAddr = appData?.permanent_address || "";
+  const mobile = appData?.mobile_number || "";
+  const email = appData?.email_address || "";
+
+  // portform files keyed by category
+  const pf: Array<{ key: string; label?: string; url: string }> =
+    Array.isArray(submission?.portfolio_files) ? submission.portfolio_files : [];
+  // Extract filename from URL path
+  const fileName = (url: string) => {
+    try { return decodeURIComponent(url.split("/").pop()?.split("_").slice(2).join("_") || url.split("/").pop() || url); }
+    catch { return url.split("/").pop() || url; }
+  };
+  const links = (key: string) =>
+    pf.filter(f => f.key === key)
+      .map(f => `<div style="font-size:7.5pt;margin-bottom:2px;">&#128206; ${f.label || fileName(f.url)}</div>`)
+      .join("");
+
+  // credential files from application (C-I) — grouped by section
+  const edu  = appData?.education_background || {};
+  const work = appData?.work_experiences     || {};
+  const pd   = appData?.professional_development || {};
+
+  const item = (label: string) => `<div style="font-size:7.5pt;margin-bottom:2px;padding-left:8px;">&#128206; ${label}</div>`;
+  const grpHdr = (title: string) => `<div style="font-size:7pt;font-weight:bold;text-transform:uppercase;margin:5px 0 2px;letter-spacing:0.5px;">${title}</div>`;
+
+  const makeGroup = (title: string, entries: string[]) =>
+    entries.length ? grpHdr(title) + entries.map(item).join("") : "";
+
+  const eduEntries = [
+    ...(edu.tertiary      || []).filter((e: any) => e.fileUrl).map((e: any) => `Tertiary: ${e.schoolName}${e.degreeProgram ? ` \u2014 ${e.degreeProgram}` : ""}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
+    ...(edu.secondary     || []).filter((e: any) => e.fileUrl).map((e: any) => `Secondary: ${e.schoolName}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
+    ...(edu.elementary    || []).filter((e: any) => e.fileUrl).map((e: any) => `Elementary: ${e.schoolName}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
+    ...(edu.technical     || []).filter((e: any) => e.fileUrl).map((e: any) => `Technical: ${e.schoolName}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
+    ...(appData?.non_formal_education || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
+  ];
+  const certEntries   = (appData?.certifications || []).filter((e: any) => e.fileUrl).map((e: any) => e.title);
+  const pubInvEntries = [
+    ...(appData?.publications || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
+    ...(appData?.inventions   || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
+  ];
+  const workEntries = [
+    ...(work.employment     || []).filter((e: any) => e.fileUrl).map((e: any) => `${e.company}${e.designation ? ` \u2014 ${e.designation}` : ""}`),
+    ...(work.consultancy    || []).filter((e: any) => e.fileUrl).map((e: any) => e.consultancy),
+    ...(work.selfEmployment || []).filter((e: any) => e.fileUrl).map((e: any) => `${e.company}${e.designation ? ` \u2014 ${e.designation}` : ""}`),
+  ];
+  const recEntries = (appData?.recognitions || []).filter((e: any) => e.fileUrl).map((e: any) => e.title);
+  const pdEntries  = [
+    ...(pd.memberships || []).filter((e: any) => e.fileUrl).map((e: any) => e.organization),
+    ...(pd.projects    || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
+    ...(pd.research    || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
+  ];
+  const cwEntries = (appData?.creative_works || []).filter((e: any) => e.fileUrl).map((e: any) => e.title);
+
+  const credHTML = [
+    makeGroup("C. Educational Background", eduEntries),
+    makeGroup("D. Certifications",         certEntries),
+    makeGroup("E. Publications & Inventions", pubInvEntries),
+    makeGroup("F. Work Experience",        workEntries),
+    makeGroup("G. Recognitions",           recEntries),
+    makeGroup("H. Professional Development", pdEntries),
+    makeGroup("I. Creative Works",         cwEntries),
+  ].filter(Boolean).join("");
+
+  const row1links = credHTML + links("eteeapForm");
+
+  const TH = "border:1px solid #000;padding:4px 6px;font-size:8pt;font-weight:bold;text-align:center;background:#fff;vertical-align:middle;";
+  const TD = "border:1px solid #000;padding:4px 6px;font-size:8pt;vertical-align:top;";
+  const uRow = (lbl: string, val: string) =>
+    `<div style="margin-bottom:4px;font-size:8.5pt;display:flex;align-items:baseline;gap:4px;">${lbl}:&nbsp;<span style="border-bottom:1px solid #000;flex:1;display:inline-block;padding-bottom:1px;">${val}</span></div>`;
+  const photo = photoUrl
+    ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;" />`
+    : `<div style="text-align:center;font-size:7pt;color:#555;line-height:1.4;">1 x 1<br/>Picture</div>`;
+  const sig1 = sigUrl ? `<img src="${sigUrl}" style="height:44px;display:block;margin-bottom:2px;" />` : `<div style="height:44px;"></div>`;
+  const sig2 = sigUrl ? `<img src="${sigUrl}" style="height:48px;display:block;margin-bottom:4px;" />` : `<div style="height:48px;"></div>`;
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/>
+<title>TIP-ACAD-E-002 \u2014 ${name}</title>
+<style>
+  @page{size:A4;margin:12mm 14mm 12mm 14mm;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Arial,Helvetica,sans-serif;color:#000;font-size:9pt;line-height:1.3;}
+  @media print{body{padding:0;}.no-print{display:none;}}
+</style></head><body>
+
+<!-- PAGE HEADER -->
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+  <div style="display:flex;gap:8px;align-items:center;">
+    <img src="/assets/TIPLogo.png" alt="TIP" style="width:50px;height:50px;object-fit:contain;" onerror="this.style.display='none'"/>
+    <div style="font-size:10pt;font-weight:bold;line-height:1.3;">TECHNOLOGICAL<br/>INSTITUTE OF THE<br/>PHILIPPINES</div>
+  </div>
+  <div style="text-align:right;font-size:7pt;font-weight:bold;letter-spacing:1.5px;">
+    T I P - A C A D - E - 0 0 2<br/>
+    <span style="font-weight:normal;font-style:italic;letter-spacing:0;font-size:6.5pt;">Revision Status / Date: 0/2025 July 04</span>
+  </div>
+</div>
+
+<!-- ETEEAP TITLE -->
+<div style="text-align:center;font-size:9.5pt;font-weight:bold;margin-bottom:6px;">
+  Expanded Tertiary Education Equivalency and Accreditation Program<br/>(ETEEAP)
+</div>
+
+<!-- PRIVACY CONSENT -->
+<div style="margin-bottom:8px;">
+  <div style="font-size:8pt;font-weight:bold;margin-bottom:2px;">PRIVACY CONSENT</div>
+  <div style="font-size:7pt;line-height:1.4;">I understand and agree that by filling out this form, I am allowing the Technological Institute of the Philippines to collect, use, share, and disclose my personal information for advising and to retain these personal information for a period allowed based on applicable laws and school policy. The purpose and extent of collection, use, sharing, disclosure, and retention of my personal information was explained to me.\\</div>
+</div>
+
+<!-- FORM TITLE -->
+<div style="text-align:center;margin-bottom:8px;">
+  <div style="font-size:10.5pt;font-weight:bold;">PORTFOLIO REQUIREMENTS FORM</div>
+  <div style="font-size:9pt;font-style:italic;">For Applicant</div>
+</div>
+
+<!-- HEADER FIELDS + PHOTO -->
+<div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:8px;">
+  <div style="flex:1;">
+    <table style="width:100%;border-collapse:collapse;">
+      <tr><td style="font-weight:bold;font-size:8.5pt;padding:3px 0;white-space:nowrap;width:145px;">Name of the Applicant:</td><td style="border-bottom:1px solid #000;font-size:8.5pt;padding:3px 4px;">${name}</td></tr>
+      <tr><td style="font-weight:bold;font-size:8.5pt;padding:3px 0;">Degree Applied For:</td><td style="border-bottom:1px solid #000;font-size:8.5pt;padding:3px 4px;">${degree}</td></tr>
+      <tr><td style="font-weight:bold;font-size:8.5pt;padding:3px 0;">Campus:</td><td style="border-bottom:1px solid #000;font-size:8.5pt;padding:3px 4px;">${campus}</td></tr>
+      <tr><td style="font-weight:bold;font-size:8.5pt;padding:3px 0;">Date of Application:</td><td style="border-bottom:1px solid #000;font-size:8.5pt;padding:3px 4px;">${appDate}</td></tr>
+      <tr><td style="font-weight:bold;font-size:8.5pt;padding:3px 0;">Folder Link:</td><td style="border-bottom:1px solid #000;font-size:7.5pt;padding:3px 4px;word-break:break-all;">${folderLink}</td></tr>
+    </table>
+  </div>
+  <div style="width:90px;height:90px;border:1.5px solid #000;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">${photo}</div>
+</div>
+
+<!-- DIRECTION -->
+<div style="font-size:7.5pt;margin-bottom:10px;line-height:1.5;">
+  <b><i>Direction.</i></b> <i>Please accomplish the following information needed. Do not leave items unanswered. All information declared in this file is under oath as well as submitted. Discovery of false information shall be disqualified from participating in the program.</i>
+</div>
+
+<!-- I. PORTFOLIO COVER SHEET -->
+<div style="font-size:10pt;font-weight:bold;margin-bottom:6px;">I. PORTFOLIO COVER SHEET</div>
+${uRow("Name (<i>Last Name, First Name Middle Name</i>)", name)}
+${uRow("City Address", cityAddr)}
+${uRow("Permanent Address", permAddr)}
+<div style="margin-bottom:4px;font-size:8.5pt;display:flex;gap:10px;flex-wrap:wrap;">
+  <span style="white-space:nowrap;">Telephone No.:&nbsp;<span style="border-bottom:1px solid #000;display:inline-block;min-width:100px;">&nbsp;</span></span>
+  <span style="white-space:nowrap;">Mobile No.:&nbsp;<span style="border-bottom:1px solid #000;display:inline-block;min-width:120px;">${mobile}</span></span>
+  <span style="white-space:nowrap;">Email Address:&nbsp;<span style="border-bottom:1px solid #000;display:inline-block;min-width:160px;">${email}</span></span>
+</div>
+${uRow("Degree Program intended to enroll", degree)}
+
+<div style="margin:14px 0 10px;font-size:8.5pt;line-height:1.8;text-align:justify;">
+  I understand that it is my responsibility to ensure that this portfolio is applicable to the program I am applying for equivalency and accreditation to earn a Bachelor&apos;s degree.
+</div>
+<div style="margin-bottom:24px;font-size:8.5pt;line-height:1.8;text-align:justify;">
+  I also acknowledge that every information is true and correct. Furthermore, I understand that every form of academic dishonesty is considered adequate grounds for dismissal from the Institute and for the revocation of credits granted.
+</div>
+
+<!-- SIGNATURE BLOCK PAGE 1 -->
+<div style="display:flex;gap:40px;margin-bottom:8px;page-break-inside:avoid;">
+  <div style="width:260px;">
+    ${sig1}
+    <div style="border-top:1.5px solid #000;padding-top:3px;">
+      <div style="font-size:8pt;text-align:center;">${name}</div>
+      <div style="font-size:7pt;text-align:center;">Printed Name of the Applicant with Signature</div>
+    </div>
+  </div>
+  <div style="width:120px;">
+    <div style="height:44px;"></div>
+    <div style="border-top:1.5px solid #000;padding-top:3px;">
+      <div style="font-size:8pt;text-align:center;">${appDate}</div>
+      <div style="font-size:7pt;text-align:center;">Date</div>
+    </div>
+  </div>
+</div>
+<div style="font-size:7pt;text-align:right;margin-top:6px;">1 of 2</div>
+
+<!-- PAGE BREAK -->
+<div style="page-break-before:always;"></div>
+
+<!-- PAGE 2 HEADER (form code only, matching PDF) -->
+<div style="text-align:right;font-size:7pt;font-weight:bold;letter-spacing:1.5px;margin-bottom:12px;">
+  T I P - A C A D - E - 0 0 2<br/>
+  <span style="font-weight:normal;font-style:italic;letter-spacing:0;font-size:6.5pt;">Revision Status / Date: 0/2025 July 04</span>
+</div>
+
+<!-- II. PORTFOLIO CONTENT -->
+<div style="font-size:10pt;font-weight:bold;margin-bottom:3px;">II. PORTFOLIO CONTENT</div>
+<div style="font-size:8pt;margin-bottom:5px;">Please scan and submit the following requirements with proper labelings and links</div>
+
+<table style="width:100%;border-collapse:collapse;margin-bottom:10px;">
+  <thead>
+    <tr>
+      <th style="${TH}width:52%;">Portfolio Content</th>
+      <th style="${TH}width:48%;">Portfolio Links</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="${TD}">
+        <b>Accomplished ETEEAP Application and Preliminary Assessment Form</b><br/>
+        <i>(Notarized)</i><br/>
+        <i>Please submit your credentials as follows:</i><br/>
+        &nbsp;- <b>ProfEd</b> <i>(Trainings, Certificates, Recognitions, Eligibility, Recommendation Letter, Work Experience, Professional Development Activities, etc.)</i><br/>
+        &nbsp;- <b>GenEd</b> (requirement)<br/>
+        &nbsp;- <b>Math/Physics</b> <i>(Mentorship or Tutorial activities, Project Involvement, Data Analysis, Use of Statistical Tools, etc.)</i><br/>
+        &nbsp;- <b>PE and NSTP</b> (Certificate Intramurals, Sportsfest, Wellness)<br/>
+        &nbsp;- <b>Chemistry</b><br/>
+        &nbsp;- <b>ABET Program Criteria</b>
+      </td>
+      <td style="${TD}">${row1links}</td>
+    </tr>
+    <tr>
+      <td style="${TD}"><b>Curriculum Vitae</b><br/><i>(a comprehensive discussion of why you intend to enroll at T.I.P. ETEEAP Unit)</i></td>
+      <td style="${TD}">${links("cv")}</td>
+    </tr>
+    <tr>
+      <td style="${TD}"><b>Psychological Test</b><br/><i>(to be administered by the Guidance and Counseling Center after Preliminary Assessment)</i></td>
+      <td style="${TD}">${links("psychTest")}</td>
+    </tr>
+    <tr>
+      <td style="${TD}"><b>Statement of Ownership/Authenticity</b><br/><i>(provide a letter stating ownership/authenticity of the documents submitted)</i></td>
+      <td style="${TD}">${links("authenticity")}</td>
+    </tr>
+    <tr>
+      <td style="${TD}"><b>Endorsement Letter from the latest employer</b></td>
+      <td style="${TD}">${links("endorsement")}</td>
+    </tr>
+    <tr>
+      <td style="${TD}">
+        <b>Other Documents Required</b><br/>
+        &nbsp;&nbsp;-&nbsp;PSA Birth Certificate<br/>
+        &nbsp;&nbsp;-&nbsp;Barangay Clearance/NBI Clearance/Passport<br/>
+        &nbsp;&nbsp;-&nbsp;Marriage Certificate <i>(for married woman)</i>
+      </td>
+      <td style="${TD}">${links("otherDocs")}</td>
+    </tr>
+    <tr>
+      <td style="${TD}"><b>Workplace Visitation Checklist</b></td>
+      <td style="${TD}">${links("visitation")}</td>
+    </tr>
+    <tr>
+      <td style="${TD}"><b>Other Evidence of capability and knowledge in the field for equivalency and accreditation</b> <i>(if any)</i></td>
+      <td style="${TD}">${links("otherEvidence")}</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- DECLARATION -->
+<div style="margin-top:10px;font-size:8.5pt;line-height:1.6;">
+  I declare under oath that the foregoing information stated and documents presented herein are true and correct. Accomplished on this __ day of __________, 20_____.
+</div>
+
+<!-- SIGNATURE PAGE 2 -->
+<div style="margin-top:20px;page-break-inside:avoid;">
+  <div style="font-size:8.5pt;margin-bottom:6px;">Signed:</div>
+  <div style="width:280px;margin-top:8px;">
+    ${sig2}
+    <div style="border-top:1.5px solid #000;padding-top:4px;">
+      <div style="font-size:8.5pt;text-align:center;">${name}</div>
+      <div style="font-size:7pt;text-align:center;">Printed Name of the Applicant with Signature</div>
+    </div>
+  </div>
+</div>
+<div style="font-size:7pt;text-align:right;margin-top:16px;">2 of 2</div>
+
+<script>window.onload=function(){setTimeout(function(){window.print();},600);};</script>
+</body></html>`;
+}
+
+export function generatePortfolioPrintHTML(submission: any, appData: any): string {
+  return _portfolioHTML(submission, appData);
+}
+
+export function openPortfolioPrintPreview(submission: any, appData: any): void {
+  const w = window.open("", "_blank", "width=900,height=700");
+  if (!w) { alert("Please allow pop-ups to use the print feature."); return; }
+  w.document.write(_portfolioHTML(submission, appData));
+  w.document.close();
 }
 
 export default function TIPPrintTemplate({ data }: { data: any }) {

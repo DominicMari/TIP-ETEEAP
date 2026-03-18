@@ -496,6 +496,15 @@ export default function ApplicantsManage({
         setSelectedApplicant(updatedData as Applicant);
       }
 
+      // Sync status to portfolio_submissions for the same user
+      const userId = (updatedData as Applicant).user_id;
+      if (userId) {
+        await supabase
+          .from('portfolio_submissions')
+          .update({ status: newStatus })
+          .eq('user_id', userId);
+      }
+
       // Send status notification email
       await sendStatusEmail(
         (updatedData as Applicant).email_address,
@@ -908,8 +917,8 @@ const ViewApplicantModal: FC<{
                       onClick={() => onStatusChange(applicant.application_id, s)}
                       disabled={updatingStatusId === applicant.application_id || applicant.status === s}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${applicant.status === s
-                          ? `${STATUS_COLORS[s]} border-transparent shadow-sm`
-                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                        ? `${STATUS_COLORS[s]} border-transparent shadow-sm`
+                        : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
                         } disabled:opacity-60 disabled:cursor-default`}
                     >
                       {applicant.status === s && <Check size={13} />}

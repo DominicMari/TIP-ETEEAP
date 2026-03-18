@@ -74,66 +74,46 @@ function AppformCredentials({ appData }: { appData: Record<string, any> }) {
   const profDev = appData.professional_development || {};
   const creative: any[] = appData.creative_works || [];
 
-  // Build ordered sections matching C–I
-  type Entry = { label: string; url?: string };
-  type Section = { title: string; entries: Entry[] };
-  const sections: Section[] = [];
+  // Flatten all entries that have a fileUrl
+  const allEntries: { section: string; label: string; url?: string }[] = [];
 
-  const toEntries = (list: any[], labelFn: (e: any) => string): Entry[] =>
-    list.map(e => ({ label: labelFn(e), url: e.fileUrl }));
+  const addEntries = (section: string, list: any[], labelFn: (e: any) => string) =>
+    list.forEach(e => allEntries.push({ section, label: labelFn(e), url: e.fileUrl }));
 
-  // C. Educational Background — merge all levels
-  const eduEntries: Entry[] = [
-    ...toEntries(edu.tertiary || [], e => `Tertiary: ${e.schoolName}${e.degreeProgram ? ` — ${e.degreeProgram}` : ""} (${e.yearGraduated || ""})`),
-    ...toEntries(edu.secondary || [], e => `Secondary: ${e.schoolName} (${e.yearGraduated || ""})`),
-    ...toEntries(edu.elementary || [], e => `Elementary: ${e.schoolName} (${e.yearGraduated || ""})`),
-    ...toEntries(edu.technical || [], e => `Technical: ${e.schoolName} (${e.yearGraduated || ""})`),
-    ...toEntries(nonFormal, e => `Non-Formal: ${e.title}${e.sponsor ? ` — ${e.sponsor}` : ""}`),
+  const eduLevels = [
+    { key: "tertiary", label: "Tertiary" }, { key: "secondary", label: "Secondary" },
+    { key: "elementary", label: "Elementary" }, { key: "technical", label: "Technical" },
   ];
-  if (eduEntries.some(e => e.url)) sections.push({ title: "C. Educational Background", entries: eduEntries.filter(e => e.url) });
+  eduLevels.forEach(({ key, label }) =>
+    addEntries(`C. Formal Education (${label})`, edu[key] || [],
+      e => `${e.schoolName}${e.degreeProgram ? ` — ${e.degreeProgram}` : ""} (${e.yearGraduated || ""})`));
 
-  // D. Certifications
-  const certEntries = toEntries(certs, e => `${e.title} — ${e.certifyingBodyName || ""}`).filter(e => e.url);
-  if (certEntries.length) sections.push({ title: "D. Certifications", entries: certEntries });
+  addEntries("D. Non-Formal Education", nonFormal, e => `${e.title}${e.sponsor ? ` — ${e.sponsor}` : ""}`);
+  addEntries("E. Certifications", certs, e => `${e.title} — ${e.certifyingBodyName || ""}`);
+  addEntries("F. Publications", pubs, e => `${e.title} (${e.yearPublished || ""})`);
+  addEntries("F. Inventions", invs, e => `${e.title} — ${e.agency || ""}`);
+  addEntries("G. Employment", work.employment || [], e => `${e.company} — ${e.designation}`);
+  addEntries("G. Consultancy", work.consultancy || [], e => `${e.consultancy} — ${e.companyName || ""}`);
+  addEntries("G. Self-Employment", work.selfEmployment || [], e => `${e.company} — ${e.designation}`);
+  addEntries("H. Recognitions", recs, e => `${e.title} — ${e.awardingBodyName || ""}`);
+  addEntries("I. Memberships", profDev.memberships || [], e => `${e.organization} — ${e.designation}`);
+  addEntries("I. Projects", profDev.projects || [], e => `${e.title} — ${e.designation}`);
+  addEntries("I. Research", profDev.research || [], e => `${e.title} — ${e.institution}`);
+  addEntries("Creative Works", creative, e => `${e.title} — ${e.institutionName || ""}`);
 
-  // E. Inventions and Publications
-  const epEntries = [
-    ...toEntries(pubs, e => `Publication: ${e.title} (${e.yearPublished || ""})`),
-    ...toEntries(invs, e => `Invention: ${e.title} — ${e.agency || ""}`),
-  ].filter(e => e.url);
-  if (epEntries.length) sections.push({ title: "E. Inventions and Publications", entries: epEntries });
+  // Only show entries that have a fileUrl
+  const withFiles = allEntries.filter(e => e.url);
+  if (withFiles.length === 0) return null;
 
-  // F. Work Experience
-  const workEntries = [
-    ...toEntries(work.employment || [], e => `Employment: ${e.company} — ${e.designation}`),
-    ...toEntries(work.consultancy || [], e => `Consultancy: ${e.consultancy} — ${e.companyName || ""}`),
-    ...toEntries(work.selfEmployment || [], e => `Self-Employment: ${e.company} — ${e.designation}`),
-  ].filter(e => e.url);
-  if (workEntries.length) sections.push({ title: "F. Work Experience", entries: workEntries });
-
-  // G. Recognitions
-  const recEntries = toEntries(recs, e => `${e.title} — ${e.awardingBodyName || ""}`).filter(e => e.url);
-  if (recEntries.length) sections.push({ title: "G. Recognitions", entries: recEntries });
-
-  // H. Professional Development Activities
-  const pdEntries = [
-    ...toEntries(profDev.memberships || [], e => `Membership: ${e.organization} — ${e.designation}`),
-    ...toEntries(profDev.projects || [], e => `Project: ${e.title} — ${e.designation}`),
-    ...toEntries(profDev.research || [], e => `Research: ${e.title} — ${e.institution}`),
-  ].filter(e => e.url);
-  if (pdEntries.length) sections.push({ title: "H. Professional Development Activities", entries: pdEntries });
-
-  // I. Creative Works and Special Accomplishments
-  const cwEntries = toEntries(creative, e => `${e.title} — ${e.institutionName || ""}`).filter(e => e.url);
-  if (cwEntries.length) sections.push({ title: "I. Creative Works and Special Accomplishments", entries: cwEntries });
-
-  if (sections.length === 0) return null;
+  // Group by section
+  const grouped: Record<string, typeof withFiles> = {};
+  withFiles.forEach(e => { if (!grouped[e.section]) grouped[e.section] = []; grouped[e.section].push(e); });
 
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs mb-1">
       <p className="text-xs font-semibold text-blue-700 mb-2">📋 Uploaded Files from Application (Steps C–I)</p>
-      {sections.map(({ title, entries }) => (
-        <CredSection key={title} title={title}>
+      {Object.entries(grouped).map(([section, entries]) => (
+        <CredSection key={section} title={section}>
           {entries.map((e, i) => <CredLink key={i} label={e.label} url={e.url} />)}
         </CredSection>
       ))}
@@ -195,14 +175,34 @@ export default function ApplicationForm() {
     const fetchAppData = async () => {
       setAppLoading(true);
       try {
-        const res = await fetch(`/api/my-application?email=${encodeURIComponent(session.user!.email!)}`);
+        const res = await fetch(
+          `/api/my-application?email=${encodeURIComponent(session.user!.email!)}&t=${Date.now()}`,
+          { cache: "no-store" }
+        );
         const json = await res.json();
         const data = json.application;
         if (data) {
-          setAppData(data);
-          if (data.applicant_name) setFormData((prev) => ({ ...prev, name: data.applicant_name }));
-          if (data.degree_applied_for) setFormData((prev) => ({ ...prev, degree: data.degree_applied_for }));
-          if (data.campus) setFormData((prev) => ({ ...prev, campus: data.campus }));
+          // Defensively parse any JSON-string fields
+          const parse = (v: any) => {
+            if (!v || typeof v !== "string") return v;
+            try { return JSON.parse(v); } catch { return v; }
+          };
+          const parsed = {
+            ...data,
+            education_background: parse(data.education_background),
+            non_formal_education: parse(data.non_formal_education),
+            certifications: parse(data.certifications),
+            publications: parse(data.publications),
+            inventions: parse(data.inventions),
+            work_experiences: parse(data.work_experiences),
+            recognitions: parse(data.recognitions),
+            professional_development: parse(data.professional_development),
+            creative_works: parse(data.creative_works),
+          };
+          setAppData(parsed);
+          if (parsed.applicant_name) setFormData((prev) => ({ ...prev, name: parsed.applicant_name }));
+          if (parsed.degree_applied_for) setFormData((prev) => ({ ...prev, degree: parsed.degree_applied_for }));
+          if (parsed.campus) setFormData((prev) => ({ ...prev, campus: parsed.campus }));
         }
       } catch (err) {
         console.warn("[PortForm] Error fetching application:", err);
@@ -231,7 +231,10 @@ export default function ApplicationForm() {
     }
   };
 
+  const portfolioFilesRef = useRef<Record<string, File[]>>({});
+
   const handleFilesChange = (key: string, files: File[]) => {
+    portfolioFilesRef.current = { ...portfolioFilesRef.current, [key]: files };
     setFormData((prev) => ({
       ...prev,
       portfolioFiles: { ...prev.portfolioFiles, [key]: files },
@@ -252,54 +255,77 @@ export default function ApplicationForm() {
     if (!formData.photo && !appPhotoUrl) { await showAlert("Please upload a 1x1 photo.", "Photo Required"); setIsSubmitting(false); return; }
 
     try {
-      type UploadJob = { categoryKey: string; categoryLabel: string; file: File; storagePath: string };
-      const uploadJobs: UploadJob[] = [];
       let photoUrl = appPhotoUrl || "";
 
-      // Upload new photo if provided
+      // Upload photo via server-side API (service-role, bypasses RLS)
       if (formData.photo) {
-        const photoFile = formData.photo;
-        const photoFilePath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
-        const photoResult = await supabase.storage.from("portfolio_photos").upload(photoFilePath, photoFile);
-        if (photoResult.error) throw new Error(`Photo upload failed: ${photoResult.error.message}`);
-        const { data: photoUrlData } = supabase.storage.from("portfolio_photos").getPublicUrl(photoResult.data!.path);
-        photoUrl = photoUrlData.publicUrl;
+        const photoFd = new FormData();
+        photoFd.append("user_id", supabaseUserId);
+        photoFd.append("category_key", "photo");
+        photoFd.append("category_label", "Photo");
+        photoFd.append("file", formData.photo);
+        const photoRes = await fetch("/api/portfolio-upload", { method: "POST", body: photoFd });
+        if (!photoRes.ok) {
+          const e = await photoRes.json();
+          throw new Error(`Photo upload failed: ${e.error}`);
+        }
+        const photoData = await photoRes.json();
+        photoUrl = photoData.url;
       }
 
-      // Collect portfolio file uploads
-      for (const [key, files] of Object.entries(formData.portfolioFiles)) {
+      // Collect all portfolio files from ref (avoids stale state closure)
+      const fileEntries: Array<{ key: string; file: File; label: string }> = [];
+      for (const [key, files] of Object.entries(portfolioFilesRef.current)) {
         if (!files || files.length === 0) continue;
         const catLabel = allUploadKeys.find((c) => c.key === key)?.label || key;
         for (const file of files) {
-          const filePath = `${supabaseUserId}/portfolio/${key}_${Date.now()}_${file.name}`;
-          uploadJobs.push({ categoryKey: key, categoryLabel: catLabel, file, storagePath: filePath });
+          fileEntries.push({ key, file, label: catLabel });
         }
       }
 
-      // Upload all portfolio files
-      const fileResults = await Promise.all(
-        uploadJobs.map((job) => supabase.storage.from("portfolio_files").upload(job.storagePath, job.file))
+      console.log("[Portform] files to upload:", fileEntries.length, "keys:", fileEntries.map(f => f.key));
+
+      if (fileEntries.length === 0) {
+        console.warn("[Portform] No files selected — submitting with empty portfolio_files");
+      }
+
+      // Upload each file via server-side API (service-role, bypasses RLS)
+      const portfolioFileUrls = await Promise.all(
+        fileEntries.map(async ({ key, file, label }) => {
+          const fd = new FormData();
+          fd.append("user_id", supabaseUserId);
+          fd.append("category_key", key);
+          fd.append("category_label", label);
+          fd.append("file", file);
+          console.log("[Portform] uploading:", file.name, "key:", key);
+          const res = await fetch("/api/portfolio-upload", { method: "POST", body: fd });
+          const json = await res.json();
+          console.log("[Portform] upload result for", file.name, ":", JSON.stringify(json));
+          if (!res.ok) {
+            throw new Error(`Failed to upload ${file.name}: ${json.error}`);
+          }
+          return json as { key: string; label: string; fileName: string; url: string };
+        })
       );
-      const failedUploads = fileResults.filter((r) => r.error);
-      if (failedUploads.length > 0) throw new Error(`Failed to upload ${failedUploads.length} file(s).`);
 
-      const portfolioFileUrls = fileResults.map((result, index) => {
-        const job = uploadJobs[index];
-        const { data: urlData } = supabase.storage.from("portfolio_files").getPublicUrl(result.data!.path);
-        return { key: job.categoryKey, label: job.categoryLabel, fileName: job.file.name, url: urlData.publicUrl };
+      const upsertRes = await fetch("/api/portfolio-submission", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: supabaseUserId,
+          full_name: formData.name,
+          degree_program: formData.degree,
+          campus: formData.campus,
+          photo_url: photoUrl,
+          signature: signature,
+          portfolio_files: portfolioFileUrls,
+        }),
       });
-
-      const { error: insertError } = await supabase.from("portfolio_submissions").insert({
-        user_id: supabaseUserId,
-        full_name: formData.name,
-        degree_program: formData.degree,
-        campus: formData.campus,
-        photo_url: photoUrl,
-        signature: signature,
-        status: "Submitted",
-        portfolio_files: portfolioFileUrls,
-      });
-      if (insertError) throw insertError;
+      const upsertJson = await upsertRes.json();
+      console.log("[Portform] PATCH response:", JSON.stringify(upsertJson));
+      if (!upsertRes.ok) {
+        throw new Error(upsertJson.error || "Failed to save submission");
+      }
       setSubmitSuccess(true);
     } catch (error) {
       const errMsg = (error as Error).message;
@@ -313,7 +339,6 @@ export default function ApplicationForm() {
   const handleConsentAgree = () => setHasConsented(true);
   const handleConsentDisagree = () => router.push("/");
 
-  // Helper to format date
   const fmtDate = (d: string | null | undefined) => {
     if (!d) return "";
     try {
@@ -322,7 +347,6 @@ export default function ApplicationForm() {
     } catch { return d; }
   };
 
-  // Get first priority degree
   const getFirstPriority = (): string => {
     if (appData?.degree_applied_for) return appData.degree_applied_for;
     if (formData.degree) return formData.degree;
@@ -372,9 +396,6 @@ export default function ApplicationForm() {
         <div className="p-6 lg:p-8 lg:col-span-3">
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* ═══════════════════════════════════════════════════════ */}
-            {/*  PORTFOLIO REQUIREMENTS FORM HEADER                   */}
-            {/* ═══════════════════════════════════════════════════════ */}
             <div className="text-center mb-2">
               <h2 className="font-bold text-lg">PORTFOLIO REQUIREMENTS FORM</h2>
               <p className="text-sm italic">For Applicant</p>
@@ -407,14 +428,11 @@ export default function ApplicationForm() {
               </div>
             </div>
 
-            {/* Direction */}
             <div className="text-xs text-gray-700 italic leading-relaxed border-t border-gray-200 pt-3">
               <b className="not-italic">Direction.</b> Please accomplish the following information needed. Do not leave items unanswered. All information declared in this file is under oath as well as submitted. Discovery of false information shall be disqualified from participating in the program.
             </div>
 
-            {/* ═══════════════════════════════════════════════════════ */}
-            {/*  I. PORTFOLIO COVER SHEET                             */}
-            {/* ═══════════════════════════════════════════════════════ */}
+            {/* I. PORTFOLIO COVER SHEET */}
             <div>
               <h3 className="font-bold text-sm mb-3">I. PORTFOLIO COVER SHEET</h3>
               <div className="space-y-2.5 pl-2">
@@ -430,8 +448,6 @@ export default function ApplicationForm() {
               </div>
             </div>
 
-
-            {/* Photo upload if app data exists but user wants to change */}
             {appData && (
               <div className="flex items-center gap-3">
                 <label htmlFor="photo-upload" className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer hover:underline">
@@ -441,15 +457,12 @@ export default function ApplicationForm() {
               </div>
             )}
 
-            {/* ═══════════════════════════════════════════════════════ */}
-            {/*  II. PORTFOLIO CONTENT — PDF Table Layout              */}
-            {/* ═══════════════════════════════════════════════════════ */}
+            {/* II. PORTFOLIO CONTENT */}
             <div>
               <h3 className="font-bold text-sm mb-1">II. PORTFOLIO CONTENT</h3>
               <p className="text-xs text-gray-600 mb-3">Please scan and submit the following requirements with proper labelings and links</p>
 
               <div className="border border-gray-300 rounded-lg overflow-hidden">
-                {/* Table Header */}
                 <div className="grid grid-cols-2 bg-gray-100 border-b border-gray-300">
                   <div className="px-4 py-2 font-bold text-sm text-center border-r border-gray-300">Portfolio Content</div>
                   <div className="px-4 py-2 font-bold text-sm text-center">Portfolio Links</div>
@@ -471,7 +484,6 @@ export default function ApplicationForm() {
                     </ul>
                   </div>
                   <div className="px-3 py-3 flex flex-col gap-2">
-                    {/* Appform credential data from Steps C–I */}
                     {appData && <AppformCredentials appData={appData} />}
                     <FileUploader label="Additional Credentials" multiple onFilesChange={(f) => handleFilesChange("eteeapForm", f)} error={fileErrors["eteeapForm"]} />
                   </div>
@@ -586,12 +598,11 @@ export default function ApplicationForm() {
               </div>
             </div>
 
-            {/* Direction warning */}
             <div className="bg-yellow-50 text-yellow-800 p-4 rounded-lg text-xs leading-relaxed border border-yellow-300">
               <strong>⚠️ Direction:</strong> Please accomplish all required information. All information declared is under oath. Discovery of false information shall lead to disqualification.
             </div>
 
-            {/* ═══ Signature & Submit ═══ */}
+            {/* Signature & Submit */}
             <div className="space-y-4">
               <div className="pt-4 border-t border-gray-200">
                 <h3 className="font-bold text-base mb-2 flex items-center text-gray-800">

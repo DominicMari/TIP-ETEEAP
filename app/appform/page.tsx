@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import supabase from "@/lib/supabase/client";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { PenTool, Loader2, ArrowLeft, AlertCircle } from "lucide-react";
+import { PenTool, Loader2, ArrowLeft, AlertCircle, Printer } from "lucide-react";
 import SignatureCanvas from 'react-signature-canvas';
 import InitialForm from "./a";
 import PersonalInformationForm from "./b";
@@ -13,6 +13,7 @@ import BackgroundAchievementsForm from "./d";
 import LifelongLearningForm from "./i";
 import SelfReportForm from "./j";
 import PortfolioForm from "./portfolio";
+import { openPrintPreview } from "@/components/admin/printTemplate";
 import { useRouter } from 'next/navigation';
 import DataPrivacyConsent from './undertaking';
 import Modal from "@/components/ui/Modal";
@@ -57,7 +58,7 @@ function Pagination({ currentStep, totalSteps, stepTitles }: { currentStep: numb
 }
 
 // --- Success Screen Component ---
-function SuccessScreen({ onEdit, onGoToPortfolio, isDeleting }: { onEdit: () => void; onGoToPortfolio: () => void; isDeleting: boolean }) {
+function SuccessScreen({ onEdit, onGoToPortfolio, onPrint, isDeleting, isPrinting }: { onEdit: () => void; onGoToPortfolio: () => void; onPrint: () => void; isDeleting: boolean; isPrinting?: boolean }) {
     return (
         <div className="bg-white shadow-lg rounded-2xl w-full max-w-md p-10 text-center flex flex-col items-center">
             <div className="text-6xl mb-4">🎉</div>
@@ -80,9 +81,18 @@ function SuccessScreen({ onEdit, onGoToPortfolio, isDeleting }: { onEdit: () => 
                 </button>
                 <button
                     type="button"
+                    onClick={onPrint}
+                    disabled={isPrinting}
+                    className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    {isPrinting ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                    Print Application Form
+                </button>
+                <button
+                    type="button"
                     onClick={onEdit}
                     disabled={isDeleting}
-                    className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     {isDeleting && <Loader2 size={16} className="animate-spin" />}
                     Make a New Application
@@ -394,6 +404,25 @@ export default function ApplicationFormPage() {
     };
 
     const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+    const [isPrinting, setIsPrinting] = useState(false);
+
+    const handlePrint = async () => {
+        if (!session?.user?.email) return;
+        setIsPrinting(true);
+        try {
+            const res = await fetch(`/api/my-application?email=${encodeURIComponent(session.user.email)}`);
+            const json = await res.json();
+            if (json.application) {
+                openPrintPreview(json.application);
+            } else {
+                await showAlert("Could not load application data for printing.", "Error");
+            }
+        } catch {
+            await showAlert("Failed to load application for printing.", "Error");
+        } finally {
+            setIsPrinting(false);
+        }
+    };
 
     const startEditApplication = async () => {
         if (!session?.user?.email) return;
@@ -781,7 +810,7 @@ export default function ApplicationFormPage() {
                 return (<FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} />);
             // ✅ 9. Pass the new reset handler to the SuccessScreen
             case 9:
-                return <SuccessScreen onEdit={startNewApplication} onGoToPortfolio={() => router.push('/portform')} isDeleting={isDeletingApp} />;
+                return <SuccessScreen onEdit={startNewApplication} onGoToPortfolio={() => router.push('/portform')} onPrint={handlePrint} isPrinting={isPrinting} isDeleting={isDeletingApp} />;
             default:
                 return <div>Form complete or invalid step.</div>;
         }
@@ -820,9 +849,18 @@ export default function ApplicationFormPage() {
                         </Link>
                         <button
                             type="button"
+                            onClick={handlePrint}
+                            disabled={isPrinting}
+                            className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isPrinting ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                            Print Application Form
+                        </button>
+                        <button
+                            type="button"
                             onClick={startNewApplication}
                             disabled={isDeletingApp}
-                            className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isDeletingApp && <Loader2 size={16} className="animate-spin" />}
                             Make a New Application
