@@ -63,9 +63,9 @@ export function generatePrintHTML(data: any): string {
 <html>
 <head>
   <meta charset="UTF-8"/>
-  <title>TIP-ACAD-E-001 â€” ${data.applicant_name || "Applicant"}</title>
+  <title></title>
   <style>
-    @page { size: A4; margin: 12mm 14mm 12mm 14mm; }
+    @page { size: A4; margin: 12mm 14mm 12mm 14mm; marks: none; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 9pt; line-height: 1.3; }
     @media print { body { padding: 0; } .no-print { display: none; } }
@@ -76,7 +76,7 @@ export function generatePrintHTML(data: any): string {
 <!-- PAGE HEADER -->
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
   <div style="display:flex;gap:8px;align-items:center;">
-    <img src="/assets/TIPLogo.png" alt="TIP" style="width:50px;height:50px;object-fit:contain;" onerror="this.style.display='none'" />
+    <img src="/assets/NewTIPLogo.png" alt="TIP" style="width:50px;height:50px;object-fit:contain;" onerror="this.style.display='none'" />
     <div style="font-size:10pt;font-weight:bold;line-height:1.3;">TECHNOLOGICAL<br/>INSTITUTE OF THE<br/>PHILIPPINES</div>
   </div>
   <div style="text-align:right;font-size:7pt;font-weight:bold;letter-spacing:1.5px;">
@@ -413,9 +413,9 @@ function _portfolioHTML(submission: any, appData: any): string {
       .join("");
 
   // credential files from application (C-I) — grouped by section
-  const edu  = appData?.education_background || {};
-  const work = appData?.work_experiences     || {};
-  const pd   = appData?.professional_development || {};
+  const edu = appData?.education_background || {};
+  const work = appData?.work_experiences || {};
+  const pd = appData?.professional_development || {};
 
   const item = (label: string) => `<div style="font-size:7.5pt;margin-bottom:2px;padding-left:8px;">&#128206; ${label}</div>`;
   const grpHdr = (title: string) => `<div style="font-size:7pt;font-weight:bold;text-transform:uppercase;margin:5px 0 2px;letter-spacing:0.5px;">${title}</div>`;
@@ -424,38 +424,38 @@ function _portfolioHTML(submission: any, appData: any): string {
     entries.length ? grpHdr(title) + entries.map(item).join("") : "";
 
   const eduEntries = [
-    ...(edu.tertiary      || []).filter((e: any) => e.fileUrl).map((e: any) => `Tertiary: ${e.schoolName}${e.degreeProgram ? ` \u2014 ${e.degreeProgram}` : ""}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
-    ...(edu.secondary     || []).filter((e: any) => e.fileUrl).map((e: any) => `Secondary: ${e.schoolName}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
-    ...(edu.elementary    || []).filter((e: any) => e.fileUrl).map((e: any) => `Elementary: ${e.schoolName}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
-    ...(edu.technical     || []).filter((e: any) => e.fileUrl).map((e: any) => `Technical: ${e.schoolName}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
+    ...(edu.tertiary || []).filter((e: any) => e.fileUrl).map((e: any) => `Tertiary: ${e.schoolName}${e.degreeProgram ? ` \u2014 ${e.degreeProgram}` : ""}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
+    ...(edu.secondary || []).filter((e: any) => e.fileUrl).map((e: any) => `Secondary: ${e.schoolName}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
+    ...(edu.elementary || []).filter((e: any) => e.fileUrl).map((e: any) => `Elementary: ${e.schoolName}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
+    ...(edu.technical || []).filter((e: any) => e.fileUrl).map((e: any) => `Technical: ${e.schoolName}${e.yearGraduated ? ` (${e.yearGraduated})` : ""}`),
     ...(appData?.non_formal_education || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
   ];
-  const certEntries   = (appData?.certifications || []).filter((e: any) => e.fileUrl).map((e: any) => e.title);
+  const certEntries = (appData?.certifications || []).filter((e: any) => e.fileUrl).map((e: any) => e.title);
   const pubInvEntries = [
     ...(appData?.publications || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
-    ...(appData?.inventions   || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
+    ...(appData?.inventions || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
   ];
   const workEntries = [
-    ...(work.employment     || []).filter((e: any) => e.fileUrl).map((e: any) => `${e.company}${e.designation ? ` \u2014 ${e.designation}` : ""}`),
-    ...(work.consultancy    || []).filter((e: any) => e.fileUrl).map((e: any) => e.consultancy),
+    ...(work.employment || []).filter((e: any) => e.fileUrl).map((e: any) => `${e.company}${e.designation ? ` \u2014 ${e.designation}` : ""}`),
+    ...(work.consultancy || []).filter((e: any) => e.fileUrl).map((e: any) => e.consultancy),
     ...(work.selfEmployment || []).filter((e: any) => e.fileUrl).map((e: any) => `${e.company}${e.designation ? ` \u2014 ${e.designation}` : ""}`),
   ];
   const recEntries = (appData?.recognitions || []).filter((e: any) => e.fileUrl).map((e: any) => e.title);
-  const pdEntries  = [
+  const pdEntries = [
     ...(pd.memberships || []).filter((e: any) => e.fileUrl).map((e: any) => e.organization),
-    ...(pd.projects    || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
-    ...(pd.research    || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
+    ...(pd.projects || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
+    ...(pd.research || []).filter((e: any) => e.fileUrl).map((e: any) => e.title),
   ];
   const cwEntries = (appData?.creative_works || []).filter((e: any) => e.fileUrl).map((e: any) => e.title);
 
   const credHTML = [
     makeGroup("C. Educational Background", eduEntries),
-    makeGroup("D. Certifications",         certEntries),
+    makeGroup("D. Certifications", certEntries),
     makeGroup("E. Publications & Inventions", pubInvEntries),
-    makeGroup("F. Work Experience",        workEntries),
-    makeGroup("G. Recognitions",           recEntries),
+    makeGroup("F. Work Experience", workEntries),
+    makeGroup("G. Recognitions", recEntries),
     makeGroup("H. Professional Development", pdEntries),
-    makeGroup("I. Creative Works",         cwEntries),
+    makeGroup("I. Creative Works", cwEntries),
   ].filter(Boolean).join("");
 
   const row1links = credHTML + links("eteeapForm");
@@ -472,9 +472,9 @@ function _portfolioHTML(submission: any, appData: any): string {
 
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"/>
-<title>TIP-ACAD-E-002 \u2014 ${name}</title>
+<title></title>
 <style>
-  @page{size:A4;margin:12mm 14mm 12mm 14mm;}
+  @page{size:A4;margin:12mm 14mm 12mm 14mm;marks:none;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:Arial,Helvetica,sans-serif;color:#000;font-size:9pt;line-height:1.3;}
   @media print{body{padding:0;}.no-print{display:none;}}
@@ -483,7 +483,7 @@ function _portfolioHTML(submission: any, appData: any): string {
 <!-- PAGE HEADER -->
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
   <div style="display:flex;gap:8px;align-items:center;">
-    <img src="/assets/TIPLogo.png" alt="TIP" style="width:50px;height:50px;object-fit:contain;" onerror="this.style.display='none'"/>
+    <img src="/assets/NewTIPLogo.png" alt="TIP" style="width:50px;height:50px;object-fit:contain;" onerror="this.style.display='none'"/>
     <div style="font-size:10pt;font-weight:bold;line-height:1.3;">TECHNOLOGICAL<br/>INSTITUTE OF THE<br/>PHILIPPINES</div>
   </div>
   <div style="text-align:right;font-size:7pt;font-weight:bold;letter-spacing:1.5px;">
@@ -557,9 +557,10 @@ ${uRow("Degree Program intended to enroll", degree)}
     </div>
   </div>
   <div style="width:120px;">
-    <div style="height:44px;"></div>
-    <div style="border-top:1.5px solid #000;padding-top:3px;">
+    <div style="height:44px;display:flex;align-items:flex-end;justify-content:center;">
       <div style="font-size:8pt;text-align:center;">${appDate}</div>
+    </div>
+    <div style="border-top:1.5px solid #000;padding-top:3px;">
       <div style="font-size:7pt;text-align:center;">Date</div>
     </div>
   </div>

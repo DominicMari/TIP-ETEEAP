@@ -10,6 +10,7 @@ import DataPrivacyConsent from "./undertaking";
 import FileUploader from "./FileUploader";
 import Modal from "@/components/ui/Modal";
 import { useModal } from "@/components/ui/useModal";
+import { openPortfolioPrintPreview } from "@/components/admin/printTemplate";
 
 // --- FormField Helper ---
 const FormField = ({ icon, children, className }: { icon: React.ReactNode; children: React.ReactNode; className?: string }) => (
@@ -142,6 +143,7 @@ export default function ApplicationForm() {
   const signaturePadRef = useRef<SignaturePadHandles>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submittedData, setSubmittedData] = useState<{ submission: any; appData: any } | null>(null);
   const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
   const [userLoading, setUserLoading] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -326,6 +328,20 @@ export default function ApplicationForm() {
       if (!upsertRes.ok) {
         throw new Error(upsertJson.error || "Failed to save submission");
       }
+      // Store submitted data for print/edit on success screen
+      setSubmittedData({
+        submission: {
+          user_id: supabaseUserId,
+          full_name: formData.name,
+          degree_program: formData.degree,
+          campus: formData.campus,
+          photo_url: photoUrl,
+          signature: signature,
+          portfolio_files: portfolioFileUrls,
+          status: "Submitted",
+        },
+        appData,
+      });
       setSubmitSuccess(true);
     } catch (error) {
       const errMsg = (error as Error).message;
@@ -364,10 +380,26 @@ export default function ApplicationForm() {
   if (submitSuccess) {
     return (
       <div className="min-h-screen bg-gray-100 flex justify-center items-center p-4">
-        <div className="bg-white p-10 rounded-2xl shadow-2xl text-center flex flex-col items-center">
-          <h2 className="text-3xl font-bold text-green-600 mb-4">Submission Successful! 🎉</h2>
-          <p className="text-gray-700 mb-8">Thank you for submitting your ETEEAP portfolio. We will review it shortly.</p>
-          <Link href="/" className="px-6 py-3 bg-yellow-500 text-gray-900 font-bold rounded-lg hover:bg-yellow-400 transition-colors">Back to the Home Page</Link>
+        <div className="bg-white p-10 rounded-2xl shadow-2xl text-center flex flex-col items-center gap-4">
+          <h2 className="text-3xl font-bold text-green-600 mb-2">Submission Successful! 🎉</h2>
+          <p className="text-gray-700">Thank you for submitting your ETEEAP portfolio. We will review it shortly.</p>
+          <div className="flex flex-wrap gap-3 justify-center mt-4">
+            <button
+              onClick={() => setSubmitSuccess(false)}
+              className="px-6 py-3 bg-slate-700 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              Edit Portfolio
+            </button>
+            <button
+              onClick={() => submittedData && openPortfolioPrintPreview(submittedData.submission, submittedData.appData)}
+              className="px-6 py-3 bg-yellow-500 text-gray-900 font-bold rounded-lg hover:bg-yellow-400 transition-colors"
+            >
+              Print Portfolio
+            </button>
+            <Link href="/" className="px-6 py-3 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition-colors">
+              Back to Home Page
+            </Link>
+          </div>
         </div>
       </div>
     );
