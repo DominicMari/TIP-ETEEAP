@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Plus, Minus, Lightbulb, Sparkles, AlertCircle } from "lucide-react";
+import { Plus, Minus, Lightbulb, Sparkles, AlertCircle, Loader2 } from "lucide-react";
 import { getRecommendedDegree, getInputGuidance } from "@/utils/recommendationEngine";
 
 export default function PrioritiesGoalsForm({
@@ -22,6 +22,7 @@ export default function PrioritiesGoalsForm({
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [guidance, setGuidance] = useState<{ message: string; suggestions: string[] } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [statementError, setStatementError] = useState(false);
   const [planError,       setPlanError]       = useState(false);
   const [overseasError,   setOverseasError]   = useState(false);
@@ -43,9 +44,15 @@ export default function PrioritiesGoalsForm({
     setStatementError(false);
     const check = getInputGuidance(textToAnalyze);
     setGuidance(!check.isReady ? { message: check.message, suggestions: check.suggestions } : null);
-    const results = getRecommendedDegree("Student", textToAnalyze, textToAnalyze);
-    setRecommendations(results);
-    setShowRecommendations(true);
+    
+    // Set loading state and add 3-5 second delay before showing results
+    setIsLoading(true);
+    setTimeout(() => {
+      const results = getRecommendedDegree("Student", textToAnalyze, textToAnalyze);
+      setRecommendations(results);
+      setShowRecommendations(true);
+      setIsLoading(false);
+    }, 3000);
   };
   // recommendation logic end
 
@@ -226,10 +233,15 @@ const handleAddDegree = () => {
                 <button
                     type="button"
                     onClick={handleGetRecommendation}
-                    className="whitespace-nowrap px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center gap-2"
+                    disabled={isLoading}
+                    className="whitespace-nowrap px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-400 text-white text-sm font-bold rounded-lg shadow-md transition-all flex items-center gap-2"
                 >
-                    <Lightbulb size={16} />
-                    Analyze My Goals
+                    {isLoading ? (
+                        <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                        <Lightbulb size={16} />
+                    )}
+                    {isLoading ? "Analyzing..." : "Analyze My Goals"}
                 </button>
             </div>
 
