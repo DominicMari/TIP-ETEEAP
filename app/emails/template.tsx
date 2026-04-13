@@ -15,17 +15,7 @@ import {
 } from "@react-email/components";
 import * as React from "react";
 
-// 2. Fallback URL is now a full, secure URL
-const baseUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : 'https://tip-eteeap.vercel.app'; 
-
-
 const logoUrl = `https://zwqrpmnpboyvvniboqrh.supabase.co/storage/v1/object/public/Assets/images/NewTIPLogo.png`;
-const fbUrl = `https://zwqrpmnpboyvvniboqrh.supabase.co/storage/v1/object/public/Assets/images/FB.png`;
-const xUrl = `https://zwqrpmnpboyvvniboqrh.supabase.co/storage/v1/object/public/Assets/images/x.png`;
-const igUrl = `https://zwqrpmnpboyvvniboqrh.supabase.co/storage/v1/object/public/Assets/images/IG.png`;
-
 interface EmailTemplateProps {
   subject: string;
   body: string; // This will be HTML
@@ -36,196 +26,257 @@ export const EmailTemplate = ({ subject, body }: EmailTemplateProps) => (
     <Head />
     <Preview>{subject}</Preview>
     <Body style={main}>
-      <Container style={container}>
-        <Section style={accentBar}>
-          <Row>
-            <Column style={{ width: '24px' }}>
-              <div style={accentDot}></div>
-            </Column>
-            <Column>
-              <Text style={eyebrow}>Official T.I.P. Communication</Text>
-            </Column>
-          </Row>
+      <Container style={shell}>
+        <Section style={brandTopBar}>
+          <Text style={brandTopBarText}>ETEEAP Department</Text>
         </Section>
 
-        {/* Header */}
-        <Section style={header}>
-          <Row>
-            <Column style={{ width: '80px', verticalAlign: 'middle' }}>
-              <Img
-                src={logoUrl}
-                width="80"
-                height="80"
-                alt="TIP Logo"
-                style={{ display: 'block', outline: 'none', border: 'none', textDecoration: 'none' }}
-              />
-            </Column>
-            <Column style={{ verticalAlign: 'middle', paddingLeft: '12px' }}>
-              <Text style={tipHeaderText}>TECHNOLOGICAL INSTITUTE OF THE PHILIPPINES</Text>
-            </Column>
-          </Row>
-        </Section>
+        <Section style={card}>
+          <Section style={headerSection}>
+            <Img
+              src={logoUrl}
+              width="100"
+              height="72"
+              alt="TIP Logo"
+              style={logo}
+            />
+            <Text style={tipHeaderText}>TECHNOLOGICAL INSTITUTE OF THE PHILIPPINES</Text>
+            <Text style={subHeaderText}>Expanded Tertiary Education Equivalency and Accreditation Program</Text>
+          </Section>
 
-        {/* Subject */}
-        <Heading style={h1}>{subject}</Heading>
+          <Hr style={hr} />
 
-        {/* Body */}
-        <Section style={bodySection}>
-          <Text style={lead}>Hello,</Text>
-          <Text style={text} dangerouslySetInnerHTML={{ __html: body }}></Text>
-        </Section>
-
-        {/* Footer */}
-        <Hr style={hr} />
-        <Section style={footer}>
-          <Row style={socialsRow}>
-            <Column align="center" style={socialCol}>
-              <Link href="https://www.facebook.com/TIP1962official">
-                <Img src={fbUrl} width="28" height="28" alt="Facebook" style={{ display: 'block', outline: 'none', border: 'none', textDecoration: 'none' }} />
-              </Link>
-            </Column>
-            <Column align="center" style={socialCol}>
-              <Link href="https://twitter.com/TIP1962official">
-                <Img src={xUrl} width="28" height="28" alt="Twitter" style={{ display: 'block', outline: 'none', border: 'none', textDecoration: 'none' }} />
-              </Link>
-            </Column>
-            <Column align="center" style={socialCol}>
-              <Link href="https://www.instagram.com/tip1962official/">
-                <Img src={igUrl} width="28" height="28" alt="Instagram" style={{ display: 'block', outline: 'none', border: 'none', textDecoration: 'none' }} />
-              </Link>
-            </Column>
-          </Row>
-          <Text style={footerText}>
-            Technological Institute of the Philippines
-            <br />
-            363 P. Casal St., Quiapo, Manila
-            <br />
-            31338 Arlegui St., Quiapo, Manila
-            <br />
-            Tel. No: (02) 8733-9117 / (02) 7918-8476 / 0917-177-2566 
-            <br />
-            938 Aurora Blvd, Cubao, Quezon City, Metro Manila
-            <br />
-            Tel. No: (02) 8723-1131 / (02) 8723-1132 / 0917-177-2572
-          </Text>
+          <Section style={footer}>
+            <Text style={footerTitle}>Technological Institute of the Philippines</Text>
+            <Text style={footerText}>
+              363 P. Casal St., Quiapo, Manila | 3138 Arlegui St., Quiapo, Manila
+              <br />
+              Tel. No: (02) 8733-9117 / (02) 7918-8476 / 0917-177-2566
+              <br />
+              938 Aurora Blvd, Cubao, Quezon City, Metro Manila
+              <br />
+              Tel. No: (02) 8723-1131 / (02) 8723-1132 / 0917-177-2572
+            </Text>
+          </Section>
         </Section>
       </Container>
     </Body>
   </Html>
 );
 
-// --- 8. All-New, Cleaner Styles ---
+export default EmailTemplate;
 
-const FONT_FAMILY =
-  "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif";
+const CONTENT_FONT =
+  "Gotham, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+
+const HEADER_FONT = "Arial, Helvetica, sans-serif";
 
 const main = {
-  backgroundColor: "#f6f7fb",
-  fontFamily: FONT_FAMILY,
-  padding: "0 12px",
-};
-
-const container = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #f4c300",
-  borderRadius: "14px",
-  boxShadow: "0 15px 40px rgba(0,0,0,0.06)",
-  margin: "36px auto",
-  padding: "28px 26px 32px",
-  width: "100%",
-  maxWidth: "600px",
-};
-
-const accentBar = {
-  marginBottom: "12px",
-};
-
-const accentDot = {
-  width: "10px",
-  height: "10px",
-  borderRadius: "999px",
-  backgroundColor: "#f4c300",
-  marginTop: "6px",
-};
-
-const eyebrow = {
-  fontSize: "11px",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase" as const,
-  color: "#6b7280",
+  backgroundColor: "#f4f6fb",
+  fontFamily: CONTENT_FONT,
   margin: "0",
+  padding: "26px 12px",
 };
 
-const header = {
-  padding: "8px 0 20px",
+const shell = {
+  margin: "0 auto",
+  maxWidth: "620px",
+  width: "100%",
+};
+
+const brandTopBar = {
+  backgroundColor: "#111827",
+  borderRadius: "12px 12px 0 0",
+  padding: "10px 20px",
+};
+
+const brandTopBarText = {
+  color: "#f4c300",
+  fontFamily: CONTENT_FONT,
+  fontSize: "11px",
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  margin: "0",
+  textTransform: "uppercase" as const,
+};
+
+const card = {
+  backgroundColor: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: "0 0 12px 12px",
+  boxShadow: "0 16px 45px rgba(15, 23, 42, 0.08)",
+  padding: "30px 26px 28px",
+  width: "100%",
+};
+
+const headerSection = {
+  paddingBottom: "20px",
+  textAlign: "center" as const,
+};
+
+const logo = {
+  display: "block",
+  margin: "0 auto 12px",
+  outline: "none",
+  border: "none",
+  textDecoration: "none",
+};
+
+const tipHeaderText = {
+  color: "#0f172a",
+  fontFamily: HEADER_FONT,
+  fontSize: "18px",
+  fontWeight: 700,
+  letterSpacing: "0.02em",
+  lineHeight: "1.35",
+  margin: "0",
+  textTransform: "uppercase" as const,
+};
+
+const subHeaderText = {
+  color: "#475569",
+  fontFamily: CONTENT_FONT,
+  fontSize: "12px",
+  lineHeight: "18px",
+  margin: "8px 0 0",
+};
+
+const subjectSection = {
+  backgroundColor: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: "10px",
+  marginBottom: "14px",
+  padding: "16px 16px 14px",
+};
+
+const subjectLabel = {
+  color: "#b08900",
+  fontFamily: CONTENT_FONT,
+  fontSize: "11px",
+  fontWeight: 700,
+  letterSpacing: "0.06em",
+  margin: "0 0 6px",
+  textTransform: "uppercase" as const,
 };
 
 const h1 = {
-  color: "#141414",
-  fontFamily: FONT_FAMILY,
+  color: "#0f172a",
+  fontFamily: CONTENT_FONT,
   fontSize: "24px",
   fontWeight: 700,
-  margin: "0 0 18px",
-  padding: "0",
+  letterSpacing: "-0.01em",
   lineHeight: "1.3",
+  margin: "0",
+};
+
+const metaStrip = {
+  backgroundColor: "#fffbea",
+  border: "1px solid #f3e8b3",
+  borderRadius: "10px",
+  marginBottom: "18px",
+  padding: "10px 12px",
+};
+
+const metaCol = {
+  verticalAlign: "top",
+};
+
+const metaDividerCol = {
+  width: "14px",
+};
+
+const verticalDivider = {
+  backgroundColor: "#f4c300",
+  borderRadius: "99px",
+  height: "28px",
+  margin: "0 auto",
+  width: "2px",
+};
+
+const metaTitle = {
+  color: "#6b7280",
+  fontFamily: CONTENT_FONT,
+  fontSize: "10px",
+  letterSpacing: "0.05em",
+  margin: "0 0 2px",
+  textAlign: "center" as const,
+  textTransform: "uppercase" as const,
+};
+
+const metaValue = {
+  color: "#111827",
+  fontFamily: CONTENT_FONT,
+  fontSize: "12px",
+  fontWeight: 700,
+  margin: "0",
+  textAlign: "center" as const,
 };
 
 const bodySection = {
-  padding: "0 6px",
+  borderLeft: "3px solid #f4c300",
+  padding: "4px 0 4px 14px",
 };
 
 const lead = {
-  color: "#1f2937",
+  color: "#0f172a",
+  fontFamily: CONTENT_FONT,
   fontSize: "16px",
+  fontWeight: 600,
   lineHeight: "24px",
-  margin: "0 0 10px",
+  margin: "0 0 8px",
+};
+
+const bodyDivider = {
+  borderColor: "#e2e8f0",
+  margin: "0 0 12px",
 };
 
 const text = {
-  color: "#1f2937",
-  fontFamily: FONT_FAMILY,
+  color: "#1e293b",
+  fontFamily: CONTENT_FONT,
   fontSize: "15px",
   lineHeight: "24px",
   margin: "0",
 };
 
-const tipHeaderText = {
-  fontFamily: FONT_FAMILY,
-  fontSize: "16px",
-  fontWeight: 700,
-  color: "#0f172a",
-  margin: "0 0 4px",
-};
-
-const subHeaderText = {
-  fontFamily: FONT_FAMILY,
-  fontSize: "13px",
-  color: "#4b5563",
-  margin: "0",
-};
-
 const hr = {
-  borderColor: "#e5e7eb",
-  margin: "28px 0 18px",
+  borderColor: "#e2e8f0",
+  margin: "24px 0 14px",
 };
 
 const footer = {
-  paddingTop: "4px",
+  textAlign: "center" as const,
 };
 
 const socialsRow = {
-  paddingBottom: "14px",
+  margin: "0 auto 12px",
+  width: "160px",
 };
 
 const socialCol = {
-  padding: "0 6px",
+  padding: "0 4px",
+};
+
+const socialIcon = {
+  display: "block",
+  outline: "none",
+  border: "none",
+  textDecoration: "none",
+};
+
+const footerTitle = {
+  color: "#0f172a",
+  fontFamily: HEADER_FONT,
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "0 0 6px",
 };
 
 const footerText = {
-  color: "#6b7280",
-  fontFamily: FONT_FAMILY,
+  color: "#64748b",
+  fontFamily: CONTENT_FONT,
   fontSize: "12px",
   textAlign: "center" as const,
-  lineHeight: "18px",
+  lineHeight: "19px",
   margin: "0",
 };

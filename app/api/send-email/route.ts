@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { Resend } from 'resend';
-import { EmailTemplate } from '@/app/emails/template';
+import React from 'react';
+import EmailTemplate from '@/app/emails/template';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM_EMAIL = 'admin@tipeteeap.online';
+const FROM_EMAIL = 'eteeapadmin@tipeteeap.online';
 
 export async function POST(req: NextRequest) {
   const cookieStore = await cookies();
@@ -21,10 +22,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: `TIP Tech Support <${FROM_EMAIL}>`,
+      from: `ETEEAP Department <${FROM_EMAIL}>`,
       to: [recipient],
       subject: subject.trim(),
-      react: EmailTemplate({ subject: subject.trim(), body }),
+      react: React.createElement(EmailTemplate, {
+        subject: subject.trim(),
+        body,
+      }),
     });
 
     if (error) {
