@@ -585,7 +585,7 @@ export default function ApplicationFormPage() {
 
             if (photoFile) {
                 const photoPath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
-                const { error: photoUploadError } = await supabase.storage.from('application_files').upload(photoPath, photoFile);
+                const { error: photoUploadError } = await supabase.storage.from('application_files').upload(photoPath, photoFile, { contentType: photoFile.type || 'image/jpeg' });
                 if (photoUploadError) throw new Error(`Photo upload failed: ${photoUploadError.message}`);
                 const { data: photoUrlData } = supabase.storage.from('application_files').getPublicUrl(photoPath);
                 photoUrlStr = photoUrlData.publicUrl;
@@ -595,8 +595,9 @@ export default function ApplicationFormPage() {
 
             // 3. Upload Signature
             const sigBlob = await (await fetch(signatureDataUrl)).blob();
+            const sigFile = new File([sigBlob], `signature_${Date.now()}.png`, { type: 'image/png' });
             const sigPath = `${supabaseUserId}/signature_${Date.now()}.png`;
-            const { error: sigUploadError } = await supabase.storage.from('application_files').upload(sigPath, sigBlob);
+            const { error: sigUploadError } = await supabase.storage.from('application_files').upload(sigPath, sigFile, { contentType: 'image/png' });
             if (sigUploadError) throw new Error(`Signature upload failed: ${sigUploadError.message}`);
             const { data: sigUrlData } = supabase.storage.from('application_files').getPublicUrl(sigPath);
             const sigUrlStr = sigUrlData.publicUrl;
@@ -607,7 +608,7 @@ export default function ApplicationFormPage() {
                 const updated = await Promise.all(entries.map(async (entry) => {
                     if (!entry.fileObject) return entry;
                     const filePath = `${supabaseUserId}/credentials/${section}_${Date.now()}_${entry.fileObject.name}`;
-                    const { error } = await supabase.storage.from('application_files').upload(filePath, entry.fileObject);
+                    const { error } = await supabase.storage.from('application_files').upload(filePath, entry.fileObject, { contentType: entry.fileObject.type || 'application/octet-stream' });
                     if (error) { console.warn(`Credential file upload failed (${section}):`, error.message); return entry; }
                     const { data: urlData } = supabase.storage.from('application_files').getPublicUrl(filePath);
                     const { fileObject: _removed, ...rest } = entry;
@@ -671,7 +672,7 @@ export default function ApplicationFormPage() {
                         const filePath = `${supabaseUserId}/portfolio/${Date.now()}_${file.name}`;
                         const { error: uploadErr } = await supabase.storage
                             .from('portfolio_files')
-                            .upload(filePath, file);
+                            .upload(filePath, file, { contentType: file.type || 'application/octet-stream' });
 
                         if (uploadErr) {
                             console.error(`Error uploading:`, uploadErr);

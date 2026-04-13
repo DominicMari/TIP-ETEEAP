@@ -81,6 +81,18 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
+        // Insert edit notification (non-blocking)
+        try {
+            await supabase.from("notifications").insert({
+                type: "application_edited",
+                applicant_name: payload.applicant_name ?? null,
+                application_id: null,
+                is_read: false,
+            });
+        } catch (notifErr) {
+            console.error("Failed to insert edit notification:", notifErr);
+        }
+
         return NextResponse.json({ success: true });
     } catch (err: any) {
         return NextResponse.json({ error: err.message || "Unexpected error" }, { status: 500 });

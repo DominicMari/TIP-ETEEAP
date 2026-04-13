@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import Modal from "@/components/ui/Modal";
 import { useModal } from "@/components/ui/useModal";
+import { getRemarksTemplate } from '@/lib/utils/remarksTemplates';
+import { sendStatusEmail } from '@/lib/utils/statusEmail';
 
 interface DegreePriority {
   priority: string;
@@ -220,81 +222,6 @@ const getCompletionPercentage = (app: Applicant): number => {
   if (hasMeaningfulValue(parseField(app.goal_statement)) || hasMeaningfulValue(parseField(app.self_assessment))) completedSteps++;
 
   return (completedSteps / 8) * 100;
-};
-
-// Get suggested remarks templates
-const getRemarksTemplate = (status: string): string => {
-  const templates: Record<string, string> = {
-    Submitted: 'Thank you for starting your application. Please complete all required sections to proceed with the review process.',
-    Pending: 'Your application is currently under review. Our team will carefully assess your qualifications and experience. You will be notified once a decision has been made.',
-    'Competency Process': 'Your application review is complete and you are now proceeding to the Competency Process. Please wait for further instructions from the admissions team.',
-    Enrolled: 'Congratulations! You are now marked as Enrolled. Please check your email for your enrollment instructions and schedule.',
-    Graduated: 'Congratulations! Your status is now marked as Graduated. We are proud of your achievement.'
-  };
-  return templates[status] || '';
-};
-
-// Send status notification email
-const sendStatusEmail = async (
-  applicantEmail: string | null,
-  applicantName: string | null,
-  status: string,
-  remarks: string | null
-): Promise<void> => {
-  if (!applicantEmail) {
-    console.warn('No email address available for applicant');
-    return;
-  }
-
-  const emailTemplates: Record<string, { subject: string; body: string }> = {
-    Submitted: {
-      subject: 'Application Received - TIP ETEEAP',
-      body: `Dear ${applicantName || 'Applicant'},\n\nThank you for submitting your application to the TIP ETEEAP program. We have received your application and it is now in our system.\n\nPlease continue to complete any remaining sections of your application. Our team will begin reviewing your submission shortly.\n\nBest regards,\nTIP ETEEAP Team`
-    },
-    Pending: {
-      subject: 'Application Under Review - TIP ETEEAP',
-      body: `Dear ${applicantName || 'Applicant'},\n\nYour application is now under review. Our assessment team is carefully evaluating your qualifications, experience, and fit for the program.\n\nYou will be notified of the decision as soon as the review process is complete.\n\nThank you for your patience.\n\nBest regards,\nTIP ETEEAP Team`
-    },
-    'Competency Process': {
-      subject: 'Proceed to Competency Process - TIP ETEEAP',
-      body: `Dear ${applicantName || 'Applicant'},\n\nYour application review has been completed and you are now endorsed to proceed to the Competency Process.\n\nPlease wait for the next instructions from the TIP ETEEAP team regarding schedules and requirements.\n\nBest regards,\nTIP ETEEAP Team`
-    },
-    Enrolled: {
-      subject: 'Enrollment Status Update - TIP ETEEAP',
-      body: `Dear ${applicantName || 'Applicant'},\n\nCongratulations! Your status has been updated to Enrolled.\n\nPlease review your email and follow the enrollment instructions sent by the TIP ETEEAP team.\n\nBest regards,\nTIP ETEEAP Team`
-    },
-    Graduated: {
-      subject: 'Graduation Status Update - TIP ETEEAP',
-      body: `Dear ${applicantName || 'Applicant'},\n\nCongratulations! Your status has been updated to Graduated.\n\nWe commend your accomplishment and wish you continued success.\n\nBest regards,\nTIP ETEEAP Team`
-    }
-  };
-
-  const emailTemplate = emailTemplates[status];
-  if (!emailTemplate) {
-    console.warn(`No email template found for status: ${status}`);
-    return;
-  }
-
-  try {
-    const response = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        recipient: applicantEmail,
-        subject: emailTemplate.subject,
-        body: remarks ? `${emailTemplate.body}\n\n---\nAdmin Comments:\n${remarks}` : emailTemplate.body
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('Failed to send email:', error.error);
-    }
-  } catch (error) {
-    console.error('Error sending email:', error);
-  }
 };
 
 const STATUS_OPTIONS = ['All', 'Submitted', 'Pending', 'Competency Process', 'Enrolled', 'Graduated'];

@@ -128,6 +128,19 @@ export async function PATCH(request: Request) {
             console.log("[PATCH] update result:", JSON.stringify(updateData), "error:", updateError?.message);
 
             if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+
+            // Insert notification (non-blocking)
+            try {
+                await supabase.from('notifications').insert({
+                    type: 'portfolio_edited',
+                    applicant_name: full_name ?? null,
+                    application_id: null,
+                    is_read: false,
+                });
+            } catch (notifErr) {
+                console.error('Failed to insert portfolio edit notification:', notifErr);
+            }
+
             return NextResponse.json({ success: true, action: "updated", id: existing.id, fileCount: merged.length });
         } else {
             // No existing row — insert fresh
@@ -149,6 +162,19 @@ export async function PATCH(request: Request) {
             console.log("[PATCH] insert result:", JSON.stringify(insertData), "error:", insertError?.message);
 
             if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+
+            // Insert notification (non-blocking)
+            try {
+                await supabase.from('notifications').insert({
+                    type: 'new_portfolio',
+                    applicant_name: full_name ?? null,
+                    application_id: null,
+                    is_read: false,
+                });
+            } catch (notifErr) {
+                console.error('Failed to insert portfolio notification:', notifErr);
+            }
+
             return NextResponse.json({ success: true, action: "inserted", fileCount: (portfolio_files ?? []).length });
         }
     } catch (err: any) {

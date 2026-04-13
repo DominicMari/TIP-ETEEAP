@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import supabase from "@/lib/supabase/client";
 import {
   CheckCircle2,
   Clock,
@@ -322,15 +323,10 @@ export default function ApplicationTrackerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasFetched, setHasFetched] = useState(false);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    if (authStatus === "authenticated" && session?.user?.email && !hasFetched) {
-      fetchApplications(session.user.email);
-    }
-  }, [authStatus, session, hasFetched]);
-
-  const fetchApplications = async (email: string) => {
-    setLoading(true);
+  const fetchApplications = async (email: string, isInitial = false) => {
+    if (isInitial) setLoading(true);
     setError(null);
     try {
       const response = await fetch(`/api/applicants?email=${encodeURIComponent(email)}`);
@@ -346,9 +342,89 @@ export default function ApplicationTrackerPage() {
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
+
+  // Set up Supabase Realtime subscription with polling fallback
+  useEffect(() => {
+    if (authStatus !== "authenticated" || !session?.user?.email) return;
+
+    const email = session.user.email;
+
+    // Initial fetch
+    fetchApplications(email, true);
+
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let realtimeConnected = false;
+
+    // Attempt Supabase Realtime subscription
+    try {
+      channel = supabase
+        .channel("tracker-applications")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "applications",
+            filter: `email_address=eq.${email}`,
+          },
+          () => {
+            fetchApplications(email);
+          }
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            realtimeConnected = true;
+            // Clear polling if Realtime connected successfully
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+          } else if (
+            status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT" ||
+            status === "CLOSED"
+          ) {
+            // Realtime unavailable — fall back to polling
+            if (!realtimeConnected && !pollingIntervalRef.current) {
+              pollingIntervalRef.current = setInterval(() => {
+                fetchApplications(email);
+              }, 30_000);
+            }
+          }
+        });
+    } catch {
+      // Realtime setup failed — fall back to polling
+      if (!pollingIntervalRef.current) {
+        pollingIntervalRef.current = setInterval(() => {
+          fetchApplications(email);
+        }, 30_000);
+      }
+    }
+
+    // Start polling as a safety net; cancel it once Realtime confirms SUBSCRIBED
+    const safetyPollTimeout = setTimeout(() => {
+      if (!realtimeConnected && !pollingIntervalRef.current) {
+        pollingIntervalRef.current = setInterval(() => {
+          fetchApplications(email);
+        }, 30_000);
+      }
+    }, 5_000);
+
+    return () => {
+      clearTimeout(safetyPollTimeout);
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, session?.user?.email]);
 
   // Not authenticated
   if (authStatus === "loading") {
@@ -437,7 +513,7 @@ export default function ApplicationTrackerPage() {
           </div>
         )}
 
-        {!loading && !error && applications.length === 0 && (
+        {!loading && !error && applications.length === 0 && hasFetched && (
           <div className="text-center py-20">
             <div className="w-20 h-20 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <FileText className="w-10 h-10 text-gray-500" />
@@ -446,8 +522,7 @@ export default function ApplicationTrackerPage() {
               No Applications Found
             </h2>
             <p className="text-gray-500 mb-6 max-w-md mx-auto">
-              We couldn&apos;t find any applications associated with your
-              account. Start by submitting an application.
+              No application found. Please complete and submit your application form.
             </p>
             <Link
               href="/appform"

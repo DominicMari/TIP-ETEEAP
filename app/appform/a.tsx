@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Camera } from "lucide-react";
+import { validateFile } from "@/lib/utils/validateFile";
 
 export default function InitialForm({
   formData,
@@ -27,8 +28,9 @@ export default function InitialForm({
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setErrors((prev) => ({ ...prev, photo: "Image size must be less than 2MB." }));
+      const result = validateFile(file);
+      if (!result.valid) {
+        setErrors((prev) => ({ ...prev, photo: result.error! }));
         return;
       }
       setPhotoPreview(URL.createObjectURL(file));
@@ -85,9 +87,8 @@ export default function InitialForm({
               name="name"
               value={formData.name || ""}
               onChange={handleChange}
-              className={`w-full border rounded-lg px-3 py-2 text-black ${
-                errors.name ? "border-red-500" : "border-gray-400"
-              }`}
+              className={`w-full border rounded-lg px-3 py-2 text-black ${errors.name ? "border-red-500" : "border-gray-400"
+                }`}
             />
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
           </div>
@@ -101,9 +102,8 @@ export default function InitialForm({
               name="degree"
               value={formData.degree || ""}
               onChange={handleChange}
-              className={`w-full border rounded-lg px-3 py-2 text-black ${
-                errors.degree ? "border-red-500" : "border-gray-400"
-              }`}
+              className={`w-full border rounded-lg px-3 py-2 text-black ${errors.degree ? "border-red-500" : "border-gray-400"
+                }`}
             >
               <option value="">Select degree</option>
               <option value="BSCS">BSCS (Computer Science)</option>
@@ -126,9 +126,8 @@ export default function InitialForm({
         <div className="flex flex-col items-center w-full sm:w-auto sm:pt-6">
           <label
             htmlFor="photo-upload"
-            className={`w-24 h-24 rounded-full bg-yellow-400 flex items-center justify-center cursor-pointer overflow-hidden ${
-              errors.photo ? "ring-2 ring-red-500" : ""
-            }`}
+            className={`w-24 h-24 rounded-full bg-yellow-400 flex items-center justify-center cursor-pointer overflow-hidden ${errors.photo ? "ring-2 ring-red-500" : ""
+              }`}
           >
             {photoPreview ? (
               <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
@@ -159,9 +158,8 @@ export default function InitialForm({
           name="campus"
           value={formData.campus || ""}
           onChange={handleChange}
-          className={`w-full border rounded-lg px-3 py-2 text-black ${
-            errors.campus ? "border-red-500" : "border-gray-400"
-          }`}
+          className={`w-full border rounded-lg px-3 py-2 text-black ${errors.campus ? "border-red-500" : "border-gray-400"
+            }`}
         >
           <option value="">Select campus</option>
           <option value="QC">Quezon City</option>
@@ -181,9 +179,8 @@ export default function InitialForm({
           name="folderLink"
           value={formData.folderLink || ""}
           onChange={handleChange}
-          className={`w-full border rounded-lg px-3 py-2 text-black ${
-            errors.folderLink ? "border-red-500" : "border-gray-400"
-          }`}
+          className={`w-full border rounded-lg px-3 py-2 text-black ${errors.folderLink ? "border-red-500" : "border-gray-400"
+            }`}
         />
         {errors.folderLink && <p className="text-red-500 text-xs mt-1">{errors.folderLink}</p>}
       </div>

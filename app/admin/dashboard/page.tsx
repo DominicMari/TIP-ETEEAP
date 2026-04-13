@@ -13,8 +13,10 @@ import DashboardHome from "./DashboardHome";
 import EmailManagement from "./emailmanagement";
 import PortfolioSubmissions from "./portfoliosubmissions";
 import SupportTicket from "./supportticket";
+import Reports from "./reports";
 import Modal from "@/components/ui/Modal";
 import { useModal } from "@/components/ui/useModal";
+import NotificationBell from "./NotificationBell";
 
 // Define a type for your GoogleUser
 export interface GoogleUser {
@@ -42,7 +44,8 @@ type TabName =
   | "AdminLogins"
   | "AdminManagement"
   | "EmailManagement"
-  | "SupportTicket";
+  | "SupportTicket"
+  | "Reports";
 
 const tabs: { [key in TabName]: { title: string; component: ComponentType<any> | null } } = {
   Home: { title: "Dashboard", component: DashboardHome },
@@ -52,7 +55,8 @@ const tabs: { [key in TabName]: { title: string; component: ComponentType<any> |
   AdminLogins: { title: "Admin Login History", component: UserManage },
   AdminManagement: { title: "Admin Management", component: AdminManagement },
   EmailManagement: { title: "Email Management", component: EmailManagement },
-  SupportTicket: { title: "Support Ticket", component: SupportTicket }
+  SupportTicket: { title: "Support Ticket", component: SupportTicket },
+  Reports: { title: "Reports", component: Reports },
 };
 
 // Define the shape of an admin's profile
@@ -149,6 +153,15 @@ export default function DashboardPage() {
       router.push("/admin");
     }
   }
+
+  const handleNavigateToApplicant = (applicationId: string) => {
+    setRecordFocusRequest({
+      tab: "Applicants",
+      id: applicationId,
+      key: Date.now(),
+    });
+    setActiveTab("Applicants");
+  };
 
   const handleNavigateToRecord = (target: HomeRecordNavigationTarget) => {
     const nextTab: "Applicants" | "PortfolioSubmissions" =
@@ -321,6 +334,9 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 mb-8 flex-shrink-0">
             <img src="/assets/NewTIPLogo.png" alt="TIP Logo" className="w-13 h-10" />
             <h1 className="text-xl font-bold text-gray-800">Admin Panel</h1>
+            <div className="ml-auto">
+              <NotificationBell onNavigateToApplicant={handleNavigateToApplicant} />
+            </div>
           </div>
           <div className="flex flex-col flex-grow overflow-y-auto overflow-x-hidden">
             <nav className="flex flex-col gap-2 flex-grow pr-1">

@@ -4,64 +4,86 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "edge";
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(request: Request) {
-  try {
-    const formData = await request.formData();
+  try {
+    const formData = await request.formData();
 
-    const name = formData.get("name") as string | null;
+    const name = formData.get("name") as string | null;
     // TODO: Add an email field to the form and use it here.
     const email = formData.get("email") as string | null;
-    const degree = formData.get("degree") as string | null;
-    const campus = formData.get("campus") as string | null;
-    const folderLink = formData.get("folderLink") as string | null;
-    const photoFile = formData.get("photo") as File | Blob | null;
+    const degree = formData.get("degree") as string | null;
+    const campus = formData.get("campus") as string | null;
+    const folderLink = formData.get("folderLink") as string | null;
+    const photoFile = formData.get("photo") as File | Blob | null;
 
-    if (!name || !degree || !campus || !folderLink || !photoFile || !email) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
+    if (!name || !degree || !campus || !folderLink || !photoFile || !email) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
 
-    // Use Uint8Array for Edge runtime compatibility
-    const photoBytes = new Uint8Array(await photoFile.arrayBuffer());
-    const fileName = `photos/${Date.now()}-${(photoFile as File).name || "photo.jpg"}`;
+    // Use Uint8Array for Edge runtime compatibility
+    const photoBytes = new Uint8Array(await photoFile.arrayBuffer());
+    const fileName = `photos/${Date.now()}-${(photoFile as File).name || "photo.jpg"}`;
 
-    // Upload the photo
-    const { error: uploadError } = await supabase.storage
-      .from("application-photos")
-      .upload(fileName, photoBytes, {
-        contentType: photoFile.type,
-      });
+    // Upload the photo
+    const { error: uploadError } = await supabase.storage
+      .from("application-photos")
+      .upload(fileName, photoBytes, {
+        contentType: photoFile.type || "image/jpeg",
+      });
 
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
-    }
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    }
 
-    // Get public URL correctly from data.publicUrl
-    const { data: publicUrlData } = supabase.storage
-      .from("application-photos")
-    .getPublicUrl(fileName);
+    // Get public URL correctly from data.publicUrl
+    const { data: publicUrlData } = supabase.storage
+      .from("application-photos")
+      .getPublicUrl(fileName);
 
-    const photoUrl = publicUrlData?.publicUrl || null;
+    const photoUrl = publicUrlData?.publicUrl || null;
 
-    const { error: dbError } = await supabase
-      .from("applications")
-      .insert([{
-        name,
+    const { data: insertedData, error: dbError } = await supabase
+      .from("applications")
+      .insert([{
+        name,
         email,
-        degree,
-        campus,
-        folder_link: folderLink,
-        photo_url: photoUrl,
-      }]); // array wrapper required
+        degree,
+        campus,
+        folder_link: folderLink,
+        photo_url: photoUrl,
+      }])
+      .select("application_id")
+      .single();
 
-    if (dbError) {
-      return NextResponse.json({ error: dbError.message }, { status: 500 });
-    }
+    if (dbError) {
+      return NextResponse.json({ error: dbError.message }, { status: 500 });
+    }
+
+    const applicationId = insertedData?.application_id ?? null;
+
+    // Insert notification record (non-blocking)
+    try {
+      await supabase.from('notifications').insert({
+        type: 'new_application',
+        applicant_name: name,
+        application_id: applicationId,
+        is_read: false,
+      });
+    } catch (notifError) {
+      console.error('Failed to insert notification:', notifError);
+    }
 
     // Send confirmation email
+    const submissionDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
     try {
       await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-email`, {
         method: 'POST',
@@ -70,8 +92,8 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           recipient: email,
-          subject: 'Application Received - TIP ETEEAP',
-          body: `Dear ${name || 'Applicant'},\n\nThank you for submitting your application to the TIP ETEEAP program. We have received your application and it is now in our system.\n\nPlease continue to complete any remaining sections of your application. Our team will begin reviewing your submission shortly.\n\nBest regards,\nTIP ETEEAP Team`
+          subject: 'Application Received \u2013 TIP ETEEAP',
+          body: `Dear <strong>${name}</strong>,<br><br>Thank you for submitting your application to the TIP ETEEAP program. We have received your application and it is now in our system.<br><br><strong>Application Details:</strong><br>Name: ${name}<br>Degree Program: ${degree}<br>Campus: ${campus}<br>Submission Date: ${submissionDate}<br><br>Our team will begin reviewing your submission shortly.<br><br>Best regards,<br>TIP ETEEAP Team`,
         }),
       });
     } catch (emailError) {
@@ -79,9 +101,8 @@ export async function POST(request: Request) {
       // Do not block the response for the user if email sending fails
     }
 
-
-    return NextResponse.json({ message: "Application saved successfully" });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Unexpected error" }, { status: 500 });
-  }
+    return NextResponse.json({ message: "Application saved successfully" });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Unexpected error" }, { status: 500 });
+  }
 }

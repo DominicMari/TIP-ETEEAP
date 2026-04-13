@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Upload, Trash2, FileText, Image as ImageIcon } from "lucide-react";
+import { validateFile } from "@/lib/utils/validateFile";
 
 interface PortfolioDocument {
   title: string;
@@ -42,14 +43,14 @@ export default function PortfolioForm({
       }));
       setDocuments(restoredDocs);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileChange = (index: number, file: File | null) => {
     const updated = [...documents];
     updated[index].file = file;
     setDocuments(updated);
-    
+
     // Clear error for this specific slot when a file is added
     if (file) {
       setErrors((prev) => {
@@ -74,8 +75,10 @@ export default function PortfolioForm({
       }
     });
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    // 2. Block if any existing validation errors remain
+    const combinedErrors = { ...errors, ...newErrors };
+    if (Object.keys(combinedErrors).length > 0) {
+      setErrors(combinedErrors);
       return;
     }
 
@@ -117,7 +120,7 @@ export default function PortfolioForm({
 
       <div className="flex-1 overflow-y-auto max-h-[65vh] px-8 py-4">
         <h3 className="font-bold text-lg mb-2 text-black">
-         Portfolio - Document Submission
+          Portfolio - Document Submission
         </h3>
         <p className="text-sm text-gray-500 mb-6">
           Upload clear scanned copies or high-quality photos of your documents.
@@ -145,10 +148,10 @@ export default function PortfolioForm({
                 // SUCCESS STATE: File Uploaded
                 <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
                   {doc.file?.type?.includes("image") ? (
-                      <ImageIcon className="text-green-600" size={20} />
-                    ) : (
-                      <FileText className="text-green-600" size={20} />
-                    )}
+                    <ImageIcon className="text-green-600" size={20} />
+                  ) : (
+                    <FileText className="text-green-600" size={20} />
+                  )}
                   <div className="flex-1 truncate">
                     <p className="text-sm font-semibold text-green-900 truncate">{doc.file.name}</p>
                     <p className="text-xs text-green-700">
@@ -174,10 +177,16 @@ export default function PortfolioForm({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        if (file.size > 10 * 1024 * 1024) {
-                          setErrors((prev) => ({ ...prev, [index]: "File size must be less than 10MB." }));
+                        const result = validateFile(file);
+                        if (!result.valid) {
+                          setErrors((prev) => ({ ...prev, [index]: result.error! }));
                           return;
                         }
+                        setErrors((prev) => {
+                          const newErrs = { ...prev };
+                          delete newErrs[index];
+                          return newErrs;
+                        });
                         handleFileChange(index, file);
                       }
                     }}

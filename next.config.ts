@@ -7,7 +7,12 @@ const nextConfig: NextConfig = {
 
   // Configure Next.js Image Optimization domains
   images: {
-    domains: ["lh3.googleusercontent.com"], // Allow Google profile images
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+    ],
   },
 
 };
