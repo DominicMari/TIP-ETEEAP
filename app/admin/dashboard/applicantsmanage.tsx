@@ -3,7 +3,10 @@ import { createPortal } from 'react-dom';
 import { openPrintPreview } from "@/components/admin/printTemplate";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { FileViewer, FileItem } from "@/components/admin/FileViewer";
+import FileFeedbackModal from "@/components/admin/FileFeedbackModal";
+import { FileFeedbackEntry } from "@/lib/types/fileFeedback";
 import { useEffect, useState, FC, ReactNode, useMemo, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import supabase from '../../../lib/supabase/client'; // Adjust path if needed
 import {
   Loader2,
@@ -173,6 +176,7 @@ interface Applicant {
   emergency_contact_number: string | null;
   portfolio: any | null;
   admin_remarks: string | null;
+  file_feedback: FileFeedbackEntry[] | null;
 }
 
 // --- Constants ---
@@ -272,6 +276,7 @@ export default function ApplicantsManage({
   focusRequestKey?: number;
   onFocusRequestHandled?: (key: number) => void;
 }) {
+  const { data: session } = useSession();
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -375,25 +380,36 @@ export default function ApplicantsManage({
     setIsModalOpen(true);
 
     // Auto-change "Submitted" to "Pending" when admin opens to review
-    if (applicant.status === 'Submitted') {
+    if ((applicant.status === 'Submitted' || !applicant.status)) {
       const newStatus = 'Pending';
       const template = getRemarksTemplate(newStatus);
       setUpdatingStatusId(applicant.application_id);
 
-      const { data: updatedData, error: updateError } = await supabase
-        .from('applications')
-        .update({ status: newStatus, admin_remarks: template, updated_at: new Date().toISOString() })
-        .eq('application_id', applicant.application_id)
-        .select()
-        .single();
-
-      setUpdatingStatusId(null);
-
-      if (!updateError && updatedData) {
-        const updated = updatedData as Applicant;
-        setApplicants(prev => prev.map(a => a.application_id === applicant.application_id ? updated : a));
-        setSelectedApplicant(updated);
-        await sendStatusEmail(updated.email_address, updated.applicant_name, newStatus, template);
+      try {
+        const res = await fetch('/api/update-status', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table: 'applications',
+            idColumn: 'application_id',
+            id: applicant.application_id,
+            status: newStatus,
+            extra: { admin_remarks: template },
+          }),
+        });
+        const json = await res.json();
+        if (res.ok && json.data) {
+          const updated = json.data as Applicant;
+          setApplicants(prev => prev.map(a => a.application_id === applicant.application_id ? updated : a));
+          setSelectedApplicant(updated);
+          await sendStatusEmail(updated.email_address, updated.applicant_name, newStatus, template);
+        } else {
+          console.error('Failed to auto-update status:', json.error);
+        }
+      } catch (err) {
+        console.error('Error auto-updating status:', err);
+      } finally {
+        setUpdatingStatusId(null);
       }
     }
   };
@@ -643,6 +659,8 @@ export default function ApplicantsManage({
             onClose={handleCloseModal}
             onStatusChange={handleStatusChange}
             updatingStatusId={updatingStatusId}
+            setSelectedApplicant={setSelectedApplicant}
+            adminName={session?.user?.name ?? 'Admin'}
           />
         )}
 
@@ -797,11 +815,15 @@ const ViewApplicantModal: FC<{
   onClose: () => void;
   onStatusChange: (applicationId: string, newStatus: string) => void;
   updatingStatusId: string | null;
+  setSelectedApplicant: React.Dispatch<React.SetStateAction<Applicant | null>>;
+  adminName: string;
 }> = ({
   applicant,
   onClose,
   onStatusChange,
   updatingStatusId,
+  setSelectedApplicant,
+  adminName,
 }) => {
     const handlePrint = () => {
       openPrintPreview(applicant);
@@ -812,6 +834,7 @@ const ViewApplicantModal: FC<{
     const [imageViewerIndex, setImageViewerIndex] = useState(0);
     const [fileViewerOpen, setFileViewerOpen] = useState(false);
     const [fileViewerFiles, setFileViewerFiles] = useState<FileItem[]>([]);
+    const [feedbackModal, setFeedbackModal] = useState<{ fileName: string; fileUrl: string } | null>(null);
 
     const getFileType = (url: string): FileItem["type"] => {
       const ext = (url || "").toLowerCase().split(".").pop() || "";
@@ -893,291 +916,310 @@ const ViewApplicantModal: FC<{
 
     return createPortal(
       <>
-      <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm'>
-        <div className='bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col text-black'>
-          {/* Modal Header */}
-          <div className='flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10'>
-            <div className='flex items-center gap-4'>
-              <h2 className='text-2xl font-bold text-gray-800'>
-                Applicant Details
-              </h2>
-              <div className='flex items-center gap-2'>
-                {allImages.length > 0 && (
-                  <button
-                    onClick={() => openImageViewer(allImages, 0)}
-                    className='flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors'
-                  >
-                    <ImageIcon size={14} />
-                    {allImages.length} Image{allImages.length !== 1 ? 's' : ''}
-                  </button>
-                )}
-                {uniqueUploadedFiles.length > 0 && (
-                  <button
-                    onClick={() => openFileViewer(uniqueUploadedFiles)}
-                    className='flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors'
-                  >
-                    <FolderOpen size={14} />
-                    {uniqueUploadedFiles.length} File{uniqueUploadedFiles.length !== 1 ? 's' : ''}
-                  </button>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className='text-gray-400 hover:text-gray-700'
-              aria-label='Close modal'
-            >
-              <X size={28} />
-            </button>
-          </div>
-
-          {/* Two-Column Modal Body */}
-          <div className='flex-1 flex overflow-hidden'>
-
-            {/* Left Column (Info) */}
-            <div className='w-1/3 max-w-sm border-r border-gray-200 p-6 overflow-y-auto space-y-6 bg-gray-50'>
-              {/* Applicant Bio */}
-              <div className='flex flex-col items-center text-center'>
-                <div className='relative group mb-4'>
-                  <img
-                    className='h-32 w-32 rounded-full object-cover bg-gray-200 flex-shrink-0 shadow-md cursor-pointer'
-                    src={applicant.photo_url || '/assets/default-avatar.png'}
-                    alt='Applicant Photo'
-                    onClick={() => {
-                      if (applicant.photo_url) {
-                        openImageViewer(allImages, allImages.indexOf(applicant.photo_url));
-                      }
-                    }}
-                    onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
-                  />
-                  {applicant.photo_url && (
-                    <div
-                      className='absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer'
-                      onClick={() => openImageViewer(allImages, allImages.indexOf(applicant.photo_url as string))}
-                    >
-                      <ZoomIn className='w-6 h-6 text-white' />
-                    </div>
-                  )}
-                </div>
-                <h3 className='text-2xl font-bold text-gray-900'>
-                  {applicant.applicant_name || 'N/A'}
-                </h3>
-                <p className='text-lg text-gray-600'>
-                  {applicant.degree_applied_for || 'N/A'}
-                </p>
-                <p className='text-sm text-gray-500'>{applicant.campus} Campus</p>
-                {/* Current Status Badge */}
-                <div
-                  className={`mt-2 text-sm font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${STATUS_COLORS[applicant.status || 'Submitted']
-                    }`}
-                >
-                  {updatingStatusId === applicant.application_id
-                    ? <Loader2 className='h-4 w-4 animate-spin' />
-                    : STATUS_ICONS[applicant.status || 'Submitted']
-                  }
-                  {applicant.status || 'Submitted'}
-                </div>
-
-                {/* Status Selector */}
-                <div className="mt-4 flex flex-wrap gap-2 w-full">
-                  {["Submitted", "Pending", "Competency Process", "Enrolled", "Graduated"].map((s) => (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm'>
+          <div className='bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col text-black'>
+            {/* Modal Header */}
+            <div className='flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10'>
+              <div className='flex items-center gap-4'>
+                <h2 className='text-2xl font-bold text-gray-800'>
+                  Applicant Details
+                </h2>
+                <div className='flex items-center gap-2'>
+                  {allImages.length > 0 && (
                     <button
-                      key={s}
-                      onClick={() => onStatusChange(applicant.application_id, s)}
-                      disabled={updatingStatusId === applicant.application_id || applicant.status === s}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${applicant.status === s
-                        ? `${STATUS_COLORS[s]} border-transparent shadow-sm`
-                        : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-                        } disabled:opacity-60 disabled:cursor-default`}
+                      onClick={() => openImageViewer(allImages, 0)}
+                      className='flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors'
                     >
-                      {applicant.status === s && <Check size={13} />}
-                      {s}
+                      <ImageIcon size={14} />
+                      {allImages.length} Image{allImages.length !== 1 ? 's' : ''}
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              <InfoCard title='Applicant Information'>
-                <InfoItem label='Birthday' value={formatDate(applicant.birth_date)} />
-                <InfoItem label='Birthplace' value={applicant.birth_place} />
-                <InfoItem label='Age' value={applicant.age != null ? String(applicant.age) : 'N/A'} />
-                <InfoItem label='Gender' value={applicant.gender} />
-                <InfoItem label='Civil Status' value={applicant.civil_status} />
-                <InfoItem label='Nationality' value={applicant.nationality} />
-                <InfoItem label='Religion' value={applicant.religion} />
-                <InfoItem label='Language Spoken' value={applicant.language_spoken} />
-              </InfoCard>
-
-              <InfoCard title='Emergency Contact'>
-                <InfoItem label='Contact Name' value={applicant.emergency_contact_name} />
-                <InfoItem label='Address' value={applicant.emergency_address} />
-                <InfoItem label='Relationship' value={applicant.emergency_relationship} />
-                <InfoItem label='Contact Number' value={applicant.emergency_contact_number} />
-              </InfoCard>
-
-              <InfoCard title='Contact Information'>
-                <InfoItem label='Email'>
-                  <a href={`mailto:${applicant.email_address}`} className='text-blue-600 hover:underline break-all'>
-                    {applicant.email_address || 'N/A'}
-                  </a>
-                </InfoItem>
-                <InfoItem label='Mobile Number' value={applicant.mobile_number} />
-                <InfoItem label='City Address' value={applicant.city_address} />
-                <InfoItem label='Permanent Address' value={applicant.permanent_address} />
-              </InfoCard>
-
-              <InfoCard title='Application Info'>
-                <InfoItem
-                  label='Date Submitted'
-                  value={formatDate(applicant.application_date || applicant.created_at, true)}
-                />
-                <InfoItem
-                  label='Last Updated'
-                  value={formatDate(applicant.updated_at, true)}
-                />
-                <InfoItem label='Portfolio/Folder Link'>
-                  {applicant.folder_link ? (
-                    <button
-                      type='button'
-                      onClick={() => openFileViewer([toFileItem('Portfolio Folder', applicant.folder_link as string)])}
-                      className='break-all text-blue-600 hover:underline text-left inline-flex items-center gap-1.5'
-                    >
-                      <FolderOpen className='w-4 h-4' />
-                      {applicant.folder_link}
-                    </button>
-                  ) : (
-                    <span>N/A</span>
                   )}
-                </InfoItem>
-              </InfoCard>
-
-              <InfoCard title='Uploaded Files'>
-                {uniqueUploadedFiles.length > 0 ? (
-                  <>
+                  {uniqueUploadedFiles.length > 0 && (
                     <button
-                      type='button'
                       onClick={() => openFileViewer(uniqueUploadedFiles)}
-                      className='w-full mb-3 bg-gradient-to-r from-yellow-100 to-amber-100 hover:from-yellow-200 hover:to-amber-200 text-yellow-800 text-xs font-semibold py-2.5 px-3 rounded-lg inline-flex items-center justify-center gap-2 transition-all shadow-sm border border-yellow-200'
+                      className='flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors'
                     >
-                      <FolderOpen className='w-4 h-4' />
-                      View All Files ({uniqueUploadedFiles.length})
+                      <FolderOpen size={14} />
+                      {uniqueUploadedFiles.length} File{uniqueUploadedFiles.length !== 1 ? 's' : ''}
                     </button>
-                    <div className='space-y-1.5 max-h-64 overflow-y-auto pr-1'>
-                      {uniqueUploadedFiles.map((f, idx) => (
-                        <button
-                          key={`${f.url}-${idx}`}
-                          type='button'
-                          onClick={() => openFileViewer([f])}
-                          className='w-full text-left text-xs text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded-md px-2 py-1.5 inline-flex items-start gap-2 transition-colors group'
-                        >
-                          <span className={`mt-0.5 shrink-0 ${
-                            f.type === 'image' ? 'text-blue-500' :
-                            f.type === 'pdf' ? 'text-red-500' :
-                            f.type === 'document' ? 'text-indigo-500' : 'text-gray-400'
-                          }`}>
-                            {f.type === 'image' ? <ImageIcon className='w-3.5 h-3.5' /> :
-                             f.type === 'pdf' ? <FileText className='w-3.5 h-3.5' /> :
-                             <File className='w-3.5 h-3.5' />}
-                          </span>
-                          <span className='break-words leading-tight group-hover:underline'>{f.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <p className='text-sm text-gray-500 italic'>No uploaded files found from application records.</p>
-                )}
-              </InfoCard>
-
-              <InfoCard title='Internal Data'>
-                <InfoItem label='Application ID' value={applicant.application_id} />
-                <InfoItem label='User ID' value={applicant.user_id} />
-              </InfoCard>
-
-              {applicant.admin_remarks && (
-                <InfoCard title='Admin Remarks'>
-                  <p className='text-sm text-gray-700 whitespace-pre-wrap'>{applicant.admin_remarks}</p>
-                </InfoCard>
-              )}
-            </div>
-
-            {/* Right Column (Content) */}
-            <div className='flex-1 p-8 overflow-y-auto'>
-              <CollapsibleSection title="Goal Statement" isOpenDefault={true}>
-                <GoalStatement data={applicant.goal_statement} />
-              </CollapsibleSection>
-              <CollapsibleSection title="Education Background">
-                <EducationBackground data={applicant.education_background} />
-              </CollapsibleSection>
-              <CollapsibleSection title="Work Experiences">
-                <WorkExperiences data={applicant.work_experiences} />
-              </CollapsibleSection>
-              <CollapsibleSection title="Professional Development">
-                <ProfessionalDevelopment data={applicant.professional_development} />
-              </CollapsibleSection>
-              <GenericList data={applicant.non_formal_education} title="Non-Formal Education" />
-              <CollapsibleSection title="Certifications"><Certifications data={applicant.certifications} /></CollapsibleSection>
-              <GenericList data={applicant.publications} title="Publications" />
-              <GenericList data={applicant.inventions} title="Inventions" />
-              <GenericList data={applicant.recognitions} title="Recognitions" />
-              <CollapsibleSection title="Lifelong Learning">
-                <AssessmentList data={applicant.lifelong_learning} />
-              </CollapsibleSection>
-              <CollapsibleSection title="Creative Works">
-                <CreativeWorks data={applicant.creative_works} />
-              </CollapsibleSection>
-              <CollapsibleSection title="Applicant Signature">
-                <Signature
-                  data={applicant.signature_url}
-                  onOpen={() => {
-                    if (applicant.signature_url) {
-                      openImageViewer(allImages, allImages.indexOf(applicant.signature_url));
-                    }
-                  }}
-                />
-              </CollapsibleSection>
-            </div>
-          </div>
-
-          {/* Modal Footer */}
-          <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex justify-between items-center">
-            <div className='flex items-center gap-2 text-xs text-gray-500'>
-              <span>ID: {applicant.application_id?.substring(0, 12)}…</span>
-            </div>
-            <div className='flex gap-3'>
+                  )}
+                </div>
+              </div>
               <button
                 onClick={onClose}
-                className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-lg font-medium text-gray-700 transition-colors"
+                className='text-gray-400 hover:text-gray-700'
+                aria-label='Close modal'
               >
-                Close
-              </button>
-              <button
-                onClick={handlePrint}
-                className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
-                Print Application
+                <X size={28} />
               </button>
             </div>
+
+            {/* Two-Column Modal Body */}
+            <div className='flex-1 flex overflow-hidden'>
+
+              {/* Left Column (Info) */}
+              <div className='w-1/3 max-w-sm border-r border-gray-200 p-6 overflow-y-auto space-y-6 bg-gray-50'>
+                {/* Applicant Bio */}
+                <div className='flex flex-col items-center text-center'>
+                  <div className='relative group mb-4'>
+                    <img
+                      className='h-32 w-32 rounded-full object-cover bg-gray-200 flex-shrink-0 shadow-md cursor-pointer'
+                      src={applicant.photo_url || '/assets/default-avatar.png'}
+                      alt='Applicant Photo'
+                      onClick={() => {
+                        if (applicant.photo_url) {
+                          openImageViewer(allImages, allImages.indexOf(applicant.photo_url));
+                        }
+                      }}
+                      onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
+                    />
+                    {applicant.photo_url && (
+                      <div
+                        className='absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer'
+                        onClick={() => openImageViewer(allImages, allImages.indexOf(applicant.photo_url as string))}
+                      >
+                        <ZoomIn className='w-6 h-6 text-white' />
+                      </div>
+                    )}
+                  </div>
+                  <h3 className='text-2xl font-bold text-gray-900'>
+                    {applicant.applicant_name || 'N/A'}
+                  </h3>
+                  <p className='text-lg text-gray-600'>
+                    {applicant.degree_applied_for || 'N/A'}
+                  </p>
+                  <p className='text-sm text-gray-500'>{applicant.campus} Campus</p>
+                  {/* Current Status Badge */}
+                  <div
+                    className={`mt-2 text-sm font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${STATUS_COLORS[applicant.status || 'Submitted']
+                      }`}
+                  >
+                    {updatingStatusId === applicant.application_id
+                      ? <Loader2 className='h-4 w-4 animate-spin' />
+                      : STATUS_ICONS[applicant.status || 'Submitted']
+                    }
+                    {applicant.status || 'Submitted'}
+                  </div>
+
+                  {/* Status Selector — Submitted and Pending are system-managed only */}
+                  <div className="mt-4 flex flex-wrap gap-2 w-full">
+                    {["Competency Process", "Enrolled", "Graduated"].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => onStatusChange(applicant.application_id, s)}
+                        disabled={updatingStatusId === applicant.application_id || applicant.status === s}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${applicant.status === s
+                          ? `${STATUS_COLORS[s]} border-transparent shadow-sm`
+                          : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                          } disabled:opacity-60 disabled:cursor-default`}
+                      >
+                        {applicant.status === s && <Check size={13} />}
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <InfoCard title='Applicant Information'>
+                  <InfoItem label='Birthday' value={formatDate(applicant.birth_date)} />
+                  <InfoItem label='Birthplace' value={applicant.birth_place} />
+                  <InfoItem label='Age' value={applicant.age != null ? String(applicant.age) : 'N/A'} />
+                  <InfoItem label='Gender' value={applicant.gender} />
+                  <InfoItem label='Civil Status' value={applicant.civil_status} />
+                  <InfoItem label='Nationality' value={applicant.nationality} />
+                  <InfoItem label='Religion' value={applicant.religion} />
+                  <InfoItem label='Language Spoken' value={applicant.language_spoken} />
+                </InfoCard>
+
+                <InfoCard title='Emergency Contact'>
+                  <InfoItem label='Contact Name' value={applicant.emergency_contact_name} />
+                  <InfoItem label='Address' value={applicant.emergency_address} />
+                  <InfoItem label='Relationship' value={applicant.emergency_relationship} />
+                  <InfoItem label='Contact Number' value={applicant.emergency_contact_number} />
+                </InfoCard>
+
+                <InfoCard title='Contact Information'>
+                  <InfoItem label='Email'>
+                    <a href={`mailto:${applicant.email_address}`} className='text-blue-600 hover:underline break-all'>
+                      {applicant.email_address || 'N/A'}
+                    </a>
+                  </InfoItem>
+                  <InfoItem label='Mobile Number' value={applicant.mobile_number} />
+                  <InfoItem label='City Address' value={applicant.city_address} />
+                  <InfoItem label='Permanent Address' value={applicant.permanent_address} />
+                </InfoCard>
+
+                <InfoCard title='Application Info'>
+                  <InfoItem
+                    label='Date Submitted'
+                    value={formatDate(applicant.application_date || applicant.created_at, true)}
+                  />
+                  <InfoItem
+                    label='Last Updated'
+                    value={formatDate(applicant.updated_at, true)}
+                  />
+                  <InfoItem label='Portfolio/Folder Link'>
+                    {applicant.folder_link ? (
+                      <button
+                        type='button'
+                        onClick={() => openFileViewer([toFileItem('Portfolio Folder', applicant.folder_link as string)])}
+                        className='break-all text-blue-600 hover:underline text-left inline-flex items-center gap-1.5'
+                      >
+                        <FolderOpen className='w-4 h-4' />
+                        {applicant.folder_link}
+                      </button>
+                    ) : (
+                      <span>N/A</span>
+                    )}
+                  </InfoItem>
+                </InfoCard>
+
+                <InfoCard title='Uploaded Files'>
+                  {uniqueUploadedFiles.length > 0 ? (
+                    <>
+                      <button
+                        type='button'
+                        onClick={() => openFileViewer(uniqueUploadedFiles)}
+                        className='w-full mb-3 bg-gradient-to-r from-yellow-100 to-amber-100 hover:from-yellow-200 hover:to-amber-200 text-yellow-800 text-xs font-semibold py-2.5 px-3 rounded-lg inline-flex items-center justify-center gap-2 transition-all shadow-sm border border-yellow-200'
+                      >
+                        <FolderOpen className='w-4 h-4' />
+                        View All Files ({uniqueUploadedFiles.length})
+                      </button>
+                      <div className='space-y-1.5 max-h-64 overflow-y-auto pr-1'>
+                        {uniqueUploadedFiles.map((f, idx) => (
+                          <button
+                            key={`${f.url}-${idx}`}
+                            type='button'
+                            onClick={() => openFileViewer([f])}
+                            className='w-full text-left text-xs text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded-md px-2 py-1.5 inline-flex items-start gap-2 transition-colors group'
+                          >
+                            <span className={`mt-0.5 shrink-0 ${f.type === 'image' ? 'text-blue-500' :
+                              f.type === 'pdf' ? 'text-red-500' :
+                                f.type === 'document' ? 'text-indigo-500' : 'text-gray-400'
+                              }`}>
+                              {f.type === 'image' ? <ImageIcon className='w-3.5 h-3.5' /> :
+                                f.type === 'pdf' ? <FileText className='w-3.5 h-3.5' /> :
+                                  <File className='w-3.5 h-3.5' />}
+                            </span>
+                            <span className='break-words leading-tight group-hover:underline'>{f.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className='text-sm text-gray-500 italic'>No uploaded files found from application records.</p>
+                  )}
+                </InfoCard>
+
+                <InfoCard title='Internal Data'>
+                  <InfoItem label='Application ID' value={applicant.application_id} />
+                  <InfoItem label='User ID' value={applicant.user_id} />
+                </InfoCard>
+
+                {applicant.admin_remarks && (
+                  <InfoCard title='Admin Remarks'>
+                    <p className='text-sm text-gray-700 whitespace-pre-wrap'>{applicant.admin_remarks}</p>
+                  </InfoCard>
+                )}
+              </div>
+
+              {/* Right Column (Content) */}
+              <div className='flex-1 p-8 overflow-y-auto'>
+                <CollapsibleSection title="Goal Statement" isOpenDefault={true}>
+                  <GoalStatement data={applicant.goal_statement} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Education Background">
+                  <EducationBackground data={applicant.education_background} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Work Experiences">
+                  <WorkExperiences data={applicant.work_experiences} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Professional Development">
+                  <ProfessionalDevelopment data={applicant.professional_development} />
+                </CollapsibleSection>
+                <GenericList data={applicant.non_formal_education} title="Non-Formal Education" />
+                <CollapsibleSection title="Certifications"><Certifications data={applicant.certifications} /></CollapsibleSection>
+                <GenericList data={applicant.publications} title="Publications" />
+                <GenericList data={applicant.inventions} title="Inventions" />
+                <GenericList data={applicant.recognitions} title="Recognitions" />
+                <CollapsibleSection title="Lifelong Learning">
+                  <AssessmentList data={applicant.lifelong_learning} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Creative Works">
+                  <CreativeWorks data={applicant.creative_works} />
+                </CollapsibleSection>
+                <CollapsibleSection title="Applicant Signature">
+                  <Signature
+                    data={applicant.signature_url}
+                    onOpen={() => {
+                      if (applicant.signature_url) {
+                        openImageViewer(allImages, allImages.indexOf(applicant.signature_url));
+                      }
+                    }}
+                  />
+                </CollapsibleSection>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex justify-between items-center">
+              <div className='flex items-center gap-2 text-xs text-gray-500'>
+                <span>ID: {applicant.application_id?.substring(0, 12)}…</span>
+              </div>
+              <div className='flex gap-3'>
+                <button
+                  onClick={onClose}
+                  className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-lg font-medium text-gray-700 transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
+                  Print Application
+                </button>
+              </div>
+            </div>
+
           </div>
-
         </div>
-      </div>
 
-      <ImageViewer
-        images={imageViewerImages}
-        initialIndex={imageViewerIndex}
-        isOpen={imageViewerOpen}
-        onClose={() => setImageViewerOpen(false)}
-        title='Applicant Image Viewer'
-      />
+        <ImageViewer
+          images={imageViewerImages}
+          initialIndex={imageViewerIndex}
+          isOpen={imageViewerOpen}
+          onClose={() => setImageViewerOpen(false)}
+          title='Applicant Image Viewer'
+          onFeedback={(url, name) => setFeedbackModal({ fileName: name, fileUrl: url })}
+        />
 
-      <FileViewer
-        files={fileViewerFiles}
-        isOpen={fileViewerOpen}
-        onClose={() => setFileViewerOpen(false)}
-        title='Applicant Files'
-      />
+        <FileViewer
+          files={fileViewerFiles}
+          isOpen={fileViewerOpen}
+          onClose={() => setFileViewerOpen(false)}
+          title='Applicant Files'
+          onFeedback={(url, name) => setFeedbackModal({ fileName: name, fileUrl: url })}
+        />
+
+        {feedbackModal && (
+          <FileFeedbackModal
+            isOpen={true}
+            onClose={() => setFeedbackModal(null)}
+            fileName={feedbackModal.fileName}
+            sourceType="application"
+            recordId={applicant.application_id}
+            adminName={adminName}
+            onSuccess={(entry) => {
+              setSelectedApplicant(prev => prev ? {
+                ...prev,
+                file_feedback: [...(prev.file_feedback || []), entry],
+              } : prev);
+              setFeedbackModal(null);
+            }}
+          />
+        )}
       </>
       , document.body);
   };

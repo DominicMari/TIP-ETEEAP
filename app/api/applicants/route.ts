@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       const { data, error } = await supabase
         .from("applications")
         .select(
-          "application_id, applicant_name, degree_applied_for, campus, status, admin_remarks, created_at, updated_at"
+          "application_id, applicant_name, degree_applied_for, campus, status, admin_remarks, created_at, updated_at, file_feedback"
         )
         .eq("email_address", email)
         .order("created_at", { ascending: false });

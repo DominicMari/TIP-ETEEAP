@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
+  MessageSquare,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -19,6 +20,7 @@ interface ImageViewerProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  onFeedback?: (imageUrl: string, imageName: string) => void;
 }
 
 export const ImageViewer: React.FC<ImageViewerProps> = ({
@@ -27,6 +29,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
   isOpen,
   onClose,
   title = 'Image Viewer',
+  onFeedback,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [scale, setScale] = useState(1);
@@ -209,6 +212,15 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
           {/* Download */}
           <ToolbarBtn onClick={downloadImage} title="Download" icon={<Download size={16} />} />
 
+          {/* Give Feedback */}
+          {onFeedback && (
+            <ToolbarBtn
+              onClick={() => onFeedback(images[currentIndex], `image-${currentIndex + 1}`)}
+              title="Give Feedback"
+              icon={<MessageSquare size={16} />}
+            />
+          )}
+
           <ToolbarSep />
 
           {/* Close */}
@@ -282,9 +294,9 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
                 backgroundRepeat: 'no-repeat',
                 display:
                   magnifierPosition.x >= 0 &&
-                  magnifierPosition.x <= 100 &&
-                  magnifierPosition.y >= 0 &&
-                  magnifierPosition.y <= 100
+                    magnifierPosition.x <= 100 &&
+                    magnifierPosition.y >= 0 &&
+                    magnifierPosition.y <= 100
                     ? 'block'
                     : 'none',
               }}
@@ -315,11 +327,10 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
                   setCurrentIndex(idx);
                   resetView();
                 }}
-                className={`flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border-2 transition-all duration-150 ${
-                  idx === currentIndex
-                    ? 'border-yellow-400 ring-2 ring-yellow-400/30 shadow-lg shadow-yellow-400/10'
-                    : 'border-transparent hover:border-gray-500 opacity-60 hover:opacity-100'
-                }`}
+                className={`flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border-2 transition-all duration-150 ${idx === currentIndex
+                  ? 'border-yellow-400 ring-2 ring-yellow-400/30 shadow-lg shadow-yellow-400/10'
+                  : 'border-transparent hover:border-gray-500 opacity-60 hover:opacity-100'
+                  }`}
               >
                 <img
                   src={img}
@@ -347,11 +358,10 @@ const ToolbarBtn: React.FC<{
   <button
     onClick={onClick}
     title={title}
-    className={`p-2 rounded-lg transition-all duration-150 ${
-      active
-        ? 'text-yellow-400 bg-yellow-400/15'
-        : 'text-gray-400 hover:text-white hover:bg-gray-700/80'
-    }`}
+    className={`p-2 rounded-lg transition-all duration-150 ${active
+      ? 'text-yellow-400 bg-yellow-400/15'
+      : 'text-gray-400 hover:text-white hover:bg-gray-700/80'
+      }`}
   >
     {icon}
   </button>

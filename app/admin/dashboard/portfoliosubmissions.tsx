@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useState, FC, ReactNode, useMemo, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { createPortal } from 'react-dom';
 import supabase from "../../../lib/supabase/client";
 import {
@@ -37,6 +38,8 @@ import { useModal } from "@/components/ui/useModal";
 import { openPortfolioPrintPreview } from "@/components/admin/printTemplate";
 import { ImageViewer } from "@/components/admin/ImageViewer";
 import { FileViewer, FileItem } from "@/components/admin/FileViewer";
+import FileFeedbackModal from "@/components/admin/FileFeedbackModal";
+import { FileFeedbackEntry } from "@/lib/types/fileFeedback";
 
 type TabType = 'overview' | 'personal' | 'credentials' | 'portfolio' | 'signature';
 
@@ -63,6 +66,7 @@ interface PortfolioSubmission {
   photo_url: string;
   signature: string;
   status: string;
+  file_feedback: FileFeedbackEntry[] | null;
 }
 
 const getPortfolioProgress = (submission: PortfolioSubmission): number => {
@@ -101,6 +105,7 @@ export default function PortfolioSubmissions({
   focusRequestKey?: number;
   onFocusRequestHandled?: (key: number) => void;
 }) {
+  const { data: session } = useSession();
   const [submissions, setSubmissions] = useState<PortfolioSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -209,17 +214,29 @@ export default function PortfolioSubmissions({
     // Auto-change "Submitted" → "Pending"
     if (latestSubmission.status === "Submitted") {
       setUpdatingStatusId(submission.id);
-      const { data: updatedData, error: updateError } = await supabase
-        .from("portfolio_submissions")
-        .update({ status: "Pending" })
-        .eq("id", submission.id)
-        .select()
-        .single();
-      setUpdatingStatusId(null);
-      if (!updateError && updatedData) {
-        const updated = updatedData as PortfolioSubmission;
-        setSubmissions((prev) => prev.map((s) => (s.id === submission.id ? updated : s)));
-        setSelectedSubmission(updated);
+      try {
+        const res = await fetch('/api/update-status', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table: 'portfolio_submissions',
+            idColumn: 'id',
+            id: submission.id,
+            status: 'Pending',
+          }),
+        });
+        const json = await res.json();
+        if (res.ok && json.data) {
+          const updated = json.data as PortfolioSubmission;
+          setSubmissions((prev) => prev.map((s) => (s.id === submission.id ? updated : s)));
+          setSelectedSubmission(updated);
+        } else {
+          console.error('Failed to auto-update portfolio status:', json.error);
+        }
+      } catch (err) {
+        console.error('Error auto-updating portfolio status:', err);
+      } finally {
+        setUpdatingStatusId(null);
       }
     }
   };
@@ -412,6 +429,8 @@ export default function PortfolioSubmissions({
           onClose={handleCloseModal}
           onStatusChange={handleStatusChange}
           updatingStatusId={updatingStatusId}
+          setSelectedSubmission={setSelectedSubmission}
+          adminName={session?.user?.name ?? 'Admin'}
         />
       )}
       <Modal {...modalProps} />
@@ -427,12 +446,15 @@ const ViewSubmissionModal: FC<{
   onClose: () => void;
   onStatusChange: (id: number, status: string) => void;
   updatingStatusId: number | null;
-}> = ({ submission, appData, loadingAppData, onClose, onStatusChange, updatingStatusId }) => {
+  setSelectedSubmission: React.Dispatch<React.SetStateAction<PortfolioSubmission | null>>;
+  adminName: string;
+}> = ({ submission, appData, loadingAppData, onClose, onStatusChange, updatingStatusId, setSelectedSubmission, adminName }) => {
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [imageViewerImages, setImageViewerImages] = useState<string[]>([]);
   const [imageViewerIndex, setImageViewerIndex] = useState(0);
   const [fileViewerOpen, setFileViewerOpen] = useState(false);
   const [fileViewerFiles, setFileViewerFiles] = useState<FileItem[]>([]);
+  const [feedbackModal, setFeedbackModal] = useState<{ fileName: string; fileUrl: string } | null>(null);
 
   const fmtDate = (d?: string | null) => {
     if (!d) return "—";
@@ -462,13 +484,13 @@ const ViewSubmissionModal: FC<{
     const images: string[] = [];
     if (submission.photo_url) images.push(submission.photo_url);
     if (submission.signature) images.push(submission.signature);
-    
+
     // Collect images from portfolio files
     const pf = submission.portfolio_files || [];
     pf.forEach((f) => {
       if (getFileType(f.url) === 'image') images.push(f.url);
     });
-    
+
     // Collect images from appData
     if (appData) {
       const edu = appData.education_background || {};
@@ -481,13 +503,13 @@ const ViewSubmissionModal: FC<{
       (appData.recognitions || []).forEach((e: any) => { if (e.fileUrl && getFileType(e.fileUrl) === 'image') images.push(e.fileUrl); });
       (appData.creative_works || []).forEach((e: any) => { if (e.fileUrl && getFileType(e.fileUrl) === 'image') images.push(e.fileUrl); });
     }
-    
+
     return [...new Set(images)]; // Remove duplicates
   };
 
   const collectAllFiles = (): FileItem[] => {
     const files: FileItem[] = [];
-    
+
     // Portfolio files
     const pf = submission.portfolio_files || [];
     pf.forEach((f) => {
@@ -497,7 +519,7 @@ const ViewSubmissionModal: FC<{
         type: getFileType(f.url),
       });
     });
-    
+
     // AppData files
     if (appData) {
       const edu = appData.education_background || {};
@@ -537,7 +559,7 @@ const ViewSubmissionModal: FC<{
         if (e.fileUrl) files.push({ name: `Creative: ${e.title}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
       });
     }
-    
+
     return files;
   };
 
@@ -546,7 +568,7 @@ const ViewSubmissionModal: FC<{
     const type = getFileType(url);
     const allImages = collectAllImages();
     const allFiles = collectAllFiles();
-    
+
     return (
       <div className="flex items-center gap-2 group">
         {type === 'image' ? (
@@ -773,12 +795,12 @@ const ViewSubmissionModal: FC<{
 
             {/* C–I Credential Files */}
             {!loadingAppData && credentialSections.length > 0 && (
-              <Section 
-                icon={<FileText size={15} />} 
+              <Section
+                icon={<FileText size={15} />}
                 title="Credential Files (C–I)"
                 action={
                   <button
-                    onClick={() => openFileViewer(allFiles.filter(f => credentialSections.some(s => s.entries.some((e: {url?: string}) => e.url === f.url))))}
+                    onClick={() => openFileViewer(allFiles.filter(f => credentialSections.some(s => s.entries.some((e: { url?: string }) => e.url === f.url))))}
                     className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                   >
                     View All
@@ -823,8 +845,8 @@ const ViewSubmissionModal: FC<{
               const hasFiles = grouped.some(g => g.files.length > 0);
 
               return (
-                <Section 
-                  icon={<Star size={15} />} 
+                <Section
+                  icon={<Star size={15} />}
                   title="Portfolio Files Submitted"
                   action={hasFiles ? (
                     <button
@@ -866,13 +888,13 @@ const ViewSubmissionModal: FC<{
               <div className="border rounded-lg p-2 bg-gray-100 max-w-xs mx-auto relative group">
                 {submission.signature ? (
                   <>
-                    <img 
-                      src={submission.signature} 
-                      alt="Signature" 
+                    <img
+                      src={submission.signature}
+                      alt="Signature"
                       className="w-full h-auto object-contain cursor-pointer"
                       onClick={() => openImageViewer(allImages, allImages.indexOf(submission.signature))}
                     />
-                    <div 
+                    <div
                       className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-lg"
                       onClick={() => openImageViewer(allImages, allImages.indexOf(submission.signature))}
                     >
@@ -893,7 +915,22 @@ const ViewSubmissionModal: FC<{
               <span>·</span>
               <span>User: {submission.user_id?.substring(0, 12)}…</span>
             </div>
-            <div className='flex gap-3'>
+            <div className='flex flex-wrap items-center gap-2'>
+              {/* Status Selector — Submitted and Pending are system-managed only */}
+              {["Competency Process", "Enrolled", "Graduated"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => onStatusChange(submission.id, s)}
+                  disabled={updatingStatusId === submission.id || submission.status === s}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border transition-all ${submission.status === s
+                    ? `${STATUS_COLORS[s] || ''} border-transparent shadow-sm`
+                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                    } disabled:opacity-60 disabled:cursor-default`}
+                >
+                  {submission.status === s && <Check size={13} />}
+                  {s}
+                </button>
+              ))}
               <button onClick={onClose} className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
                 Close
               </button>
@@ -916,6 +953,7 @@ const ViewSubmissionModal: FC<{
         isOpen={imageViewerOpen}
         onClose={() => setImageViewerOpen(false)}
         title="Portfolio Images"
+        onFeedback={(url, name) => setFeedbackModal({ fileName: name, fileUrl: url })}
       />
 
       {/* File Viewer */}
@@ -924,7 +962,26 @@ const ViewSubmissionModal: FC<{
         isOpen={fileViewerOpen}
         onClose={() => setFileViewerOpen(false)}
         title="Portfolio Files"
+        onFeedback={(url, name) => setFeedbackModal({ fileName: name, fileUrl: url })}
       />
+
+      {/* File Feedback Modal */}
+      {feedbackModal && (
+        <FileFeedbackModal
+          isOpen={true}
+          onClose={() => setFeedbackModal(null)}
+          fileName={feedbackModal.fileName}
+          sourceType="portfolio"
+          recordId={String(submission.id)}
+          adminName={adminName}
+          onSuccess={(entry) => {
+            setSelectedSubmission((prev) =>
+              prev ? { ...prev, file_feedback: [...(prev.file_feedback || []), entry] } : prev
+            );
+            setFeedbackModal(null);
+          }}
+        />
+      )}
     </>
     , document.body);
 };

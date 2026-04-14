@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Download, File, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, FileText, Download, File, Image as ImageIcon, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 export interface FileItem {
@@ -17,6 +17,7 @@ interface FileViewerProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  onFeedback?: (fileUrl: string, fileName: string) => void;
 }
 
 const getFileType = (url: string, name?: string): 'image' | 'pdf' | 'document' | 'other' => {
@@ -39,6 +40,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({
   isOpen,
   onClose,
   title = 'File Viewer',
+  onFeedback,
 }) => {
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [loading, setLoading] = useState(false);
@@ -269,8 +271,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                   key={index}
                   onClick={() => handleFileSelect(file)}
                   className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all ${isSelected
-                      ? 'bg-yellow-500/20 border border-yellow-500/50'
-                      : 'hover:bg-gray-800 border border-transparent'
+                    ? 'bg-yellow-500/20 border border-yellow-500/50'
+                    : 'hover:bg-gray-800 border border-transparent'
                     }`}
                 >
                   {file.type === 'image' ? (
@@ -307,8 +309,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                         key={source.label}
                         onClick={() => setPreviewSourceIndex(idx)}
                         className={`px-2 py-1 text-xs rounded ${previewSourceIndex === idx
-                            ? 'bg-yellow-500 text-black'
-                            : 'text-gray-200 hover:bg-gray-700'
+                          ? 'bg-yellow-500 text-black'
+                          : 'text-gray-200 hover:bg-gray-700'
                           }`}
                         title={`Use ${source.label} preview`}
                       >
@@ -339,6 +341,15 @@ export const FileViewer: React.FC<FileViewerProps> = ({
                     <span className="text-gray-400 text-sm">{resolvedSizes[selectedFile.url] || 'Calculating...'}</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    {onFeedback && (
+                      <button
+                        onClick={() => onFeedback(selectedFile.url, selectedFile.name)}
+                        className="flex items-center gap-2 px-3 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <MessageSquare size={16} />
+                        Give Feedback
+                      </button>
+                    )}
                     {files.length > 1 && (
                       <>
                         <button
