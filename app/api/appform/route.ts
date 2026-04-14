@@ -78,27 +78,18 @@ export async function POST(request: Request) {
     }
 
     // Send confirmation email
-    const submissionDate = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-
     try {
       await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-email`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipient: email,
-          subject: 'Application Received \u2013 TIP ETEEAP',
-          body: `Dear <strong>${name}</strong>,<br><br>Thank you for submitting your application to the TIP ETEEAP program. We have received your application and it is now in our system.<br><br><strong>Application Details:</strong><br>Name: ${name}<br>Degree Program: ${degree}<br>Campus: ${campus}<br>Submission Date: ${submissionDate}<br><br>Our team will begin reviewing your submission shortly.<br><br>Best regards,<br>TIP ETEEAP Team`,
+          subject: 'Application Received – TIP ETEEAP',
+          body: `Dear <strong>${name}</strong>,<br><br>You have submitted an application. Please wait for further announcements from the coordinator/assessor.<br><br>Best regards,<br>TIP ETEEAP Team`,
         }),
       });
     } catch (emailError) {
       console.error('Failed to send confirmation email:', emailError);
-      // Do not block the response for the user if email sending fails
     }
 
     return NextResponse.json({ message: "Application saved successfully" });

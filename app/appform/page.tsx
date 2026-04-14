@@ -585,7 +585,8 @@ export default function ApplicationFormPage() {
 
             if (photoFile) {
                 const photoPath = `${supabaseUserId}/photo_${Date.now()}_${photoFile.name}`;
-                const { error: photoUploadError } = await supabase.storage.from('application_files').upload(photoPath, photoFile, { contentType: photoFile.type || 'image/jpeg' });
+                const photoBuffer = await photoFile.arrayBuffer();
+                const { error: photoUploadError } = await supabase.storage.from('application_files').upload(photoPath, photoBuffer, { contentType: photoFile.type || 'image/jpeg' });
                 if (photoUploadError) throw new Error(`Photo upload failed: ${photoUploadError.message}`);
                 const { data: photoUrlData } = supabase.storage.from('application_files').getPublicUrl(photoPath);
                 photoUrlStr = photoUrlData.publicUrl;
@@ -606,9 +607,11 @@ export default function ApplicationFormPage() {
             // Collect all entries with a fileObject, upload, replace with fileUrl
             const uploadCredentialFiles = async (entries: any[], section: string) => {
                 const updated = await Promise.all(entries.map(async (entry) => {
-                    if (!entry.fileObject) return entry;
+                    if (!entry.fileObject || !(entry.fileObject instanceof File)) return entry;
                     const filePath = `${supabaseUserId}/credentials/${section}_${Date.now()}_${entry.fileObject.name}`;
-                    const { error } = await supabase.storage.from('application_files').upload(filePath, entry.fileObject, { contentType: entry.fileObject.type || 'application/octet-stream' });
+                    const mimeType = entry.fileObject.type || 'application/octet-stream';
+                    const buffer = await entry.fileObject.arrayBuffer();
+                    const { error } = await supabase.storage.from('application_files').upload(filePath, buffer, { contentType: mimeType });
                     if (error) { console.warn(`Credential file upload failed (${section}):`, error.message); return entry; }
                     const { data: urlData } = supabase.storage.from('application_files').getPublicUrl(filePath);
                     const { fileObject: _removed, ...rest } = entry;
@@ -664,33 +667,33 @@ export default function ApplicationFormPage() {
             if (formData.portfolioFiles && formData.portfolioFiles.length > 0) {
                 for (let i = 0; i < formData.portfolioFiles.length; i++) {
                     const file = formData.portfolioFiles[i];
-
-                    // This was likely the line causing the "does not exist" error
                     const meta = formData.portfolio_metadata?.[i] || { title: `File ${i + 1}` };
 
-                    if (file) {
-                        const filePath = `${supabaseUserId}/portfolio/${Date.now()}_${file.name}`;
-                        const { error: uploadErr } = await supabase.storage
-                            .from('portfolio_files')
-                            .upload(filePath, file, { contentType: file.type || 'application/octet-stream' });
+                    // Skip non-File entries (e.g. plain metadata objects from localStorage)
+                    if (!(file instanceof File)) continue;
 
-                        if (uploadErr) {
-                            console.error(`Error uploading:`, uploadErr);
-                            continue; // Skip this file if it fails
-                        }
+                    const filePath = `${supabaseUserId}/portfolio/${Date.now()}_${file.name}`;
+                    const fileBuffer = await file.arrayBuffer();
+                    const { error: uploadErr } = await supabase.storage
+                        .from('portfolio_files')
+                        .upload(filePath, fileBuffer, { contentType: file.type || 'application/octet-stream' });
 
-                        const { data: publicUrl } = supabase.storage
-                            .from('portfolio_files')
-                            .getPublicUrl(filePath);
-
-                        uploadedPortfolioMetadata.push({
-                            title: meta.title, // Use the title from metadata
-                            url: publicUrl.publicUrl,
-                            storagePath: filePath,
-                            fileSize: file.size,
-                            fileType: file.type
-                        });
+                    if (uploadErr) {
+                        console.error(`Error uploading:`, uploadErr);
+                        continue;
                     }
+
+                    const { data: publicUrl } = supabase.storage
+                        .from('portfolio_files')
+                        .getPublicUrl(filePath);
+
+                    uploadedPortfolioMetadata.push({
+                        title: meta.title,
+                        url: publicUrl.publicUrl,
+                        storagePath: filePath,
+                        fileSize: file.size,
+                        fileType: file.type,
+                    });
                 }
             }
 
@@ -756,6 +759,21 @@ export default function ApplicationFormPage() {
                 const insertPayload = { user_id: supabaseUserId, ...basePayload };
                 const { error: insertError } = await supabase.from('applications').insert(insertPayload);
                 if (insertError) throw insertError;
+
+                // Send submission confirmation email (non-blocking)
+                try {
+                    await fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            recipient: session!.user!.email!,
+                            subject: 'Application Received – TIP ETEEAP',
+                            body: `Dear <strong>${basePayload.applicant_name ?? 'Applicant'}</strong>,<br><br>You have submitted an application. Please wait for further announcements from the coordinator/assessor.<br><br>Best regards,<br>TIP ETEEAP Team`,
+                        }),
+                    });
+                } catch (emailErr) {
+                    console.error('Failed to send submission email:', emailErr);
+                }
             }
 
             // Clear local storage and move to success

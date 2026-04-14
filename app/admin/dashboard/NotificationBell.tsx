@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell } from 'lucide-react';
 import { useNotifications } from './useNotifications';
 import { getBadgeDisplay, formatNotificationItem } from './notificationUtils';
@@ -14,34 +15,90 @@ export interface NotificationBellProps {
 export default function NotificationBell({ onNavigateToApplicant }: NotificationBellProps) {
     const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications();
     const [isOpen, setIsOpen] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+    const [mounted, setMounted] = useState(false);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => { setMounted(true); }, []);
 
     // Close dropdown on outside click
     useEffect(() => {
         const handleMouseDown = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
+            if (
+                buttonRef.current?.contains(e.target as Node) ||
+                dropdownRef.current?.contains(e.target as Node)
+            ) return;
+            setIsOpen(false);
         };
         document.addEventListener('mousedown', handleMouseDown);
         return () => document.removeEventListener('mousedown', handleMouseDown);
     }, []);
 
+    const handleToggle = () => {
+        if (!isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setDropdownPos({ top: rect.bottom + 8, left: rect.left });
+        }
+        setIsOpen((prev) => !prev);
+    };
+
     const handleNotificationClick = async (id: string, applicationId: string | null) => {
         await markAsRead(id);
-        if (applicationId) {
-            onNavigateToApplicant(applicationId);
-        }
+        if (applicationId) onNavigateToApplicant(applicationId);
         setIsOpen(false);
     };
 
     const badge = getBadgeDisplay(unreadCount);
 
+    const dropdown = (
+        <div
+            ref={dropdownRef}
+            style={{ top: dropdownPos.top, left: dropdownPos.left, zIndex: 999999 }}
+            className="fixed w-80 bg-white rounded-lg shadow-2xl border border-gray-200"
+        >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <span className="font-semibold text-gray-800 text-sm">Notifications</span>
+                <button
+                    onClick={() => markAllAsRead()}
+                    className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                    Mark all as read
+                </button>
+            </div>
+            <ul className="max-h-96 overflow-y-auto divide-y divide-gray-50">
+                {isLoading ? (
+                    <li className="px-4 py-6 text-center text-sm text-gray-400">Loading…</li>
+                ) : notifications.length === 0 ? (
+                    <li className="px-4 py-6 text-center text-sm text-gray-400">No new notifications</li>
+                ) : (
+                    notifications.map((notification) => {
+                        const { name, message, elapsedTime } = formatNotificationItem(notification);
+                        return (
+                            <li key={notification.id}>
+                                <button
+                                    onClick={() => handleNotificationClick(notification.id, notification.application_id)}
+                                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${!notification.is_read ? 'bg-blue-50' : 'bg-white'}`}
+                                >
+                                    <p className="text-sm font-medium text-gray-800">
+                                        {name}{' '}
+                                        <span className="font-normal text-gray-600">{message}</span>
+                                    </p>
+                                    <p className="text-xs text-gray-400 mt-0.5">{elapsedTime}</p>
+                                </button>
+                            </li>
+                        );
+                    })
+                )}
+            </ul>
+        </div>
+    );
+
     return (
-        <div ref={containerRef} className="relative inline-block">
-            {/* Bell button */}
+        <div className="relative inline-block">
             <button
-                onClick={() => setIsOpen((prev) => !prev)}
+                ref={buttonRef}
+                onClick={handleToggle}
                 className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
                 aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
             >
@@ -53,56 +110,7 @@ export default function NotificationBell({ onNavigateToApplicant }: Notification
                 )}
             </button>
 
-            {/* Dropdown panel */}
-            {isOpen && (
-                <div className="absolute left-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                        <span className="font-semibold text-gray-800 text-sm">Notifications</span>
-                        <button
-                            onClick={() => markAllAsRead()}
-                            className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
-                        >
-                            Mark all as read
-                        </button>
-                    </div>
-
-                    {/* Notification list */}
-                    <ul className="max-h-96 overflow-y-auto divide-y divide-gray-50">
-                        {isLoading ? (
-                            <li className="px-4 py-6 text-center text-sm text-gray-400">Loading…</li>
-                        ) : notifications.length === 0 ? (
-                            <li className="px-4 py-6 text-center text-sm text-gray-400">
-                                No new notifications
-                            </li>
-                        ) : (
-                            notifications.map((notification) => {
-                                const { name, message, elapsedTime } = formatNotificationItem(notification);
-                                return (
-                                    <li key={notification.id}>
-                                        <button
-                                            onClick={() =>
-                                                handleNotificationClick(
-                                                    notification.id,
-                                                    notification.application_id
-                                                )
-                                            }
-                                            className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${!notification.is_read ? 'bg-blue-50' : 'bg-white'
-                                                }`}
-                                        >
-                                            <p className="text-sm font-medium text-gray-800">
-                                                {name}{' '}
-                                                <span className="font-normal text-gray-600">{message}</span>
-                                            </p>
-                                            <p className="text-xs text-gray-400 mt-0.5">{elapsedTime}</p>
-                                        </button>
-                                    </li>
-                                );
-                            })
-                        )}
-                    </ul>
-                </div>
-            )}
+            {isOpen && mounted && createPortal(dropdown, document.body)}
         </div>
     );
 }

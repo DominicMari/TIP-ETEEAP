@@ -11,7 +11,7 @@ import {
   Row,
   Column,
   Link,
-  Hr, 
+  Hr,
 } from "@react-email/components";
 import * as React from "react";
 
@@ -42,6 +42,12 @@ export const EmailTemplate = ({ subject, body }: EmailTemplateProps) => (
             />
             <Text style={tipHeaderText}>TECHNOLOGICAL INSTITUTE OF THE PHILIPPINES</Text>
             <Text style={subHeaderText}>Expanded Tertiary Education Equivalency and Accreditation Program</Text>
+          </Section>
+
+          <Hr style={hr} />
+
+          <Section style={bodySection}>
+            <div dangerouslySetInnerHTML={{ __html: body }} style={text} />
           </Section>
 
           <Hr style={hr} />

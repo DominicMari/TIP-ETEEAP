@@ -83,6 +83,14 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: "user_id is required" }, { status: 400 });
         }
 
+        // Resolve applicant email for notifications
+        const { data: userData } = await supabase
+            .from("users")
+            .select("email")
+            .eq("id", user_id)
+            .maybeSingle();
+        const applicantEmail = userData?.email ?? null;
+
         // Fetch existing row by user_id
         const { data: existing, error: fetchError } = await supabase
             .from("portfolio_submissions")
@@ -141,6 +149,23 @@ export async function PATCH(request: Request) {
                 console.error('Failed to insert portfolio edit notification:', notifErr);
             }
 
+            // Send edit confirmation email (non-blocking)
+            if (applicantEmail) {
+                try {
+                    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-email`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            recipient: applicantEmail,
+                            subject: 'Portfolio Updated – TIP ETEEAP',
+                            body: `Dear <strong>${full_name ?? 'Applicant'}</strong>,<br><br>You have edited your existing portfolio. Please wait for further announcements from the coordinator/assessor.<br><br>Best regards,<br>TIP ETEEAP Team`,
+                        }),
+                    });
+                } catch (emailErr) {
+                    console.error('Failed to send portfolio edit email:', emailErr);
+                }
+            }
+
             return NextResponse.json({ success: true, action: "updated", id: existing.id, fileCount: merged.length });
         } else {
             // No existing row — insert fresh
@@ -173,6 +198,23 @@ export async function PATCH(request: Request) {
                 });
             } catch (notifErr) {
                 console.error('Failed to insert portfolio notification:', notifErr);
+            }
+
+            // Send submission confirmation email (non-blocking)
+            if (applicantEmail) {
+                try {
+                    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-email`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            recipient: applicantEmail,
+                            subject: 'Portfolio Received – TIP ETEEAP',
+                            body: `Dear <strong>${full_name ?? 'Applicant'}</strong>,<br><br>You have submitted a portfolio. Please wait for further announcements from the coordinator/assessor.<br><br>Best regards,<br>TIP ETEEAP Team`,
+                        }),
+                    });
+                } catch (emailErr) {
+                    console.error('Failed to send portfolio submission email:', emailErr);
+                }
             }
 
             return NextResponse.json({ success: true, action: "inserted", fileCount: (portfolio_files ?? []).length });

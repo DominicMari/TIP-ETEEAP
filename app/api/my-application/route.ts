@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
+import { EmailTemplate } from "@/app/emails/template";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const FROM_EMAIL = "admin@tipeteeap.online";
 
 export async function GET(request: Request) {
     try {
@@ -91,6 +96,22 @@ export async function PATCH(request: Request) {
             });
         } catch (notifErr) {
             console.error("Failed to insert edit notification:", notifErr);
+        }
+
+        // Send edit confirmation email (non-blocking)
+        try {
+            const applicantName = payload.applicant_name ?? "Applicant";
+            await resend.emails.send({
+                from: `TIP Tech Support <${FROM_EMAIL}>`,
+                to: [email],
+                subject: "Application Updated – TIP ETEEAP",
+                react: EmailTemplate({
+                    subject: "Application Updated – TIP ETEEAP",
+                    body: `Dear <strong>${applicantName}</strong>,<br><br>You have edited your existing application. Please wait for further announcements from the coordinator/assessor.<br><br>Best regards,<br>TIP ETEEAP Team`,
+                }),
+            });
+        } catch (emailErr) {
+            console.error("Failed to send edit confirmation email:", emailErr);
         }
 
         return NextResponse.json({ success: true });

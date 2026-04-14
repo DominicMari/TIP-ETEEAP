@@ -148,6 +148,7 @@ export default function ApplicationForm() {
   const [userLoading, setUserLoading] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [hasConsented, setHasConsented] = useState(false);
+  const [checkingExisting, setCheckingExisting] = useState(true);
   const router = useRouter();
   const { modalProps, showAlert } = useModal();
 
@@ -170,6 +171,32 @@ export default function ApplicationForm() {
     };
     fetchSupabaseUser();
   }, [session, status]);
+
+  // Check for existing portfolio submission
+  useEffect(() => {
+    if (!supabaseUserId) return;
+    const checkExisting = async () => {
+      setCheckingExisting(true);
+      try {
+        const res = await fetch(`/api/portfolio-submission?user_id=${encodeURIComponent(supabaseUserId)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.id) {
+            // Fetch full submission data for print
+            const fullRes = await fetch(`/api/portfolio-submission?id=${json.id}`);
+            const fullJson = fullRes.ok ? await fullRes.json() : {};
+            setSubmittedData({ submission: fullJson.submission ?? { user_id: supabaseUserId }, appData });
+            setSubmitSuccess(true);
+          }
+        }
+      } catch {
+        // fail open — let them proceed to the form
+      } finally {
+        setCheckingExisting(false);
+      }
+    };
+    checkExisting();
+  }, [supabaseUserId]);
 
   // Fetch application data for cover sheet
   useEffect(() => {
@@ -377,15 +404,24 @@ export default function ApplicationForm() {
     );
   }
 
+  if (checkingExisting || userLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <Loader2 className="animate-spin text-yellow-500 w-10 h-10" />
+      </div>
+    );
+  }
+
   if (submitSuccess) {
     return (
       <div className="min-h-screen bg-gray-100 flex justify-center items-center p-4">
         <div className="bg-white p-10 rounded-2xl shadow-2xl text-center flex flex-col items-center gap-4">
-          <h2 className="text-3xl font-bold text-green-600 mb-2">Submission Successful! 🎉</h2>
-          <p className="text-gray-700">Thank you for submitting your ETEEAP portfolio. We will review it shortly.</p>
+          <div className="text-6xl">🎉</div>
+          <h2 className="text-3xl font-bold text-green-600">Portfolio Submitted!</h2>
+          <p className="text-gray-700">Your ETEEAP portfolio has been submitted. We will review it shortly.</p>
           <div className="flex flex-wrap gap-3 justify-center mt-4">
             <button
-              onClick={() => setSubmitSuccess(false)}
+              onClick={() => { setSubmitSuccess(false); setCheckingExisting(false); }}
               className="px-6 py-3 bg-slate-700 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors"
             >
               Edit Portfolio
