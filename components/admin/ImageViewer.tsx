@@ -275,7 +275,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
             ref={imageRef}
             src={images[currentIndex]}
             alt={`Image ${currentIndex + 1}`}
-            className="max-h-[80vh] max-w-[90vw] object-contain select-none"
+            className="max-h-[80vh] max-w-[90vw] object-contain select-none rounded bg-white"
             draggable={false}
           />
 
@@ -335,7 +335,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
                 <img
                   src={img}
                   alt={`Thumbnail ${idx + 1}`}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover bg-white"
                 />
               </button>
             ))}
