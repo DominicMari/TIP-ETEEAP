@@ -3,11 +3,11 @@
 "use client";
 
 import { useEffect, useState, FC, ReactNode, useMemo, useRef } from "react";
+import { createPortal } from 'react-dom';
 import supabase from "../../../lib/supabase/client";
 import {
   Loader2,
   AlertCircle,
-  ExternalLink,
   Camera,
   Check,
   X,
@@ -25,10 +25,26 @@ import {
   Star,
   Calendar,
   Printer,
+  User,
+  File,
+  Image as ImageIcon,
+  ZoomIn,
+  Download,
+  FolderOpen,
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { useModal } from "@/components/ui/useModal";
 import { openPortfolioPrintPreview } from "@/components/admin/printTemplate";
+import { ImageViewer } from "@/components/admin/ImageViewer";
+import { FileViewer, FileItem } from "@/components/admin/FileViewer";
+
+type TabType = 'overview' | 'personal' | 'credentials' | 'portfolio' | 'signature';
+
+interface TabConfig {
+  id: TabType;
+  label: string;
+  icon: ReactNode;
+}
 
 interface PortfolioFile {
   key: string;
@@ -412,26 +428,176 @@ const ViewSubmissionModal: FC<{
   onStatusChange: (id: number, status: string) => void;
   updatingStatusId: number | null;
 }> = ({ submission, appData, loadingAppData, onClose, onStatusChange, updatingStatusId }) => {
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [imageViewerImages, setImageViewerImages] = useState<string[]>([]);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
+  const [fileViewerOpen, setFileViewerOpen] = useState(false);
+  const [fileViewerFiles, setFileViewerFiles] = useState<FileItem[]>([]);
 
   const fmtDate = (d?: string | null) => {
     if (!d) return "—";
     try { return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }); } catch { return d; }
   };
 
-  const FileLink = ({ label, url }: { label: string; url?: string }) =>
-    url ? (
-      <a href={url} target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-1.5 text-blue-600 hover:underline text-sm">
-        <ExternalLink size={13} className="shrink-0" />
-        <span className="truncate">{label}</span>
-      </a>
-    ) : null;
+  const getFileType = (url: string): 'image' | 'pdf' | 'document' | 'other' => {
+    const ext = url.toLowerCase().split('.').pop();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || '')) return 'image';
+    if (ext === 'pdf') return 'pdf';
+    if (['doc', 'docx', 'txt', 'rtf'].includes(ext || '')) return 'document';
+    return 'other';
+  };
 
-  const Section = ({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) => (
+  const openImageViewer = (images: string[], index: number) => {
+    setImageViewerImages(images);
+    setImageViewerIndex(index);
+    setImageViewerOpen(true);
+  };
+
+  const openFileViewer = (files: FileItem[]) => {
+    setFileViewerFiles(files);
+    setFileViewerOpen(true);
+  };
+
+  const collectAllImages = (): string[] => {
+    const images: string[] = [];
+    if (submission.photo_url) images.push(submission.photo_url);
+    if (submission.signature) images.push(submission.signature);
+    
+    // Collect images from portfolio files
+    const pf = submission.portfolio_files || [];
+    pf.forEach((f) => {
+      if (getFileType(f.url) === 'image') images.push(f.url);
+    });
+    
+    // Collect images from appData
+    if (appData) {
+      const edu = appData.education_background || {};
+      ['tertiary', 'secondary', 'elementary', 'technical'].forEach((level) => {
+        (edu[level] || []).forEach((e: any) => { if (e.fileUrl && getFileType(e.fileUrl) === 'image') images.push(e.fileUrl); });
+      });
+      (appData.certifications || []).forEach((e: any) => { if (e.fileUrl && getFileType(e.fileUrl) === 'image') images.push(e.fileUrl); });
+      (appData.publications || []).forEach((e: any) => { if (e.fileUrl && getFileType(e.fileUrl) === 'image') images.push(e.fileUrl); });
+      (appData.inventions || []).forEach((e: any) => { if (e.fileUrl && getFileType(e.fileUrl) === 'image') images.push(e.fileUrl); });
+      (appData.recognitions || []).forEach((e: any) => { if (e.fileUrl && getFileType(e.fileUrl) === 'image') images.push(e.fileUrl); });
+      (appData.creative_works || []).forEach((e: any) => { if (e.fileUrl && getFileType(e.fileUrl) === 'image') images.push(e.fileUrl); });
+    }
+    
+    return [...new Set(images)]; // Remove duplicates
+  };
+
+  const collectAllFiles = (): FileItem[] => {
+    const files: FileItem[] = [];
+    
+    // Portfolio files
+    const pf = submission.portfolio_files || [];
+    pf.forEach((f) => {
+      files.push({
+        name: f.label || f.key,
+        url: f.url,
+        type: getFileType(f.url),
+      });
+    });
+    
+    // AppData files
+    if (appData) {
+      const edu = appData.education_background || {};
+      ['tertiary', 'secondary', 'elementary', 'technical'].forEach((level) => {
+        (edu[level] || []).forEach((e: any) => {
+          if (e.fileUrl) files.push({ name: `${level}: ${e.schoolName}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
+        });
+      });
+      (appData.non_formal_education || []).forEach((e: any) => {
+        if (e.fileUrl) files.push({ name: `Non-Formal: ${e.title}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
+      });
+      (appData.certifications || []).forEach((e: any) => {
+        if (e.fileUrl) files.push({ name: `Cert: ${e.title}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
+      });
+      (appData.publications || []).forEach((e: any) => {
+        if (e.fileUrl) files.push({ name: `Pub: ${e.title}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
+      });
+      (appData.inventions || []).forEach((e: any) => {
+        if (e.fileUrl) files.push({ name: `Inv: ${e.title}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
+      });
+      const work = appData.work_experiences || {};
+      ['employment', 'consultancy', 'selfEmployment'].forEach((type) => {
+        (work[type] || []).forEach((e: any) => {
+          if (e.fileUrl) files.push({ name: `Work: ${e.company || e.consultancy}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
+        });
+      });
+      (appData.recognitions || []).forEach((e: any) => {
+        if (e.fileUrl) files.push({ name: `Rec: ${e.title}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
+      });
+      const pd = appData.professional_development || {};
+      ['memberships', 'projects', 'research'].forEach((type) => {
+        (pd[type] || []).forEach((e: any) => {
+          if (e.fileUrl) files.push({ name: `PD: ${e.title || e.organization}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
+        });
+      });
+      (appData.creative_works || []).forEach((e: any) => {
+        if (e.fileUrl) files.push({ name: `Creative: ${e.title}`, url: e.fileUrl, type: getFileType(e.fileUrl) });
+      });
+    }
+    
+    return files;
+  };
+
+  const FileLink = ({ label, url }: { label: string; url?: string }) => {
+    if (!url) return null;
+    const type = getFileType(url);
+    const allImages = collectAllImages();
+    const allFiles = collectAllFiles();
+    
+    return (
+      <div className="flex items-center gap-2 group">
+        {type === 'image' ? (
+          <>
+            <button
+              onClick={() => openImageViewer(allImages, allImages.indexOf(url))}
+              className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-sm"
+              title="View with magnifier"
+            >
+              <ImageIcon size={14} />
+              <span className="truncate">{label}</span>
+              <ZoomIn size={12} className="text-gray-400 group-hover:text-blue-600" />
+            </button>
+            <button
+              onClick={() => openFileViewer([{ name: label, url, type }])}
+              className="text-gray-400 hover:text-blue-600"
+              title="Open in file viewer"
+            >
+              <File size={12} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => openFileViewer([{ name: label, url, type }])}
+              className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-sm"
+            >
+              {type === 'pdf' ? <FileText size={14} /> : <File size={14} />}
+              <span className="truncate">{label}</span>
+            </button>
+            <button
+              onClick={() => openFileViewer([{ name: label, url, type }])}
+              className="text-gray-400 hover:text-blue-600"
+              title="Open in viewer"
+            >
+              <File size={12} />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const Section = ({ icon, title, children, action }: { icon: ReactNode; title: string; children: ReactNode; action?: ReactNode }) => (
     <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-      <h4 className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">
-        {icon} {title}
-      </h4>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-wide">
+          {icon} {title}
+        </h4>
+        {action}
+      </div>
       <div className="space-y-1.5">{children}</div>
     </div>
   );
@@ -502,167 +668,265 @@ const ViewSubmissionModal: FC<{
     },
   ].filter((s) => s.entries.length > 0) : [];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col text-black">
+  const allImages = collectAllImages();
+  const allFiles = collectAllFiles();
+  const imageCount = allImages.length;
+  const fileCount = allFiles.length;
 
-        {/* Header */}
-        <div className="flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10">
-          <h2 className="text-xl font-bold text-gray-800">Portfolio Submission Details</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700" aria-label="Close">
-            <X size={26} />
-          </button>
-        </div>
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col text-black">
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-
-          {/* Photo + Name + Status + Approve/Decline */}
-          <div className="flex items-center gap-5">
-            <img
-              className="h-20 w-20 rounded-full object-cover bg-gray-200 shadow shrink-0"
-              src={submission.photo_url || "/assets/default-avatar.png"}
-              alt="Photo"
-              onError={(e) => { e.currentTarget.src = "/assets/default-avatar.png"; }}
-            />
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xl font-bold text-gray-900 truncate">{submission.full_name || "N/A"}</h3>
-              <p className="text-sm text-gray-500">{submission.degree_program || "N/A"} — {submission.campus || "N/A"}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Submitted: {fmtDate(submission.created_at)}</p>
-            </div>
-            <div className="flex flex-col items-end gap-2 shrink-0">
-              <div className={`text-xs font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${STATUS_COLORS[submission.status] || STATUS_COLORS["Submitted"]}`}>
-                {updatingStatusId === submission.id ? <Loader2 className="h-3 w-3 animate-spin" /> : STATUS_ICONS[submission.status]}
-                {submission.status}
+          {/* Header */}
+          <div className="flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10">
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-bold text-gray-800">Portfolio Submission Details</h2>
+              <div className="flex items-center gap-2">
+                {imageCount > 0 && (
+                  <button
+                    onClick={() => openImageViewer(allImages, 0)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                  >
+                    <ImageIcon size={16} />
+                    {imageCount} Image{imageCount !== 1 ? 's' : ''}
+                  </button>
+                )}
+                {fileCount > 0 && (
+                  <button
+                    onClick={() => openFileViewer(allFiles)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    <FolderOpen size={16} />
+                    {fileCount} File{fileCount !== 1 ? 's' : ''}
+                  </button>
+                )}
               </div>
             </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700" aria-label="Close">
+              <X size={26} />
+            </button>
           </div>
 
-          {/* Personal Info */}
-          {loadingAppData ? (
-            <div className="flex items-center gap-2 text-gray-500 text-sm py-2 justify-center">
-              <Loader2 className="animate-spin h-4 w-4" /> Loading application data...
-            </div>
-          ) : appData ? (
-            <Section icon={<BookOpen size={15} />} title="Personal Information">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                <Row label="Full Name" value={appData.applicant_name} />
-                <Row label="Email" value={appData.email_address} />
-                <Row label="Mobile" value={appData.mobile_number} />
-                <Row label="Birthday" value={fmtDate(appData.birth_date)} />
-                <Row label="Birthplace" value={appData.birth_place} />
-                <Row label="Age" value={appData.age} />
-                <Row label="Gender" value={appData.gender} />
-                <Row label="Civil Status" value={appData.civil_status} />
-                <Row label="Nationality" value={appData.nationality} />
-                <Row label="Religion" value={appData.religion} />
-                <Row label="Language Spoken" value={appData.language_spoken} />
-                <Row label="City Address" value={appData.city_address} />
-                <Row label="Permanent Address" value={appData.permanent_address} />
-                <Row label="Emergency Contact" value={appData.emergency_contact_name} />
-                <Row label="Emergency Relationship" value={appData.emergency_relationship} />
-                <Row label="Emergency Number" value={appData.emergency_contact_number} />
-              </div>
-            </Section>
-          ) : (
-            <p className="text-sm text-gray-400 italic text-center">No linked application data found.</p>
-          )}
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
-          {/* C–I Credential Files */}
-          {!loadingAppData && credentialSections.length > 0 && (
-            <Section icon={<FileText size={15} />} title="Credential Files (C–I)">
-              <div className="space-y-4">
-                {credentialSections.map((sec) => (
-                  <div key={sec.title}>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                      {sec.icon} {sec.title}
-                    </p>
-                    <div className="pl-3 space-y-1 border-l-2 border-gray-200">
-                      {sec.entries.map((e: { label: string; url?: string }, i: number) => <FileLink key={i} label={e.label} url={e.url} />)}
-                    </div>
+            {/* Photo + Name + Status */}
+            <div className="flex items-center gap-5">
+              <div className="relative group">
+                <img
+                  className="h-20 w-20 rounded-full object-cover bg-gray-200 shadow shrink-0 cursor-pointer"
+                  src={submission.photo_url || "/assets/default-avatar.png"}
+                  alt="Photo"
+                  onClick={() => submission.photo_url && openImageViewer(allImages, allImages.indexOf(submission.photo_url))}
+                  onError={(e) => { e.currentTarget.src = "/assets/default-avatar.png"; }}
+                />
+                {submission.photo_url && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    onClick={() => openImageViewer(allImages, allImages.indexOf(submission.photo_url))}>
+                    <ZoomIn size={20} className="text-white" />
                   </div>
-                ))}
+                )}
               </div>
-            </Section>
-          )}
-          {!loadingAppData && appData && credentialSections.length === 0 && (
-            <p className="text-sm text-gray-400 italic text-center">No credential files uploaded in the application form.</p>
-          )}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-bold text-gray-900 truncate">{submission.full_name || "N/A"}</h3>
+                <p className="text-sm text-gray-500">{submission.degree_program || "N/A"} — {submission.campus || "N/A"}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Submitted: {fmtDate(submission.created_at)}</p>
+              </div>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <div className={`text-xs font-semibold rounded-full px-3 py-1 inline-flex items-center gap-1.5 ${STATUS_COLORS[submission.status] || STATUS_COLORS["Submitted"]}`}>
+                  {updatingStatusId === submission.id ? <Loader2 className="h-3 w-3 animate-spin" /> : STATUS_ICONS[submission.status]}
+                  {submission.status}
+                </div>
+              </div>
+            </div>
 
-          {/* Portfolio Files submitted via portform — always show all categories */}
-          {(() => {
-            const PORT_GROUPS = [
-              { key: "eteeapForm", label: "Accomplished ETEEAP Application Form" },
-              { key: "cv", label: "Curriculum Vitae" },
-              { key: "psychTest", label: "Psychological Test" },
-              { key: "authenticity", label: "Statement of Ownership/Authenticity" },
-              { key: "endorsement", label: "Endorsement Letter" },
-              { key: "otherDocs", label: "Other Documents Required" },
-              { key: "visitation", label: "Workplace Visitation Checklist" },
-              { key: "otherEvidence", label: "Other Evidence" },
-            ];
-            const pf = submission.portfolio_files || [];
-            const grouped = PORT_GROUPS.map((g) => ({
-              ...g,
-              files: pf.filter((f) => f.key === g.key),
-            }));
+            {/* Personal Info */}
+            {loadingAppData ? (
+              <div className="flex items-center gap-2 text-gray-500 text-sm py-2 justify-center">
+                <Loader2 className="animate-spin h-4 w-4" /> Loading application data...
+              </div>
+            ) : appData ? (
+              <Section icon={<BookOpen size={15} />} title="Personal Information">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                  <Row label="Full Name" value={appData.applicant_name} />
+                  <Row label="Email" value={appData.email_address} />
+                  <Row label="Mobile" value={appData.mobile_number} />
+                  <Row label="Birthday" value={fmtDate(appData.birth_date)} />
+                  <Row label="Birthplace" value={appData.birth_place} />
+                  <Row label="Age" value={appData.age} />
+                  <Row label="Gender" value={appData.gender} />
+                  <Row label="Civil Status" value={appData.civil_status} />
+                  <Row label="Nationality" value={appData.nationality} />
+                  <Row label="Religion" value={appData.religion} />
+                  <Row label="Language Spoken" value={appData.language_spoken} />
+                  <Row label="City Address" value={appData.city_address} />
+                  <Row label="Permanent Address" value={appData.permanent_address} />
+                  <Row label="Emergency Contact" value={appData.emergency_contact_name} />
+                  <Row label="Emergency Relationship" value={appData.emergency_relationship} />
+                  <Row label="Emergency Number" value={appData.emergency_contact_number} />
+                </div>
+              </Section>
+            ) : (
+              <p className="text-sm text-gray-400 italic text-center">No linked application data found.</p>
+            )}
 
-            return (
-              <Section icon={<Star size={15} />} title="Portfolio Files Submitted">
-                <div className="space-y-3">
-                  {grouped.map((g) => (
-                    <div key={g.key}>
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                        {g.files.length > 0
-                          ? <span className="w-2 h-2 rounded-full bg-green-500 inline-block shrink-0" />
-                          : <span className="w-2 h-2 rounded-full bg-gray-300 inline-block shrink-0" />}
-                        {g.label}
+            {/* C–I Credential Files */}
+            {!loadingAppData && credentialSections.length > 0 && (
+              <Section 
+                icon={<FileText size={15} />} 
+                title="Credential Files (C–I)"
+                action={
+                  <button
+                    onClick={() => openFileViewer(allFiles.filter(f => credentialSections.some(s => s.entries.some((e: {url?: string}) => e.url === f.url))))}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    View All
+                  </button>
+                }
+              >
+                <div className="space-y-4">
+                  {credentialSections.map((sec) => (
+                    <div key={sec.title}>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                        {sec.icon} {sec.title}
                       </p>
-                      <div className="pl-4 space-y-1 border-l-2 border-gray-200">
-                        {g.files.length > 0 ? (
-                          g.files.map((f, i) => (
-                            <FileLink key={i} label={f.label || f.key} url={f.url} />
-                          ))
-                        ) : (
-                          <p className="text-xs text-gray-400 italic">Not yet uploaded</p>
-                        )}
+                      <div className="pl-3 space-y-1 border-l-2 border-gray-200">
+                        {sec.entries.map((e: { label: string; url?: string }, i: number) => <FileLink key={i} label={e.label} url={e.url} />)}
                       </div>
                     </div>
                   ))}
                 </div>
               </Section>
-            );
-          })()}
+            )}
+            {!loadingAppData && appData && credentialSections.length === 0 && (
+              <p className="text-sm text-gray-400 italic text-center">No credential files uploaded in the application form.</p>
+            )}
 
-          {/* Signature */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-center">Applicant Signature</p>
-            <div className="border rounded-lg p-2 bg-gray-100 max-w-xs mx-auto">
-              {submission.signature ? (
-                <img src={submission.signature} alt="Signature" className="w-full h-auto object-contain" />
-              ) : (
-                <p className="text-sm text-gray-500 italic text-center p-4">No signature provided.</p>
-              )}
+            {/* Portfolio Files submitted via portform */}
+            {(() => {
+              const PORT_GROUPS = [
+                { key: "eteeapForm", label: "Accomplished ETEEAP Application Form" },
+                { key: "cv", label: "Curriculum Vitae" },
+                { key: "psychTest", label: "Psychological Test" },
+                { key: "authenticity", label: "Statement of Ownership/Authenticity" },
+                { key: "endorsement", label: "Endorsement Letter" },
+                { key: "otherDocs", label: "Other Documents Required" },
+                { key: "visitation", label: "Workplace Visitation Checklist" },
+                { key: "otherEvidence", label: "Other Evidence" },
+              ];
+              const pf = submission.portfolio_files || [];
+              const grouped = PORT_GROUPS.map((g) => ({
+                ...g,
+                files: pf.filter((f) => f.key === g.key),
+              }));
+              const hasFiles = grouped.some(g => g.files.length > 0);
+
+              return (
+                <Section 
+                  icon={<Star size={15} />} 
+                  title="Portfolio Files Submitted"
+                  action={hasFiles ? (
+                    <button
+                      onClick={() => openFileViewer(allFiles.filter(f => pf.some(pf => pf.url === f.url)))}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      View All
+                    </button>
+                  ) : undefined}
+                >
+                  <div className="space-y-3">
+                    {grouped.map((g) => (
+                      <div key={g.key}>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 flex items-center gap-1.5">
+                          {g.files.length > 0
+                            ? <span className="w-2 h-2 rounded-full bg-green-500 inline-block shrink-0" />
+                            : <span className="w-2 h-2 rounded-full bg-gray-300 inline-block shrink-0" />}
+                          {g.label}
+                        </p>
+                        <div className="pl-4 space-y-1 border-l-2 border-gray-200">
+                          {g.files.length > 0 ? (
+                            g.files.map((f, i) => (
+                              <FileLink key={i} label={f.label || f.key} url={f.url} />
+                            ))
+                          ) : (
+                            <p className="text-xs text-gray-400 italic">Not yet uploaded</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              );
+            })()}
+
+            {/* Signature */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-center">Applicant Signature</p>
+              <div className="border rounded-lg p-2 bg-gray-100 max-w-xs mx-auto relative group">
+                {submission.signature ? (
+                  <>
+                    <img 
+                      src={submission.signature} 
+                      alt="Signature" 
+                      className="w-full h-auto object-contain cursor-pointer"
+                      onClick={() => openImageViewer(allImages, allImages.indexOf(submission.signature))}
+                    />
+                    <div 
+                      className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-lg"
+                      onClick={() => openImageViewer(allImages, allImages.indexOf(submission.signature))}
+                    >
+                      <ZoomIn size={24} className="text-white" />
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 italic text-center p-4">No signature provided.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl sticky bottom-0 flex justify-between items-center">
+            <div className='flex items-center gap-2 text-xs text-gray-500'>
+              <span>ID: {submission.id}</span>
+              <span>·</span>
+              <span>User: {submission.user_id?.substring(0, 12)}…</span>
+            </div>
+            <div className='flex gap-3'>
+              <button onClick={onClose} className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
+                Close
+              </button>
+              <button
+                onClick={() => openPortfolioPrintPreview(submission, appData)}
+                className="px-5 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+              >
+                <Printer size={15} />
+                Print Portfolio
+              </button>
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl sticky bottom-0 flex justify-end gap-3">
-          <button
-            onClick={() => openPortfolioPrintPreview(submission, appData)}
-            className="px-5 py-2 bg-slate-700 text-white font-semibold rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2"
-          >
-            <Printer size={15} />
-            Print Portfolio Form
-          </button>
-          <button onClick={onClose} className="px-6 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300">
-            Close
-          </button>
-        </div>
       </div>
-    </div>
-  );
+
+      {/* Image Viewer */}
+      <ImageViewer
+        images={imageViewerImages}
+        initialIndex={imageViewerIndex}
+        isOpen={imageViewerOpen}
+        onClose={() => setImageViewerOpen(false)}
+        title="Portfolio Images"
+      />
+
+      {/* File Viewer */}
+      <FileViewer
+        files={fileViewerFiles}
+        isOpen={fileViewerOpen}
+        onClose={() => setFileViewerOpen(false)}
+        title="Portfolio Files"
+      />
+    </>
+    , document.body);
 };
 
 // ─── Actions Menu ───

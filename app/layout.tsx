@@ -57,6 +57,9 @@ export const metadata: Metadata = {
       "Get your bachelor's degree through T.I.P.'s ETEEAP program for working professionals.",
     images: ["/twitter-image.jpg"],
   },
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

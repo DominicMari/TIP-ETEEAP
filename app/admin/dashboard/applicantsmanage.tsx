@@ -1,6 +1,8 @@
 'use client';
 import { createPortal } from 'react-dom';
 import { openPrintPreview } from "@/components/admin/printTemplate";
+import { ImageViewer } from "@/components/admin/ImageViewer";
+import { FileViewer, FileItem } from "@/components/admin/FileViewer";
 import { useEffect, useState, FC, ReactNode, useMemo, useRef } from 'react';
 import supabase from '../../../lib/supabase/client'; // Adjust path if needed
 import {
@@ -15,12 +17,30 @@ import {
   Eye,
   Trash2,
   Zap,
-  TrendingUp
+  TrendingUp,
+  User,
+  FileText,
+  Briefcase,
+  GraduationCap,
+  Award,
+  FolderOpen,
+  Image as ImageIcon,
+  File,
+  ZoomIn,
+  Download,
 } from 'lucide-react';
 import Modal from "@/components/ui/Modal";
 import { useModal } from "@/components/ui/useModal";
 import { getRemarksTemplate } from '@/lib/utils/remarksTemplates';
 import { sendStatusEmail } from '@/lib/utils/statusEmail';
+
+type TabType = 'profile' | 'education' | 'experience' | 'documents' | 'portfolio';
+
+interface TabConfig {
+  id: TabType;
+  label: string;
+  icon: ReactNode;
+}
 
 interface DegreePriority {
   priority: string;
@@ -787,14 +807,121 @@ const ViewApplicantModal: FC<{
       openPrintPreview(applicant);
     };
 
+    const [imageViewerOpen, setImageViewerOpen] = useState(false);
+    const [imageViewerImages, setImageViewerImages] = useState<string[]>([]);
+    const [imageViewerIndex, setImageViewerIndex] = useState(0);
+    const [fileViewerOpen, setFileViewerOpen] = useState(false);
+    const [fileViewerFiles, setFileViewerFiles] = useState<FileItem[]>([]);
+
+    const getFileType = (url: string): FileItem["type"] => {
+      const ext = (url || "").toLowerCase().split(".").pop() || "";
+      if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext)) return "image";
+      if (ext === "pdf") return "pdf";
+      if (["doc", "docx", "txt", "rtf"].includes(ext)) return "document";
+      return "other";
+    };
+
+    const toFileItem = (name: string, url: string): FileItem => ({
+      name,
+      url,
+      type: getFileType(url),
+    });
+
+    const extractFiles = (value: any, prefix = "Attachment"): FileItem[] => {
+      if (!value) return [];
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+          return [toFileItem(prefix, trimmed)];
+        }
+        try {
+          const parsed = JSON.parse(trimmed);
+          return extractFiles(parsed, prefix);
+        } catch {
+          return [];
+        }
+      }
+      if (Array.isArray(value)) {
+        return value.flatMap((item, index) => extractFiles(item, `${prefix} ${index + 1}`));
+      }
+      if (typeof value === "object") {
+        const files: FileItem[] = [];
+        for (const [key, val] of Object.entries(value)) {
+          if ((key.toLowerCase().includes("file") || key.toLowerCase().includes("url") || key.toLowerCase().includes("link")) && typeof val === "string") {
+            const fileUrl = val.trim();
+            if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+              files.push(toFileItem(key.replace(/_/g, " "), fileUrl));
+            }
+          } else {
+            files.push(...extractFiles(val, key.replace(/_/g, " ")));
+          }
+        }
+        return files;
+      }
+      return [];
+    };
+
+    const uploadedFiles = [
+      ...extractFiles(applicant.education_background, "Education"),
+      ...extractFiles(applicant.non_formal_education, "Non-Formal Education"),
+      ...extractFiles(applicant.certifications, "Certification"),
+      ...extractFiles(applicant.publications, "Publication"),
+      ...extractFiles(applicant.inventions, "Invention"),
+      ...extractFiles(applicant.work_experiences, "Work Experience"),
+      ...extractFiles(applicant.recognitions, "Recognition"),
+      ...extractFiles(applicant.professional_development, "Professional Development"),
+      ...extractFiles(applicant.creative_works, "Creative Work"),
+      ...extractFiles(applicant.portfolio, "Portfolio"),
+    ];
+
+    const uniqueUploadedFiles = Array.from(new Map(uploadedFiles.map((f) => [f.url, f])).values());
+    const allImages = [applicant.photo_url, applicant.signature_url, ...uniqueUploadedFiles.filter((f) => f.type === "image").map((f) => f.url)]
+      .filter((u): u is string => !!u && u.trim().length > 0);
+
+    const openImageViewer = (images: string[], index = 0) => {
+      if (!images.length) return;
+      setImageViewerImages(images);
+      setImageViewerIndex(index);
+      setImageViewerOpen(true);
+    };
+
+    const openFileViewer = (files: FileItem[]) => {
+      if (!files.length) return;
+      setFileViewerFiles(files);
+      setFileViewerOpen(true);
+    };
+
     return createPortal(
+      <>
       <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm'>
         <div className='bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col text-black'>
           {/* Modal Header */}
           <div className='flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white rounded-t-2xl z-10'>
-            <h2 className='text-2xl font-bold text-gray-800'>
-              Applicant Details
-            </h2>
+            <div className='flex items-center gap-4'>
+              <h2 className='text-2xl font-bold text-gray-800'>
+                Applicant Details
+              </h2>
+              <div className='flex items-center gap-2'>
+                {allImages.length > 0 && (
+                  <button
+                    onClick={() => openImageViewer(allImages, 0)}
+                    className='flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors'
+                  >
+                    <ImageIcon size={14} />
+                    {allImages.length} Image{allImages.length !== 1 ? 's' : ''}
+                  </button>
+                )}
+                {uniqueUploadedFiles.length > 0 && (
+                  <button
+                    onClick={() => openFileViewer(uniqueUploadedFiles)}
+                    className='flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors'
+                  >
+                    <FolderOpen size={14} />
+                    {uniqueUploadedFiles.length} File{uniqueUploadedFiles.length !== 1 ? 's' : ''}
+                  </button>
+                )}
+              </div>
+            </div>
             <button
               onClick={onClose}
               className='text-gray-400 hover:text-gray-700'
@@ -811,12 +938,27 @@ const ViewApplicantModal: FC<{
             <div className='w-1/3 max-w-sm border-r border-gray-200 p-6 overflow-y-auto space-y-6 bg-gray-50'>
               {/* Applicant Bio */}
               <div className='flex flex-col items-center text-center'>
-                <img
-                  className='h-32 w-32 rounded-full object-cover bg-gray-200 flex-shrink-0 shadow-md mb-4'
-                  src={applicant.photo_url || '/assets/default-avatar.png'}
-                  alt='Applicant Photo'
-                  onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
-                />
+                <div className='relative group mb-4'>
+                  <img
+                    className='h-32 w-32 rounded-full object-cover bg-gray-200 flex-shrink-0 shadow-md cursor-pointer'
+                    src={applicant.photo_url || '/assets/default-avatar.png'}
+                    alt='Applicant Photo'
+                    onClick={() => {
+                      if (applicant.photo_url) {
+                        openImageViewer(allImages, allImages.indexOf(applicant.photo_url));
+                      }
+                    }}
+                    onError={(e) => { e.currentTarget.src = '/assets/default-avatar.png'; }}
+                  />
+                  {applicant.photo_url && (
+                    <div
+                      className='absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer'
+                      onClick={() => openImageViewer(allImages, allImages.indexOf(applicant.photo_url as string))}
+                    >
+                      <ZoomIn className='w-6 h-6 text-white' />
+                    </div>
+                  )}
+                </div>
                 <h3 className='text-2xl font-bold text-gray-900'>
                   {applicant.applicant_name || 'N/A'}
                 </h3>
@@ -894,18 +1036,57 @@ const ViewApplicantModal: FC<{
                   value={formatDate(applicant.updated_at, true)}
                 />
                 <InfoItem label='Portfolio/Folder Link'>
-                  <a
-                    href={applicant.folder_link || '#'}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className={`break-all ${applicant.folder_link
-                      ? 'text-blue-600 hover:underline'
-                      : 'text-black pointer-events-none'
-                      }`}
-                  >
-                    {applicant.folder_link || 'N/A'}
-                  </a>
+                  {applicant.folder_link ? (
+                    <button
+                      type='button'
+                      onClick={() => openFileViewer([toFileItem('Portfolio Folder', applicant.folder_link as string)])}
+                      className='break-all text-blue-600 hover:underline text-left inline-flex items-center gap-1.5'
+                    >
+                      <FolderOpen className='w-4 h-4' />
+                      {applicant.folder_link}
+                    </button>
+                  ) : (
+                    <span>N/A</span>
+                  )}
                 </InfoItem>
+              </InfoCard>
+
+              <InfoCard title='Uploaded Files'>
+                {uniqueUploadedFiles.length > 0 ? (
+                  <>
+                    <button
+                      type='button'
+                      onClick={() => openFileViewer(uniqueUploadedFiles)}
+                      className='w-full mb-3 bg-gradient-to-r from-yellow-100 to-amber-100 hover:from-yellow-200 hover:to-amber-200 text-yellow-800 text-xs font-semibold py-2.5 px-3 rounded-lg inline-flex items-center justify-center gap-2 transition-all shadow-sm border border-yellow-200'
+                    >
+                      <FolderOpen className='w-4 h-4' />
+                      View All Files ({uniqueUploadedFiles.length})
+                    </button>
+                    <div className='space-y-1.5 max-h-64 overflow-y-auto pr-1'>
+                      {uniqueUploadedFiles.map((f, idx) => (
+                        <button
+                          key={`${f.url}-${idx}`}
+                          type='button'
+                          onClick={() => openFileViewer([f])}
+                          className='w-full text-left text-xs text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded-md px-2 py-1.5 inline-flex items-start gap-2 transition-colors group'
+                        >
+                          <span className={`mt-0.5 shrink-0 ${
+                            f.type === 'image' ? 'text-blue-500' :
+                            f.type === 'pdf' ? 'text-red-500' :
+                            f.type === 'document' ? 'text-indigo-500' : 'text-gray-400'
+                          }`}>
+                            {f.type === 'image' ? <ImageIcon className='w-3.5 h-3.5' /> :
+                             f.type === 'pdf' ? <FileText className='w-3.5 h-3.5' /> :
+                             <File className='w-3.5 h-3.5' />}
+                          </span>
+                          <span className='break-words leading-tight group-hover:underline'>{f.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className='text-sm text-gray-500 italic'>No uploaded files found from application records.</p>
+                )}
               </InfoCard>
 
               <InfoCard title='Internal Data'>
@@ -946,30 +1127,58 @@ const ViewApplicantModal: FC<{
                 <CreativeWorks data={applicant.creative_works} />
               </CollapsibleSection>
               <CollapsibleSection title="Applicant Signature">
-                <Signature data={applicant.signature_url} />
+                <Signature
+                  data={applicant.signature_url}
+                  onOpen={() => {
+                    if (applicant.signature_url) {
+                      openImageViewer(allImages, allImages.indexOf(applicant.signature_url));
+                    }
+                  }}
+                />
               </CollapsibleSection>
             </div>
           </div>
 
           {/* Modal Footer */}
-          <div className="p-4 border-t flex justify-end gap-3">
-            <button
-              onClick={onClose}
-              className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-lg font-medium text-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handlePrint}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
-              Print
-            </button>
+          <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex justify-between items-center">
+            <div className='flex items-center gap-2 text-xs text-gray-500'>
+              <span>ID: {applicant.application_id?.substring(0, 12)}…</span>
+            </div>
+            <div className='flex gap-3'>
+              <button
+                onClick={onClose}
+                className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-lg font-medium text-gray-700 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={handlePrint}
+                className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
+                Print Application
+              </button>
+            </div>
           </div>
 
         </div>
       </div>
+
+      <ImageViewer
+        images={imageViewerImages}
+        initialIndex={imageViewerIndex}
+        isOpen={imageViewerOpen}
+        onClose={() => setImageViewerOpen(false)}
+        title='Applicant Image Viewer'
+      />
+
+      <FileViewer
+        files={fileViewerFiles}
+        isOpen={fileViewerOpen}
+        onClose={() => setFileViewerOpen(false)}
+        title='Applicant Files'
+      />
+      </>
       , document.body);
   };
 
@@ -1086,18 +1295,26 @@ const CreativeWorks: FC<{ data: any }> = ({ data }) => {
 };
 
 // Renders Signature
-const Signature: FC<{ data: string | null }> = ({ data }) => {
+const Signature: FC<{ data: string | null; onOpen?: () => void }> = ({ data, onOpen }) => {
   if (!data) {
     return <p className='italic text-gray-500 text-sm'>No information provided.</p>;
   }
 
   return (
-    <div className='border rounded-lg p-2 bg-gray-100 max-w-md'>
+    <div
+      className='border rounded-lg p-2 bg-gray-100 max-w-md relative group cursor-pointer'
+      onClick={onOpen}
+    >
       <img
         src={data}
         alt='Applicant Signature'
         className='w-full h-auto object-contain'
       />
+      {onOpen && (
+        <div className='absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg'>
+          <ZoomIn className='w-6 h-6 text-white' />
+        </div>
+      )}
     </div>
   );
 };
