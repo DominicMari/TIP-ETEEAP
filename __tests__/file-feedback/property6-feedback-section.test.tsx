@@ -2,28 +2,12 @@
 // Feature: file-feedback, Property 6: FileFeedbackSection renders all entries with required fields
 // Validates: Requirements 9.2, 9.4, 9.7
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
 import { render, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { FileFeedbackSection } from "../../app/tracker/page";
+import { FileFeedbackSection } from "../../components/FileFeedbackSection";
 import type { FileFeedbackEntry } from "../../lib/types/fileFeedback";
-
-// Mock next-auth and supabase to avoid module resolution issues in tests
-vi.mock("next-auth/react", () => ({
-    useSession: () => ({ data: null, status: "unauthenticated" }),
-    signIn: vi.fn(),
-}));
-
-vi.mock("@/lib/supabase/client", () => ({
-    default: {
-        channel: vi.fn(() => ({
-            on: vi.fn().mockReturnThis(),
-            subscribe: vi.fn(),
-        })),
-        removeChannel: vi.fn(),
-    },
-}));
 
 const entryArb = fc.record({
     fileName: fc.string({ minLength: 1 }),
