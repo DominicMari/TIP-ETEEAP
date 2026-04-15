@@ -22,7 +22,11 @@ export default function PersonalInformationForm({
     >
   ) => {
     const { name, value, type, checked } = e.target as HTMLInputElement;
-    const newValue = type === "checkbox" ? checked : value;
+    let newValue = type === "checkbox" ? checked : value;
+
+    if (name === "mobile" || name === "emergencyContactNumber") {
+      newValue = String(newValue).replace(/\D/g, "");
+    }
 
     let updated = {
       ...formData,
@@ -200,7 +204,7 @@ export default function PersonalInformationForm({
                 name="age"
                 value={formData.age || ""}
                 readOnly
-                className={`w-full border rounded-lg px-3 py-2 text-black ${
+                className={`w-full border rounded-lg px-3 py-2 text-black bg-gray-100 cursor-not-allowed ${
                   errors.age ? "border-red-500" : "border-gray-400"
                 }`}
               />
@@ -310,6 +314,9 @@ export default function PersonalInformationForm({
                 required
                 type="tel"
                 name="mobile"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={11}
                 value={formData.mobile || ""}
                 onChange={handleChange}
                 className={`w-full border rounded-lg px-3 py-2 text-black ${
@@ -379,7 +386,11 @@ export default function PersonalInformationForm({
               <label className="text-sm font-semibold text-black">Contact Number: <span className="text-red-500">*</span></label>
               <input
                 required
+                type="tel"
                 name="emergencyContactNumber"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={11}
                 value={formData.emergencyContactNumber || ""}
                 onChange={handleChange}
                 className={`w-full border rounded-lg px-3 py-2 text-black ${

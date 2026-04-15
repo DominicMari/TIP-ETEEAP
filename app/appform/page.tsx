@@ -790,6 +790,18 @@ export default function ApplicationFormPage() {
         }
     };
 
+    const handleSubmitWithConfirmation = async () => {
+        const confirmed = await showConfirm(
+            'Are you sure you want to submit this application? You will still be able to make changes after submission.',
+            'Confirm Submission',
+            'confirm',
+            'Yes, submit',
+            'Cancel'
+        );
+        if (!confirmed) return;
+        await handleSubmit();
+    };
+
     // --- Render Logic ---
     const renderStep = () => {
         if (isSubmitting) {
@@ -826,7 +838,7 @@ export default function ApplicationFormPage() {
                     />
                 );
             case 8:
-                return (<FinalReviewStep nextStep={handleSubmit} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} />);
+                return (<FinalReviewStep nextStep={handleSubmitWithConfirmation} prevStep={prevStep} signaturePadRef={signaturePadRef} isSubmitting={isSubmitting} />);
             // ✅ 9. Pass the new reset handler to the SuccessScreen
             case 9:
                 return <SuccessScreen onEdit={startNewApplication} onGoToPortfolio={() => router.push('/portform')} onPrint={handlePrint} isPrinting={isPrinting} isDeleting={isDeletingApp} />;

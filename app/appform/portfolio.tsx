@@ -65,6 +65,15 @@ export default function PortfolioForm({
     handleFileChange(index, null);
   };
 
+  const isDuplicateFile = (file: File, currentIndex: number) => {
+    return documents.some((doc, idx) => {
+      return idx !== currentIndex && doc.file &&
+        doc.file.name === file.name &&
+        doc.file.size === file.size &&
+        doc.file.type === file.type;
+    });
+  };
+
   const validateAndProceed = () => {
     const newErrors: Record<string, string> = {};
 
@@ -75,7 +84,24 @@ export default function PortfolioForm({
       }
     });
 
-    // 2. Block if any existing validation errors remain
+    // 2. Validate duplicate files across slots
+    const fileIndexMap = new Map<string, number[]>();
+    documents.forEach((doc, index) => {
+      if (doc.file) {
+        const key = `${doc.file.name}-${doc.file.size}-${doc.file.type}`;
+        fileIndexMap.set(key, [...(fileIndexMap.get(key) || []), index]);
+      }
+    });
+
+    fileIndexMap.forEach((indices) => {
+      if (indices.length > 1) {
+        indices.forEach((index) => {
+          newErrors[index] = 'Duplicate file detected. Please upload a different document for each slot.';
+        });
+      }
+    });
+
+    // 3. Block if any existing validation errors remain
     const combinedErrors = { ...errors, ...newErrors };
     if (Object.keys(combinedErrors).length > 0) {
       setErrors(combinedErrors);
@@ -123,7 +149,7 @@ export default function PortfolioForm({
           Portfolio - Document Submission
         </h3>
         <p className="text-sm text-gray-500 mb-6">
-          Upload clear scanned copies or high-quality photos of your documents.
+          Upload clear scanned copies or high-quality photos of your documents. Each uploaded file can only be used once; duplicate files in different slots are not allowed.
         </p>
 
         <div className="space-y-5">
@@ -180,6 +206,13 @@ export default function PortfolioForm({
                         const result = validateFile(file);
                         if (!result.valid) {
                           setErrors((prev) => ({ ...prev, [index]: result.error! }));
+                          return;
+                        }
+                        if (isDuplicateFile(file, index)) {
+                          setErrors((prev) => ({
+                            ...prev,
+                            [index]: 'This file has already been uploaded in another document slot. Please choose a different file.',
+                          }));
                           return;
                         }
                         setErrors((prev) => {
