@@ -1,24 +1,9 @@
 // Feature: file-feedback, Property 1: Feedback entry is appended, not replaced
 // Validates: Requirements 10.1, 10.2, 10.3, 1.3, 10.4
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
-
-// Mock Supabase so the module-level createClient call doesn't fail at import time
-vi.mock("@supabase/supabase-js", () => ({
-    createClient: vi.fn(() => ({ from: vi.fn() })),
-}));
-
-vi.mock("next-auth", () => ({
-    getServerSession: vi.fn(),
-}));
-
-vi.mock("next/server", () => ({
-    NextResponse: { json: vi.fn() },
-    NextRequest: vi.fn(),
-}));
-
-import { appendFeedbackEntry } from "../../app/api/file-feedback/route";
+import { appendFeedbackEntry } from "../../lib/utils/fileFeedbackUtils";
 import type { FileFeedbackEntry } from "../../lib/types/fileFeedback";
 
 const entryArb = fc.record({

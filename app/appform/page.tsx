@@ -66,7 +66,7 @@ function SuccessScreen({ onEdit, onGoToPortfolio, onPrint, isDeleting, isPrintin
             <p className="text-gray-600 mb-8">Thank you for completing the form. We have received your application and will review it shortly.</p>
 
             <div className="flex flex-col gap-3 w-full">
-                <Link href="/tracker" className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors text-center">
+                <Link href="/tracker" className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors text-center">
                     Track Application
                 </Link>
                 <Link href="/" className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors text-center">
@@ -75,7 +75,7 @@ function SuccessScreen({ onEdit, onGoToPortfolio, onPrint, isDeleting, isPrintin
                 <button
                     type="button"
                     onClick={onGoToPortfolio}
-                    className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors"
+                    className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors"
                 >
                     Go to Portfolio Form
                 </button>
@@ -92,7 +92,7 @@ function SuccessScreen({ onEdit, onGoToPortfolio, onPrint, isDeleting, isPrintin
                     type="button"
                     onClick={onEdit}
                     disabled={isDeleting}
-                    className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     {isDeleting && <Loader2 size={16} className="animate-spin" />}
                     Make a New Application
@@ -848,7 +848,7 @@ export default function ApplicationFormPage() {
                         You have already submitted an application. Only one application per account is allowed.
                     </p>
                     <div className="flex flex-col gap-3 w-full">
-                        <Link href="/tracker" className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors text-center">
+                        <Link href="/tracker" className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors text-center">
                             Track Application
                         </Link>
                         <Link href="/" className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors text-center">
@@ -858,7 +858,7 @@ export default function ApplicationFormPage() {
                             type="button"
                             onClick={startEditApplication}
                             disabled={isLoadingEdit}
-                            className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isLoadingEdit && <Loader2 size={16} className="animate-spin" />}
                             Edit Application
@@ -870,7 +870,7 @@ export default function ApplicationFormPage() {
                             type="button"
                             onClick={handlePrint}
                             disabled={isPrinting}
-                            className="w-full py-3 px-6 bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full py-3 px-6 bg-yellow-500 text-gray-900 font-bold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {isPrinting ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
                             Print Application Form

@@ -24,6 +24,9 @@ export function formatNotificationItem(notification: {
 
     let message: string;
     switch (notification.type) {
+        case 'new_application':
+            message = 'has created a new application';
+            break;
         case 'new_portfolio':
             message = 'submitted a portfolio';
             break;

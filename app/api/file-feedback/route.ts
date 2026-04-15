@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import type { FileFeedbackEntry } from "@/lib/types/fileFeedback";
+import { appendFeedbackEntry, buildFeedbackEmailBody } from "@/lib/utils/fileFeedbackUtils";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,33 +12,6 @@ const supabase = createClient(
 
 const ALLOWED_SOURCE_TYPES = ["application", "portfolio"] as const;
 type SourceType = (typeof ALLOWED_SOURCE_TYPES)[number];
-
-// Pure helper: append a new entry to an existing (possibly null) array
-export function appendFeedbackEntry(
-    existing: FileFeedbackEntry[] | null | undefined,
-    newEntry: FileFeedbackEntry
-): FileFeedbackEntry[] {
-    return [...(existing ?? []), newEntry];
-}
-
-// Pure helper: build the email body for a feedback notification
-export function buildFeedbackEmailBody(
-    applicantName: string | null,
-    fileName: string,
-    message: string
-): string {
-    const name = applicantName ?? "Applicant";
-    const escapedFileName = fileName.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const escapedMessage = message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
-    return (
-        `<p>Dear ${name},</p>` +
-        `<p>An administrator has provided feedback on one of your submitted files.</p>` +
-        `<p><strong>File:</strong> ${escapedFileName}</p>` +
-        `<p><strong>Feedback:</strong><br>${escapedMessage}</p>` +
-        `<p>Please log in to your tracker page to review this feedback and take any necessary action.</p>` +
-        `<p>Regards,<br>TIP ETEEAP Team</p>`
-    );
-}
 
 export async function POST(req: NextRequest) {
     // Require authenticated admin session
