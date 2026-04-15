@@ -7,9 +7,7 @@ export default defineConfig({
     test: {
         environment: 'node',
         globals: true,
-        environmentMatchGlobs: [
-            ['**/*.test.tsx', 'jsdom'],
-        ],
+        // Per-file environment is set via `// @vitest-environment jsdom` docblock in .test.tsx files
     },
     resolve: {
         alias: {
