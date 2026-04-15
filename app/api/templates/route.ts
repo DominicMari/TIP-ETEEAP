@@ -94,19 +94,25 @@ export async function PATCH(req: NextRequest) {
     if (typeof subject === 'string') updates.subject = subject.trim();
     if (typeof content === 'string') updates.content = content;
 
-    const { data, error } = await supabase
+    const { error: updateError } = await supabase
       .from(TABLE)
       .update(updates)
-      .eq('id', Number(id))
-      .select()
-      .single();
+      .eq('id', Number(id));
 
-    if (error) {
-      if (error.code === '23505') {
+    if (updateError) {
+      if (updateError.code === '23505') {
         return NextResponse.json({ error: 'Template name must be unique.' }, { status: 409 });
       }
-      throw error;
+      throw updateError;
     }
+
+    const { data, error: selectError } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('id', Number(id))
+      .single();
+
+    if (selectError) throw selectError;
 
     if (!data) {
       return NextResponse.json({ error: 'Template not found.' }, { status: 404 });
