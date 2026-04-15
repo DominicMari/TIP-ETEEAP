@@ -57,8 +57,10 @@ export default function FileFeedbackModal({
     // Focus trap
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key !== "Tab") return;
-        const focusable = [closeButtonRef.current, textareaRef.current, submitButtonRef.current].filter(
-            (el): el is HTMLElement => el !== null && !el.hasAttribute("disabled")
+        const focusable = (
+            [closeButtonRef.current, textareaRef.current, submitButtonRef.current] as Array<HTMLButtonElement | HTMLTextAreaElement | null>
+        ).filter(
+            (el): el is HTMLButtonElement | HTMLTextAreaElement => el !== null && !el.hasAttribute("disabled")
         );
         if (focusable.length === 0) return;
         const first = focusable[0];
