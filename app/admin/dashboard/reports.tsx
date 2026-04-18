@@ -87,8 +87,113 @@ export default function Reports() {
     // ── PDF Export ──────────────────────────────────────────────────────────────
     const handleExportPDF = useCallback(() => {
         if (isEmpty) return;
-        window.print();
-    }, [isEmpty]);
+
+        const dateRange = startDate || endDate
+            ? `${startDate ? new Date(startDate).toLocaleDateString("en-PH") : "—"} to ${endDate ? new Date(endDate).toLocaleDateString("en-PH") : "—"}`
+            : "All dates";
+
+        const tableRows = filtered.map((r) => `
+            <tr>
+                <td>${r.applicant_name ?? ""}</td>
+                <td>${r.email_address ?? ""}</td>
+                <td>${r.degree_applied_for ?? ""}</td>
+                <td>${r.campus ?? ""}</td>
+                <td>${r.status ?? ""}</td>
+                <td>${r.created_at ? new Date(r.created_at).toLocaleDateString("en-PH") : ""}</td>
+                <td>${r.admin_remarks ?? ""}</td>
+            </tr>`).join("");
+
+        const summaryRows = [
+            { label: "Total Applicants", value: filtered.length },
+            { label: "Unique Campuses", value: byCampus.length },
+            { label: "Degree Programs", value: byDegree.length },
+        ].map(s => `<div class="summary-card"><div class="summary-label">${s.label}</div><div class="summary-value">${s.value}</div></div>`).join("");
+
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Applicant Reports – TIP ETEEAP</title>
+  <style>
+    @page { size: A4; margin: 12mm 14mm 12mm 14mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 9pt; line-height: 1.3; }
+
+    /* ── Header ── */
+    .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+    .page-header-left { display: flex; gap: 8px; align-items: center; }
+    .page-header-left img { width: 50px; height: 50px; object-fit: contain; }
+    .page-header-left .school-name { font-size: 10pt; font-weight: bold; line-height: 1.3; }
+    .page-header-right { text-align: right; font-size: 7pt; font-weight: bold; letter-spacing: 1.5px; }
+    .page-header-right span { font-weight: normal; font-style: italic; letter-spacing: 0; font-size: 6.5pt; display: block; }
+    .eteeap-title { text-align: center; font-size: 9.5pt; font-weight: bold; margin-bottom: 8px; }
+    .divider { border: none; border-top: 1.5px solid #000; margin: 6px 0 10px; }
+
+    /* ── Report title ── */
+    .report-title { font-size: 12pt; font-weight: bold; text-align: center; margin-bottom: 2px; }
+    .report-subtitle { font-size: 9pt; text-align: center; color: #444; margin-bottom: 10px; }
+
+    /* ── Summary cards ── */
+    .summary-row { display: flex; gap: 12px; margin-bottom: 12px; }
+    .summary-card { flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 8px; text-align: center; }
+    .summary-label { font-size: 8pt; color: #555; margin-bottom: 2px; }
+    .summary-value { font-size: 18pt; font-weight: bold; }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 7.5pt; margin-top: 8px; }
+    th { background: #f3f4f6; border: 1px solid #000; padding: 4px 5px; text-align: left; font-weight: bold; }
+    td { border: 1px solid #ccc; padding: 3px 5px; vertical-align: top; }
+    tr:nth-child(even) td { background: #f9fafb; }
+  </style>
+</head>
+<body>
+
+<!-- PAGE HEADER (same as printTemplate) -->
+<div class="page-header">
+  <div class="page-header-left">
+    <img src="/assets/NewTIPLogo.png" alt="TIP" onerror="this.style.display='none'" />
+    <div class="school-name">TECHNOLOGICAL<br/>INSTITUTE OF THE<br/>PHILIPPINES</div>
+  </div>
+</div>
+
+<div class="eteeap-title">
+  Expanded Tertiary Education Equivalency and Accreditation Program (ETEEAP)
+</div>
+
+<hr class="divider"/>
+
+<!-- REPORT TITLE -->
+<div class="report-title">Applicant Reports</div>
+<div class="report-subtitle">Date Range: ${dateRange} &nbsp;|&nbsp; Generated: ${new Date().toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" })}</div>
+
+<!-- SUMMARY -->
+<div class="summary-row">${summaryRows}</div>
+
+<!-- DATA TABLE -->
+<table>
+  <thead>
+    <tr>
+      <th>Applicant Name</th>
+      <th>Email</th>
+      <th>Degree</th>
+      <th>Campus</th>
+      <th>Status</th>
+      <th>Submitted</th>
+      <th>Remarks</th>
+    </tr>
+  </thead>
+  <tbody>${tableRows}</tbody>
+</table>
+
+<script>window.onload = function() { window.print(); };<\/script>
+</body>
+</html>`;
+
+        const win = window.open("", "_blank");
+        if (!win) return;
+        win.document.write(html);
+        win.document.close();
+    }, [filtered, isEmpty, startDate, endDate, byCampus.length, byDegree.length]);
 
     // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -200,15 +305,15 @@ export default function Reports() {
                             <tbody>
                                 {filtered.map((r) => (
                                     <tr key={r.application_id} className="even:bg-gray-50">
-                                        <td className="border border-gray-300 px-2 py-1">{r.applicant_name ?? ""}</td>
-                                        <td className="border border-gray-300 px-2 py-1">{r.email_address ?? ""}</td>
-                                        <td className="border border-gray-300 px-2 py-1">{r.degree_applied_for ?? ""}</td>
-                                        <td className="border border-gray-300 px-2 py-1">{r.campus ?? ""}</td>
-                                        <td className="border border-gray-300 px-2 py-1">{r.status ?? ""}</td>
-                                        <td className="border border-gray-300 px-2 py-1">
+                                        <td className="border border-gray-300 px-2 py-1 text-gray-900">{r.applicant_name ?? ""}</td>
+                                        <td className="border border-gray-300 px-2 py-1 text-gray-900">{r.email_address ?? ""}</td>
+                                        <td className="border border-gray-300 px-2 py-1 text-gray-900">{r.degree_applied_for ?? ""}</td>
+                                        <td className="border border-gray-300 px-2 py-1 text-gray-900">{r.campus ?? ""}</td>
+                                        <td className="border border-gray-300 px-2 py-1 text-gray-900">{r.status ?? ""}</td>
+                                        <td className="border border-gray-300 px-2 py-1 text-gray-900">
                                             {r.created_at ? new Date(r.created_at).toLocaleDateString("en-PH") : ""}
                                         </td>
-                                        <td className="border border-gray-300 px-2 py-1">{r.admin_remarks ?? ""}</td>
+                                        <td className="border border-gray-300 px-2 py-1 text-gray-900">{r.admin_remarks ?? ""}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -216,14 +321,6 @@ export default function Reports() {
                     </div>
                 </>
             )}
-
-            {/* Print-only styles */}
-            <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          .reports-printable { padding: 0; }
-        }
-      `}</style>
         </div>
     );
 }
