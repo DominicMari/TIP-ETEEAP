@@ -102,7 +102,7 @@ export async function PATCH(request: Request) {
         try {
             const applicantName = payload.applicant_name ?? "Applicant";
             await resend.emails.send({
-                from: `TIP Tech Support <${FROM_EMAIL}>`,
+                from: `ETEEAP Department <${FROM_EMAIL}>`,
                 to: [email],
                 subject: "Application Updated – TIP ETEEAP",
                 react: EmailTemplate({
